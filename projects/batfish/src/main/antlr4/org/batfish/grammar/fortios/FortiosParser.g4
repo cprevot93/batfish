@@ -15,6 +15,7 @@ import
   Fortios_service,
   Fortios_static,
   Fortios_system,
+  Fortios_vdom,
   Fortios_zone;
 
 options {
@@ -32,6 +33,7 @@ s_config
         c_system
         | c_firewall
         | c_router
+        | c_vdom
         | IGNORED_CONFIG_BLOCK
     ) END NEWLINE
 ;
