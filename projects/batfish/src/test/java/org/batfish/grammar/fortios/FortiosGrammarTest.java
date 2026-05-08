@@ -2510,6 +2510,63 @@ public final class FortiosGrammarTest {
                 .build()));
   }
 
+  /**
+   * Verifies that VDOM config blocks using end/end (no "next") are parsed correctly, and that route
+   * sequence numbers are scoped per-VDOM (multiple VDOMs can reuse the same ID).
+   */
+  @Test
+  public void testStaticRouteVdomNoNextExtraction() {
+    String hostname = "static_routes_vdom_no_next";
+    FortiosConfiguration vc = parseVendorConfig(hostname);
+
+    assertThat(vc.getStaticRoutes(), hasKeys("root", "software-factory"));
+
+    // Both VDOMs have route 1 — IDs are VDOM-scoped, not global
+    Map<String, StaticRoute> rootRoutes = vc.getStaticRoutes("root");
+    assertThat(rootRoutes, hasKeys("1"));
+    assertThat(rootRoutes.get("1").getDevice(), equalTo("port1"));
+    assertThat(rootRoutes.get("1").getVdom(), equalTo("root"));
+
+    Map<String, StaticRoute> swRoutes = vc.getStaticRoutes("software-factory");
+    assertThat(swRoutes, hasKeys("1"));
+    assertThat(swRoutes.get("1").getDevice(), equalTo("port2"));
+    assertThat(swRoutes.get("1").getVdom(), equalTo("software-factory"));
+  }
+
+  @Test
+  public void testStaticRouteVdomNoNextConversion() throws IOException {
+    String hostname = "static_routes_vdom_no_next";
+    Configuration c = parseConfig(hostname);
+
+    Set<org.batfish.datamodel.StaticRoute> rootRoutes =
+        c.getVrfs().get(computeVrfName("root", Interface.DEFAULT_VRF)).getStaticRoutes();
+    assertThat(rootRoutes, hasSize(1));
+
+    Set<org.batfish.datamodel.StaticRoute> swRoutes =
+        c.getVrfs()
+            .get(computeVrfName("software-factory", Interface.DEFAULT_VRF))
+            .getStaticRoutes();
+    assertThat(swRoutes, hasSize(1));
+
+    // root route 1 must not appear in software-factory and vice versa
+    assertThat(
+        rootRoutes,
+        containsInAnyOrder(
+            org.batfish.datamodel.StaticRoute.builder()
+                .setAdmin(StaticRoute.DEFAULT_DISTANCE)
+                .setNetwork(Prefix.parse("10.0.0.0/8"))
+                .setNextHop(NextHopInterface.of("port1", Ip.parse("192.168.1.254")))
+                .build()));
+    assertThat(
+        swRoutes,
+        containsInAnyOrder(
+            org.batfish.datamodel.StaticRoute.builder()
+                .setAdmin(StaticRoute.DEFAULT_DISTANCE)
+                .setNetwork(Prefix.parse("192.168.1.0/24"))
+                .setNextHop(NextHopInterface.of("port2", Ip.parse("10.0.0.254")))
+                .build()));
+  }
+
   @Test
   public void testSystemRecovery() throws IOException {
     String hostname = "fortios_system_recovery";

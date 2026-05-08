@@ -6,7 +6,8 @@ options {
 
 c_vdom: VDOM newline cv_edit*;
 
-cv_edit: EDIT vdom_name newline cve* NEXT newline;
+// fortios backup use `end` directly instead of next
+cv_edit: EDIT vdom_name newline cve* (NEXT newline)?;
 
 // Up to 31 characters
 vdom_name: str;

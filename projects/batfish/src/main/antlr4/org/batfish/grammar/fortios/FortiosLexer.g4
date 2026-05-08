@@ -177,6 +177,10 @@ IBGP_MULTIPATH: 'ibgp-multipath';
 ICAP: 'icap' {
   if (lastTokenType() == REPLACEMSG) {
     pushMode(M_Str);
+  } else if (lastTokenType() == CONFIG) {
+    // ignore config icap <profile|...>
+    setType(IGNORED_CONFIG_BLOCK);
+    pushMode(M_IgnoredConfigBlock);
   }
 };
 ICMP: 'ICMP';
@@ -255,7 +259,13 @@ ROUTER_ID: 'router-id';
 RULE: 'rule';
 SCTP_PORTRANGE: 'sctp-portrange';
 SDN: 'sdn';
-SDWAN: 'sdwan';
+SDWAN: 'sdwan' {
+  // ignore config system sdwan
+  if (lastTokenType() == SYSTEM && secondToLastTokenType() == CONFIG) {
+    setType(IGNORED_CONFIG_BLOCK);
+    pushMode(M_IgnoredConfigBlock);
+  }
+};
 SECONDARY_IP: 'secondary-IP';
 SECONDARYIP: 'secondaryip';
 SELECT: 'select';
@@ -449,6 +459,21 @@ UINT32
 WS
 :
   F_Whitespace+ -> channel ( HIDDEN )
+;
+
+// Catch-all for unrecognized config-section keywords. Matches a word-token directly after
+// `config` (top-level), or after `config system`/`config router`/`config firewall`. When fired,
+// the entire enclosing `config ... end` block is treated as IGNORED_CONFIG_BLOCK. Declared last
+// so explicit keyword tokens win on length+order ties.
+UNRECOGNIZED_CONFIG_HEAD
+:
+  (F_WordChar | F_UnquotedEscapedChar)+
+  {lastTokenType() == CONFIG
+    || (secondToLastTokenType() == CONFIG
+        && (lastTokenType() == SYSTEM
+            || lastTokenType() == ROUTER
+            || lastTokenType() == FIREWALL))}?
+  -> type(IGNORED_CONFIG_BLOCK), pushMode(M_IgnoredConfigBlock)
 ;
 
 // Fragments
@@ -850,6 +875,10 @@ M_IgnoredConfigBlockInner_EDIT: 'edit' F_NonNewline* F_Newline -> more, pushMode
 
 M_IgnoredConfigBlockInner_SINGLE_LINE: ('set' | 'unset') F_NonNewline* F_Newline -> more;
 
+// Nested `config X` directly inside an ignored block (no enclosing edit). Handles e.g.
+// `config router ospf / config redistribute "connected" / end / end`.
+M_IgnoredConfigBlockInner_CONFIG: 'config' F_NonNewline* F_Newline -> more, pushMode(M_IgnoredInteriorConfigBlockInner);
+
 M_IgnoredConfigBlockInner_END: 'end' -> type(END), popMode;
 
 M_IgnoredConfigBlockInner_WS: F_Whitespace+ -> more;
@@ -873,6 +902,9 @@ mode M_IgnoredInteriorConfigBlockInner;
 M_IgnoredInteriorConfigBlockInner_EDIT: 'edit' F_NonNewline* F_Newline -> more, pushMode(M_IgnoredEditBlock);
 
 M_IgnoredInteriorConfigBlockInner_SINGLE_LINE: ('set' | 'unset') F_NonNewline* F_Newline -> more;
+
+// Nested `config X` without enclosing edit (e.g. redistribute blocks under router protocols).
+M_IgnoredInteriorConfigBlockInner_CONFIG: 'config' F_NonNewline* F_Newline -> more, pushMode(M_IgnoredInteriorConfigBlockInner);
 
 M_IgnoredInteriorConfigBlockInner_END: 'end' F_Whitespace* F_Newline -> more, popMode;
 
