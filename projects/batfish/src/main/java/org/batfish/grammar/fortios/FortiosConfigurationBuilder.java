@@ -132,6 +132,7 @@ import org.batfish.grammar.fortios.FortiosParser.Crrmecre_set_actionContext;
 import org.batfish.grammar.fortios.FortiosParser.Crrmecre_set_match_ip_addressContext;
 import org.batfish.grammar.fortios.FortiosParser.Crs_editContext;
 import org.batfish.grammar.fortios.FortiosParser.Crs_set_deviceContext;
+import org.batfish.grammar.fortios.FortiosParser.Cv_editContext;
 import org.batfish.grammar.fortios.FortiosParser.Crs_set_distanceContext;
 import org.batfish.grammar.fortios.FortiosParser.Crs_set_dstContext;
 import org.batfish.grammar.fortios.FortiosParser.Crs_set_gatewayContext;
@@ -1143,16 +1144,28 @@ public final class FortiosConfigurationBuilder extends FortiosParserBaseListener
   }
 
   @Override
+  public void enterCv_edit(Cv_editContext ctx) {
+    _currentVdom = toString(ctx.vdom_name().str());
+  }
+
+  @Override
+  public void exitCv_edit(Cv_editContext ctx) {
+    _currentVdom = null;
+  }
+
+  @Override
   public void enterCrs_edit(Crs_editContext ctx) {
+    String vdom = _currentVdom != null ? _currentVdom : "root";
     Optional<Long> routeNum = toLong(ctx, ctx.route_num());
     StaticRoute existing =
-        routeNum.map(Object::toString).map(_c.getStaticRoutes()::get).orElse(null);
+        routeNum.map(Object::toString).map(s -> _c.getStaticRoutes(vdom).get(s)).orElse(null);
     if (existing != null) {
       // Make a clone to edit
       _currentStaticRoute = SerializationUtils.clone(existing);
     } else {
       _currentStaticRoute = new StaticRoute(toString(ctx.route_num().str()));
     }
+    _currentStaticRoute.setVdom(vdom);
     _currentStaticRouteNumValid = routeNum.isPresent();
   }
 
@@ -1160,7 +1173,8 @@ public final class FortiosConfigurationBuilder extends FortiosParserBaseListener
   public void exitCrs_edit(Crs_editContext ctx) {
     String invalidReason = staticRouteValid(_currentStaticRoute, _currentStaticRouteNumValid);
     if (invalidReason == null) {
-      _c.getStaticRoutes().put(_currentStaticRoute.getSeqNum(), _currentStaticRoute);
+      _c.getStaticRoutes(_currentStaticRoute.getVdom())
+          .put(_currentStaticRoute.getSeqNum(), _currentStaticRoute);
     } else {
       warn(ctx, String.format("Static route edit block ignored: %s", invalidReason));
     }
@@ -3246,6 +3260,7 @@ public final class FortiosConfigurationBuilder extends FortiosParserBaseListener
   private ServiceGroup _currentServiceGroup;
   private boolean _currentServiceGroupNameValid;
 
+  private @Nullable String _currentVdom;
   private StaticRoute _currentStaticRoute;
   private boolean _currentStaticRouteNumValid;
   private Zone _currentZone;

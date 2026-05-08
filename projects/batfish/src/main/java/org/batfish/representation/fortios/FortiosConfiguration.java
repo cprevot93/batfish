@@ -141,9 +141,14 @@ public class FortiosConfiguration extends VendorConfiguration {
     return _serviceGroups;
   }
 
-  /** route seq num -> static route */
-  public @Nonnull Map<String, StaticRoute> getStaticRoutes() {
+  /** vdom -> route seq num -> static route */
+  public @Nonnull Map<String, Map<String, StaticRoute>> getStaticRoutes() {
     return _staticRoutes;
+  }
+
+  /** Returns the per-VDOM route map for the given VDOM, creating if absent. */
+  public @Nonnull Map<String, StaticRoute> getStaticRoutes(@Nonnull String vdom) {
+    return _staticRoutes.computeIfAbsent(vdom, k -> new HashMap<>());
   }
 
   /** name -> zone */
@@ -172,7 +177,7 @@ public class FortiosConfiguration extends VendorConfiguration {
   private final @Nonnull Map<String, RouteMap> _routeMaps;
   private final @Nonnull Map<String, Service> _services;
   private final @Nonnull Map<String, ServiceGroup> _serviceGroups;
-  private final @Nonnull Map<String, StaticRoute> _staticRoutes;
+  private final @Nonnull Map<String, Map<String, StaticRoute>> _staticRoutes;
   private final @Nonnull Map<String, Zone> _zones;
 
   private @Nullable BgpProcess _bgpProcess;
@@ -224,13 +229,17 @@ public class FortiosConfiguration extends VendorConfiguration {
       convertBgp(_bgpProcess, c, _w);
     }
 
-    // TODO Are FortiOS static routes really global? Can't set their VRFs. Perhaps they should
-    //  only exist in their device's VRF.
-    // Convert static routes and add them to every VRF. Must happen after all VRFs are created
-    // (interfaces must be converted).
-    SortedSet<org.batfish.datamodel.StaticRoute> viStaticRoutes =
-        convertStaticRoutes(_staticRoutes.values());
-    c.getVrfs().values().forEach(vrf -> vrf.setStaticRoutes(viStaticRoutes));
+    // Convert static routes per VDOM, adding each VDOM's routes only to VRFs within that VDOM.
+    // Must happen after all VRFs are created (interfaces must be converted).
+    _staticRoutes.forEach((vdom, routes) -> {
+      SortedSet<org.batfish.datamodel.StaticRoute> viRoutes =
+          convertStaticRoutes(routes.values());
+      c.getVrfs().forEach((vrfName, vrf) -> {
+        if (vrfName.startsWith(vdom + ":")) {
+          vrf.setStaticRoutes(viRoutes);
+        }
+      });
+    });
 
     // Count structure references
     markConcreteStructure(FortiosStructureType.ROUTE_MAP);
