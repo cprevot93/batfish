@@ -3147,6 +3147,7 @@ public final class JuniperConfiguration extends VendorConfiguration {
   @VisibleForTesting
   RoutingPolicy toRoutingPolicy(PolicyStatement ps) {
     detectMisplacedTerminalActions(ps);
+    detectCommunityActionOverlaps(ps);
 
     // Ensure map of VRFs referenced in routing policies is initialized
     if (_vrfReferencesInPolicies == null) {
@@ -3329,11 +3330,22 @@ public final class JuniperConfiguration extends VendorConfiguration {
         || then instanceof PsThenNextPolicy;
   }
 
-  private List<Statement> toStatements(Set<PsThen> thens) {
+  private List<Statement> toStatements(List<PsThen> thens) {
+    // If `next term` or `next policy` is present, it suppresses any `accept`/`reject` in the
+    // same term: both lines are retained at commit, but at runtime the `accept`/`reject` does
+    // not fire. default-action is unaffected.
+    boolean hasNextTermOrPolicy =
+        thens.stream().anyMatch(t -> t instanceof PsThenNextTerm || t instanceof PsThenNextPolicy);
+    Stream<PsThen> filtered =
+        hasNextTermOrPolicy
+            ? thens.stream()
+                .filter(t -> !(t instanceof PsThenAccept) && !(t instanceof PsThenReject))
+            : thens.stream();
+    List<PsThen> all = filtered.collect(ImmutableList.toImmutableList());
     List<Statement> thenStatements = new ArrayList<>();
     Stream.concat(
-            thens.stream().filter(then -> !isFinalThen(then)),
-            thens.stream().filter(JuniperConfiguration::isFinalThen))
+            all.stream().filter(then -> !isFinalThen(then)),
+            all.stream().filter(JuniperConfiguration::isFinalThen))
         .forEach(then -> then.applyTo(thenStatements, this, _c, _w));
     return thenStatements;
   }
@@ -4414,6 +4426,7 @@ public final class JuniperConfiguration extends VendorConfiguration {
           || then instanceof PsThenDefaultActionAccept
           || then instanceof PsThenDefaultActionReject
           || then instanceof PsThenNextPolicy
+          || then instanceof PsThenNextTerm
           || then instanceof PsThenLoadBalance) {
         // Control flow or forwarding-table-specific actions — no warning.
         continue;
@@ -4913,7 +4926,7 @@ public final class JuniperConfiguration extends VendorConfiguration {
               if (nextTerminalAction.isPresent()) {
                 // Check that the terminal action is the ONLY action.
                 // If there are multiple thens, some are likely mutating actions that are skipped
-                Set<PsThen> allThens = nextTerm.getThens().getAllThens();
+                List<PsThen> allThens = nextTerm.getThens().getAllThens();
                 if (allThens.size() == 1) {
                   return;
                 }
@@ -4950,7 +4963,16 @@ public final class JuniperConfiguration extends VendorConfiguration {
       return Optional.empty();
     }
 
-    return term.getThens().getAllThens().stream()
+    List<PsThen> allThens = term.getThens().getAllThens();
+    // `next term` overrides any accept/reject in the same term: at runtime the route falls
+    // through to the next term, so this term is not terminal. (`next term` and `next policy`
+    // share a last-wins slot in PsThens, so at most one is present here.)
+    if (allThens.stream().anyMatch(t -> t instanceof PsThenNextTerm)) {
+      return Optional.empty();
+    }
+    // `next policy` similarly suppresses accept/reject at runtime, but it does terminate
+    // policy evaluation (returning the route to BGP processing), so it is the terminal action.
+    return allThens.stream()
         .filter(
             then ->
                 then instanceof PsThenAccept
@@ -4970,6 +4992,61 @@ public final class JuniperConfiguration extends VendorConfiguration {
     } else {
       throw new IllegalArgumentException(
           "Unknown terminal action type: " + terminalAction.getClass().getSimpleName());
+    }
+  }
+
+  /**
+   * Detects {@code then community add/set X; then community delete Y} same-term sequences where
+   * {@code X} and {@code Y} can match overlapping communities, so the just-added community is
+   * silently removed by the later delete.
+   */
+  private void detectCommunityActionOverlaps(PolicyStatement policy) {
+    Map<String, NamedCommunity> namedCommunities = _masterLogicalSystem.getNamedCommunities();
+    for (PsTerm term : policy.getTerms().values()) {
+      if (term.getThens() == null) {
+        continue;
+      }
+      List<PsThen> thens = term.getThens().getAllThens();
+      for (int i = 0; i < thens.size(); i++) {
+        PsThen earlier = thens.get(i);
+        if (!(earlier instanceof PsThenCommunityAdd || earlier instanceof PsThenCommunitySet)) {
+          continue;
+        }
+        String addName =
+            earlier instanceof PsThenCommunityAdd
+                ? ((PsThenCommunityAdd) earlier).getName()
+                : ((PsThenCommunitySet) earlier).getName();
+        NamedCommunity addCommunity = namedCommunities.get(addName);
+        if (addCommunity == null) {
+          continue;
+        }
+        String addVerb = earlier instanceof PsThenCommunityAdd ? "add" : "set";
+        for (int j = i + 1; j < thens.size(); j++) {
+          PsThen later = thens.get(j);
+          if (!(later instanceof PsThenCommunityDelete)) {
+            continue;
+          }
+          String delName = ((PsThenCommunityDelete) later).getName();
+          NamedCommunity delCommunity = namedCommunities.get(delName);
+          if (delCommunity == null) {
+            continue;
+          }
+          List<String> overlap =
+              CommunityActionOverlap.overlappingCommunities(addCommunity, delCommunity);
+          if (overlap.isEmpty()) {
+            continue;
+          }
+          _w.riskyRedFlag(
+              "'policy-statement %s term %s': then community %s %s adds %s, which is also matched"
+                  + " by then community delete %s in the same term, so it is removed",
+              policy.getName(),
+              term.getName(),
+              addVerb,
+              addName,
+              String.join(", ", overlap),
+              delName);
+        }
+      }
     }
   }
 

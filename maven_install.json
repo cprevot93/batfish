@@ -31,7 +31,7 @@
     "commons-cli:commons-cli": 1754587837,
     "commons-io:commons-io": 1305681826,
     "dk.brics:automaton": -1128129151,
-    "io.github.java-diff-utils:java-diff-utils": 1296992014,
+    "io.github.java-diff-utils:java-diff-utils": -510462449,
     "jakarta.activation:jakarta.activation-api": 1724199980,
     "jakarta.annotation:jakarta.annotation-api": -1862893936,
     "jakarta.ws.rs:jakarta.ws.rs-api": -620470552,
@@ -42,14 +42,14 @@
     "org.antlr:antlr4": -343190787,
     "org.antlr:antlr4-runtime": -1029114455,
     "org.apache.commons:commons-collections4": 1132363499,
-    "org.apache.commons:commons-configuration2": 43186260,
+    "org.apache.commons:commons-configuration2": -1753765099,
     "org.apache.commons:commons-lang3": -278168457,
     "org.apache.commons:commons-text": -1886494041,
     "org.apache.httpcomponents:httpclient": 1643860045,
     "org.apache.httpcomponents:httpcore": -1696303652,
-    "org.apache.logging.log4j:log4j-api": -335142555,
-    "org.apache.logging.log4j:log4j-core": 929898406,
-    "org.apache.logging.log4j:log4j-slf4j-impl": -2016536495,
+    "org.apache.logging.log4j:log4j-api": 802756642,
+    "org.apache.logging.log4j:log4j-core": 2067797603,
+    "org.apache.logging.log4j:log4j-slf4j-impl": -878637298,
     "org.codehaus.jettison:jettison": 208852749,
     "org.glassfish.grizzly:grizzly-framework": 1869934097,
     "org.glassfish.grizzly:grizzly-http-server": -292995845,
@@ -147,8 +147,8 @@
     "dk.brics:automaton:jar:sources": 153550414,
     "info.picocli:picocli": 996750497,
     "info.picocli:picocli:jar:sources": 1275876040,
-    "io.github.java-diff-utils:java-diff-utils": -1180802694,
-    "io.github.java-diff-utils:java-diff-utils:jar:sources": 1551226070,
+    "io.github.java-diff-utils:java-diff-utils": 956718211,
+    "io.github.java-diff-utils:java-diff-utils:jar:sources": -2012277036,
     "jakarta.activation:jakarta.activation-api": 345559132,
     "jakarta.activation:jakarta.activation-api:jar:sources": 928484586,
     "jakarta.annotation:jakarta.annotation-api": -468827502,
@@ -187,8 +187,8 @@
     "org.antlr:antlr4:jar:sources": 160843354,
     "org.apache.commons:commons-collections4": -1078772699,
     "org.apache.commons:commons-collections4:jar:sources": 899985523,
-    "org.apache.commons:commons-configuration2": -1750023009,
-    "org.apache.commons:commons-configuration2:jar:sources": -1458214569,
+    "org.apache.commons:commons-configuration2": 1638584925,
+    "org.apache.commons:commons-configuration2:jar:sources": 1441359906,
     "org.apache.commons:commons-lang3": 1841935436,
     "org.apache.commons:commons-lang3:jar:sources": -982252396,
     "org.apache.commons:commons-text": 869132518,
@@ -197,12 +197,12 @@
     "org.apache.httpcomponents:httpclient:jar:sources": -779528763,
     "org.apache.httpcomponents:httpcore": 67453319,
     "org.apache.httpcomponents:httpcore:jar:sources": 2134002822,
-    "org.apache.logging.log4j:log4j-api": -535303980,
-    "org.apache.logging.log4j:log4j-api:jar:sources": 1398816473,
-    "org.apache.logging.log4j:log4j-core": -1468872283,
-    "org.apache.logging.log4j:log4j-core:jar:sources": -310222995,
-    "org.apache.logging.log4j:log4j-slf4j-impl": -1644903574,
-    "org.apache.logging.log4j:log4j-slf4j-impl:jar:sources": -113655767,
+    "org.apache.logging.log4j:log4j-api": -79106511,
+    "org.apache.logging.log4j:log4j-api:jar:sources": 146262782,
+    "org.apache.logging.log4j:log4j-core": -1819849470,
+    "org.apache.logging.log4j:log4j-core:jar:sources": 1398564243,
+    "org.apache.logging.log4j:log4j-slf4j-impl": 555486058,
+    "org.apache.logging.log4j:log4j-slf4j-impl:jar:sources": -430518995,
     "org.apfloat:apfloat": -1689392346,
     "org.apfloat:apfloat:jar:sources": -1889003084,
     "org.apiguardian:apiguardian-api": 1279798469,
@@ -598,10 +598,10 @@
     },
     "io.github.java-diff-utils:java-diff-utils": {
       "shasums": {
-        "jar": "620403030d676a4a27f780a3acec7438dee1b1651a1c804fa6bb11bb07399a6f",
-        "sources": "1307a36819f8dac34187402947e2a9e850b9e7ce95dd5044524e4860c3378ab0"
+        "jar": "3e3b6e149bf5d091422689ad6fcc22baad503a52b1139a9baf250fb6de633024",
+        "sources": "a510439dd5d4795e80eb671107a270c0f2c8e1b0741a7bc88c6decf0c3ab3bdf"
       },
-      "version": "4.16"
+      "version": "4.17"
     },
     "jakarta.activation:jakarta.activation-api": {
       "shasums": {
@@ -738,10 +738,10 @@
     },
     "org.apache.commons:commons-configuration2": {
       "shasums": {
-        "jar": "b5d1700036a67eb7c9831b3e58eea46cd4e93f7707839e0d59fe950b16fed68e",
-        "sources": "028dacb2f91096e7f616d5fdb12c106e25ed4935b936eb988b99cd638a8d1036"
+        "jar": "a359968dda319134c4f187e6f82b66f5808bf7db48e0d6e40922e98084c87ba8",
+        "sources": "6c1bc311d3c00a3b4d0a486f9748ca7cfe18666f46759fa66c759108c17865cb"
       },
-      "version": "2.14.0"
+      "version": "2.15.0"
     },
     "org.apache.commons:commons-lang3": {
       "shasums": {
@@ -773,24 +773,24 @@
     },
     "org.apache.logging.log4j:log4j-api": {
       "shasums": {
-        "jar": "c4b642a7f047275215de117e0e3847eb2c7711d84a0aa7433e7b3c096daf341d",
-        "sources": "b86680bcf8ffa25897b6114cae508bb8e6ecac8081a0fc8985e0c00e27d4f4ec"
+        "jar": "820de7bbaf430eaf2e3e5ccb92f23e2085797c5ac4d4f7fc6c8b660fbefa1dbc",
+        "sources": "1d99b59e4eb2b28d88ac61928f7d0a1baa259bb0590ba1de1f33012b47e3ebbb"
       },
-      "version": "2.25.4"
+      "version": "2.26.0"
     },
     "org.apache.logging.log4j:log4j-core": {
       "shasums": {
-        "jar": "10fee2c0485d54fa44ee75d314f6295508f7b932281873db61a91b88073200e6",
-        "sources": "4bb0e69f26d69c364ab0f084043682b9de5ff0378e3f23542fba3e73b1245ab1"
+        "jar": "406bb3132c47a5d322e5c571feb0787ca84496469f346eb51f1ef2ee45499902",
+        "sources": "03358928efb94f10484d8ec3f28ad8f4ff3226de9b7c606fcb1ebdb24b9fd0dd"
       },
-      "version": "2.25.4"
+      "version": "2.26.0"
     },
     "org.apache.logging.log4j:log4j-slf4j-impl": {
       "shasums": {
-        "jar": "7ac68a0afcc83d54f48d116d79370a43f0a2a6b71b5c1d6dda943bb6a95ddbaa",
-        "sources": "5cf4627d6182215a76516cf89f46ada21517d5c9dcc59e45231d53cd5181c94d"
+        "jar": "6eab649c5f854ca91d857e3746b495aede27a21bb08c9f7cb172dce29612849e",
+        "sources": "ae90260999534b79fc2aa8e551784bcd0dd69254a5099b6bdad8676429e4f3c1"
       },
-      "version": "2.25.4"
+      "version": "2.26.0"
     },
     "org.apfloat:apfloat": {
       "shasums": {
