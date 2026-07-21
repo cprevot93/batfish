@@ -81,10 +81,12 @@ import static org.batfish.representation.juniper.JuniperStructureUsage.BRIDGE_DO
 import static org.batfish.representation.juniper.JuniperStructureUsage.BRIDGE_DOMAIN_SELF_REF;
 import static org.batfish.representation.juniper.JuniperStructureUsage.CLASS_OF_SERVICE_CLASSIFIERS_DSCP_CODE_POINTS;
 import static org.batfish.representation.juniper.JuniperStructureUsage.CLASS_OF_SERVICE_CLASSIFIERS_DSCP_FORWARDING_CLASS;
+import static org.batfish.representation.juniper.JuniperStructureUsage.CLASS_OF_SERVICE_CLASSIFIERS_DSCP_IMPORT;
 import static org.batfish.representation.juniper.JuniperStructureUsage.CLASS_OF_SERVICE_CLASSIFIERS_DSCP_IPV6_CODE_POINTS;
 import static org.batfish.representation.juniper.JuniperStructureUsage.CLASS_OF_SERVICE_CLASSIFIERS_DSCP_IPV6_FORWARDING_CLASS;
 import static org.batfish.representation.juniper.JuniperStructureUsage.CLASS_OF_SERVICE_CLASSIFIERS_EXP_CODE_POINTS;
 import static org.batfish.representation.juniper.JuniperStructureUsage.CLASS_OF_SERVICE_CLASSIFIERS_EXP_FORWARDING_CLASS;
+import static org.batfish.representation.juniper.JuniperStructureUsage.CLASS_OF_SERVICE_CLASSIFIERS_EXP_IMPORT;
 import static org.batfish.representation.juniper.JuniperStructureUsage.CLASS_OF_SERVICE_CLASSIFIERS_IEEE_802_1_CODE_POINTS;
 import static org.batfish.representation.juniper.JuniperStructureUsage.CLASS_OF_SERVICE_CLASSIFIERS_IEEE_802_1_FORWARDING_CLASS;
 import static org.batfish.representation.juniper.JuniperStructureUsage.CLASS_OF_SERVICE_CLASSIFIERS_INET_PRECEDENCE_CODE_POINTS;
@@ -111,9 +113,11 @@ import static org.batfish.representation.juniper.JuniperStructureUsage.CLASS_OF_
 import static org.batfish.representation.juniper.JuniperStructureUsage.CLASS_OF_SERVICE_REWRITE_RULES_DSCP_SELF_REFERENCE;
 import static org.batfish.representation.juniper.JuniperStructureUsage.CLASS_OF_SERVICE_REWRITE_RULES_EXP_CODE_POINT;
 import static org.batfish.representation.juniper.JuniperStructureUsage.CLASS_OF_SERVICE_REWRITE_RULES_EXP_FORWARDING_CLASS;
+import static org.batfish.representation.juniper.JuniperStructureUsage.CLASS_OF_SERVICE_REWRITE_RULES_EXP_IMPORT;
 import static org.batfish.representation.juniper.JuniperStructureUsage.CLASS_OF_SERVICE_REWRITE_RULES_EXP_SELF_REFERENCE;
 import static org.batfish.representation.juniper.JuniperStructureUsage.CLASS_OF_SERVICE_REWRITE_RULES_IEEE_802_1_CODE_POINT;
 import static org.batfish.representation.juniper.JuniperStructureUsage.CLASS_OF_SERVICE_REWRITE_RULES_IEEE_802_1_FORWARDING_CLASS;
+import static org.batfish.representation.juniper.JuniperStructureUsage.CLASS_OF_SERVICE_REWRITE_RULES_IEEE_802_1_IMPORT;
 import static org.batfish.representation.juniper.JuniperStructureUsage.CLASS_OF_SERVICE_REWRITE_RULES_IEEE_802_1_SELF_REFERENCE;
 import static org.batfish.representation.juniper.JuniperStructureUsage.CLASS_OF_SERVICE_REWRITE_RULES_INET_PRECEDENCE_CODE_POINT;
 import static org.batfish.representation.juniper.JuniperStructureUsage.CLASS_OF_SERVICE_REWRITE_RULES_INET_PRECEDENCE_FORWARDING_CLASS;
@@ -158,6 +162,7 @@ import static org.batfish.representation.juniper.JuniperStructureUsage.MPLS_INTE
 import static org.batfish.representation.juniper.JuniperStructureUsage.MPLS_LSP_ADMIN_GROUP_EXCLUDE;
 import static org.batfish.representation.juniper.JuniperStructureUsage.MPLS_LSP_ADMIN_GROUP_INCLUDE_ALL;
 import static org.batfish.representation.juniper.JuniperStructureUsage.MPLS_LSP_ADMIN_GROUP_INCLUDE_ANY;
+import static org.batfish.representation.juniper.JuniperStructureUsage.MPLS_LSP_POLICING_FILTER;
 import static org.batfish.representation.juniper.JuniperStructureUsage.MPLS_LSP_PRIMARY_PATH;
 import static org.batfish.representation.juniper.JuniperStructureUsage.MPLS_LSP_SECONDARY_ADMIN_GROUP_EXCLUDE;
 import static org.batfish.representation.juniper.JuniperStructureUsage.MPLS_LSP_SECONDARY_ADMIN_GROUP_INCLUDE_ALL;
@@ -211,6 +216,7 @@ import static org.batfish.representation.juniper.JuniperStructureUsage.STP_INTER
 import static org.batfish.representation.juniper.JuniperStructureUsage.SWITCH_OPTIONS_VRF_EXPORT;
 import static org.batfish.representation.juniper.JuniperStructureUsage.SWITCH_OPTIONS_VRF_IMPORT;
 import static org.batfish.representation.juniper.JuniperStructureUsage.SYSLOG_HOST_ROUTING_INSTANCE;
+import static org.batfish.representation.juniper.JuniperStructureUsage.SYSTEM_SERVICES_DNS_PROXY_INTERFACE;
 import static org.batfish.representation.juniper.JuniperStructureUsage.TACPLUS_SERVER_ROUTING_INSTANCE;
 import static org.batfish.representation.juniper.JuniperStructureUsage.VLAN_INTERFACE;
 import static org.batfish.representation.juniper.JuniperStructureUsage.VLAN_L3_INTERFACE;
@@ -467,8 +473,11 @@ import org.batfish.grammar.flatjuniper.FlatJuniperParser.I_vlan_taggingContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Icmp_codeContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Icmp_typeContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Ieee_802_1_code_pointContext;
+import org.batfish.grammar.flatjuniper.FlatJuniperParser.If_bridgeContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.If_ethernet_switchingContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.If_primaryContext;
+import org.batfish.grammar.flatjuniper.FlatJuniperParser.Ifbr_interface_modeContext;
+import org.batfish.grammar.flatjuniper.FlatJuniperParser.Ifbr_vlan_idContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Ife_filterContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Ife_interface_modeContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Ife_native_vlan_idContext;
@@ -538,6 +547,7 @@ import org.batfish.grammar.flatjuniper.FlatJuniperParser.Isil_metricContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Isil_passiveContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Isil_priorityContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Isil_te_metricContext;
+import org.batfish.grammar.flatjuniper.FlatJuniperParser.Isis_level_metricContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Isl_disableContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Isl_wide_metrics_onlyContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Iso_addressContext;
@@ -558,10 +568,10 @@ import org.batfish.grammar.flatjuniper.FlatJuniperParser.Mplslsp_secondaryContex
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Mplslspag_excludeContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Mplslspag_include_allContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Mplslspag_include_anyContext;
+import org.batfish.grammar.flatjuniper.FlatJuniperParser.Mplslsppol_filterContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Mplslspsag_excludeContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Mplslspsag_include_allContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Mplslspsag_include_anyContext;
-import org.batfish.grammar.flatjuniper.FlatJuniperParser.Name_or_ipContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Named_icmp_codeContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Named_icmp_typeContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Named_portContext;
@@ -571,6 +581,7 @@ import org.batfish.grammar.flatjuniper.FlatJuniperParser.Nat_rule_setContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Natp_addressContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Natp_portContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Natp_routing_instanceContext;
+import org.batfish.grammar.flatjuniper.FlatJuniperParser.Ntp_key_numberContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.O_areaContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.O_disableContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.O_enableContext;
@@ -655,6 +666,7 @@ import org.batfish.grammar.flatjuniper.FlatJuniperParser.Popsfrf_thenContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Popsfrf_throughContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Popsfrf_uptoContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Popst_acceptContext;
+import org.batfish.grammar.flatjuniper.FlatJuniperParser.Popst_add_pathContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Popst_aigp_originateContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Popst_as_path_expandContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Popst_as_path_prependContext;
@@ -714,6 +726,7 @@ import org.batfish.grammar.flatjuniper.FlatJuniperParser.Rib_nameContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Riv_communityContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Riv_exportContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Riv_importContext;
+import org.batfish.grammar.flatjuniper.FlatJuniperParser.Ro6_staticContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Ro_autonomous_systemContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Ro_confederationContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Ro_instance_importContext;
@@ -757,6 +770,7 @@ import org.batfish.grammar.flatjuniper.FlatJuniperParser.Ror_isoContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Ror_mplsContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Rores_ribContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Roresr_importContext;
+import org.batfish.grammar.flatjuniper.FlatJuniperParser.Ros_defaultsContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Ros_route4Context;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Ros_route6Context;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Roslrg_srlg_costContext;
@@ -818,8 +832,10 @@ import org.batfish.grammar.flatjuniper.FlatJuniperParser.Scoscl_inet_precedenceC
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Scoscld6_forwarding_classContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Scoscld6fc_loss_priorityContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Scoscld_forwarding_classContext;
+import org.batfish.grammar.flatjuniper.FlatJuniperParser.Scoscld_importContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Scoscldfc_loss_priorityContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Scoscle_forwarding_classContext;
+import org.batfish.grammar.flatjuniper.FlatJuniperParser.Scoscle_importContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Scosclefc_loss_priorityContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Scoscli_forwarding_classContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Scosclifc_loss_priorityContext;
@@ -856,14 +872,17 @@ import org.batfish.grammar.flatjuniper.FlatJuniperParser.Scosrrd6fc_loss_priorit
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Scosrrd_forwarding_classContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Scosrrdfc_loss_priorityContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Scosrre_forwarding_classContext;
+import org.batfish.grammar.flatjuniper.FlatJuniperParser.Scosrre_importContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Scosrrefc_loss_priorityContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Scosrri_forwarding_classContext;
+import org.batfish.grammar.flatjuniper.FlatJuniperParser.Scosrri_importContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Scosrrifc_loss_priorityContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Scosrrip_forwarding_classContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Scosrripfc_loss_priorityContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Scossm_forwarding_classContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Se_address_bookContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Se_authentication_key_chainContext;
+import org.batfish.grammar.flatjuniper.FlatJuniperParser.Se_key_chainContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Se_zonesContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Sea_keyContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Sea_toleranceContext;
@@ -906,6 +925,7 @@ import org.batfish.grammar.flatjuniper.FlatJuniperParser.Seippr_protocolContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Seipv_bind_interfaceContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Seipvi_gatewayContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Seipvi_ipsec_policyContext;
+import org.batfish.grammar.flatjuniper.FlatJuniperParser.Sekc_keyContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Sen_destinationContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Sen_sourceContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Sen_staticContext;
@@ -975,16 +995,30 @@ import org.batfish.grammar.flatjuniper.FlatJuniperParser.Sy_portsContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Sy_porttypeContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Sy_security_profileContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Sy_tacplus_serverContext;
+import org.batfish.grammar.flatjuniper.FlatJuniperParser.Syn_authentication_keyContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Syn_serverContext;
-import org.batfish.grammar.flatjuniper.FlatJuniperParser.Syn_server_routing_instanceContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Syn_source_addressContext;
+import org.batfish.grammar.flatjuniper.FlatJuniperParser.Syn_trusted_keyContext;
+import org.batfish.grammar.flatjuniper.FlatJuniperParser.Syns_keyContext;
+import org.batfish.grammar.flatjuniper.FlatJuniperParser.Syns_routing_instanceContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Syp_disableContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Syr_encrypted_passwordContext;
+import org.batfish.grammar.flatjuniper.FlatJuniperParser.Sys_fileContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Sys_hostContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Syserv_ftpContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Syserv_sshContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Syserv_telnetContext;
+import org.batfish.grammar.flatjuniper.FlatJuniperParser.Syservd_forwardersContext;
+import org.batfish.grammar.flatjuniper.FlatJuniperParser.Syservddp_interfaceContext;
+import org.batfish.grammar.flatjuniper.FlatJuniperParser.Sysfa_fileContext;
+import org.batfish.grammar.flatjuniper.FlatJuniperParser.Sysfa_sizeContext;
+import org.batfish.grammar.flatjuniper.FlatJuniperParser.Sysh_facilityContext;
+import org.batfish.grammar.flatjuniper.FlatJuniperParser.Sysh_portContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Sysh_routing_instanceContext;
+import org.batfish.grammar.flatjuniper.FlatJuniperParser.Sysh_transportContext;
+import org.batfish.grammar.flatjuniper.FlatJuniperParser.Syslog_facilityContext;
+import org.batfish.grammar.flatjuniper.FlatJuniperParser.Syslog_severityContext;
+import org.batfish.grammar.flatjuniper.FlatJuniperParser.Syslog_transport_protocolContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Sysp_logical_systemContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Syt_routing_instanceContext;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Syt_secretContext;
@@ -1123,6 +1157,11 @@ import org.batfish.representation.juniper.JunosApplication;
 import org.batfish.representation.juniper.JunosApplicationReference;
 import org.batfish.representation.juniper.JunosApplicationSet;
 import org.batfish.representation.juniper.JunosApplicationSetReference;
+import org.batfish.representation.juniper.JunosSyslogFacility;
+import org.batfish.representation.juniper.JunosSyslogFile;
+import org.batfish.representation.juniper.JunosSyslogHost;
+import org.batfish.representation.juniper.JunosSyslogSeverity;
+import org.batfish.representation.juniper.JunosSyslogTransportProtocol;
 import org.batfish.representation.juniper.LiteralCommunityMember;
 import org.batfish.representation.juniper.LogicalSystem;
 import org.batfish.representation.juniper.MulticastModeOptions;
@@ -1150,6 +1189,7 @@ import org.batfish.representation.juniper.NextHop;
 import org.batfish.representation.juniper.NoPortTranslation;
 import org.batfish.representation.juniper.NodeDevice;
 import org.batfish.representation.juniper.NssaSettings;
+import org.batfish.representation.juniper.NtpServer;
 import org.batfish.representation.juniper.OspfArea;
 import org.batfish.representation.juniper.OspfInterfaceSettings;
 import org.batfish.representation.juniper.OspfInterfaceSettings.OspfInterfaceType;
@@ -1192,6 +1232,7 @@ import org.batfish.representation.juniper.PsProtocol;
 import org.batfish.representation.juniper.PsTerm;
 import org.batfish.representation.juniper.PsThen;
 import org.batfish.representation.juniper.PsThenAccept;
+import org.batfish.representation.juniper.PsThenAddPathSendCount;
 import org.batfish.representation.juniper.PsThenAigpOriginate;
 import org.batfish.representation.juniper.PsThenAsPathExpand;
 import org.batfish.representation.juniper.PsThenAsPathExpandAsList;
@@ -1284,7 +1325,12 @@ public class ConfigurationBuilder extends FlatJuniperParserBaseListener
       IntegerSpace.of(new SubRange(1, 65535));
   private static final IntegerSpace SRLG_COST_RANGE = IntegerSpace.of(new SubRange(1, 65535));
   private static final LongSpace SRLG_VALUE_RANGE = LongSpace.of(Range.closed(1L, 4294967295L));
+  private static final IntegerSpace NTP_KEY_NUMBER_RANGE = IntegerSpace.of(new SubRange(1, 65534));
   private static final IntegerSpace VNI_NUMBER_RANGE = IntegerSpace.of(new SubRange(0, 16777215));
+
+  // IS-IS wide metric: 1 through 16,777,215 (2^24 - 1).
+  private static final IntegerSpace ISIS_LEVEL_METRIC_RANGE =
+      IntegerSpace.of(new SubRange(1, 16777215));
 
   private static final IntegerSpace VLAN_RANGE = IntegerSpace.of(new SubRange(1, 4094));
 
@@ -1296,6 +1342,11 @@ public class ConfigurationBuilder extends FlatJuniperParserBaseListener
       IntegerSpace.of(new SubRange(2, 64));
 
   private static final IntegerSpace OSPF_EXTERNAL_TYPE_RANGE = IntegerSpace.of(new SubRange(1, 2));
+
+  // Junos system syslog archive file size: 64 KB through 1 GB, in bytes.
+  private static final long SYSLOG_ARCHIVE_SIZE_MAX_BYTES = 1073741824L;
+  private static final LongSpace SYSLOG_ARCHIVE_SIZE_BYTES_RANGE =
+      LongSpace.of(Range.closed(65536L, SYSLOG_ARCHIVE_SIZE_MAX_BYTES));
 
   private <T, U extends T> T convProblem(
       Class<T> returnType, ParserRuleContext ctx, U defaultReturnValue) {
@@ -2249,6 +2300,11 @@ public class ConfigurationBuilder extends FlatJuniperParserBaseListener
     return toLongInSpace(messageCtx, ctx, SRLG_VALUE_RANGE, "srlg-value");
   }
 
+  private @Nonnull Optional<Integer> toInteger(
+      ParserRuleContext messageCtx, Ntp_key_numberContext ctx) {
+    return toIntegerInSpace(messageCtx, ctx, NTP_KEY_NUMBER_RANGE, "ntp key-number");
+  }
+
   private static IpProtocol toIpProtocol(Ip_protocolContext ctx) {
     if (ctx.dec() != null) {
       int protocolNum = toInt(ctx.dec());
@@ -2552,6 +2608,8 @@ public class ConfigurationBuilder extends FlatJuniperParserBaseListener
 
   private Nat _currentNat;
 
+  private NtpServer _currentNtpServer;
+
   private NatPool _currentNatPool;
 
   private NatRule _currentNatRule;
@@ -2586,13 +2644,6 @@ public class ConfigurationBuilder extends FlatJuniperParserBaseListener
             ctx,
             "then default-action is overridden by bare then accept/reject in the same term:"
                 + " default-action does not fire");
-      } else if (entry.contains("(dead-with-bare-reject)")) {
-        warnRisky(
-            ctx,
-            String.format(
-                "then %s has no effect on the propagated route when then reject is also present"
-                    + " in the same term",
-                entry.replace(" (dead-with-bare-reject)", "")));
       } else if (entry.contains("(dedup)")) {
         warnRisky(ctx, String.format("Duplicate then %s", entry.replace(" (dedup)", "")));
       } else if (entry.contains("(conflict)")) {
@@ -2635,6 +2686,10 @@ public class ConfigurationBuilder extends FlatJuniperParserBaseListener
   private Zone _currentToZone;
 
   private VrrpGroup _currentVrrpGroup;
+
+  private JunosSyslogHost _currentSyslogHost;
+
+  private JunosSyslogFile _currentSyslogFile;
 
   private Vlan _currentNamedVlan;
 
@@ -3072,6 +3127,33 @@ public class ConfigurationBuilder extends FlatJuniperParserBaseListener
     _configuration.defineFlattenedStructure(INTERFACE, unitFullName, ctx, _parser);
     _configuration.referenceStructure(
         INTERFACE, unitFullName, INTERFACE_SELF_REFERENCE, getLine(ctx.num.start));
+  }
+
+  @Override
+  public void enterIf_bridge(If_bridgeContext ctx) {
+    _currentInterfaceOrRange.initBridgeSwitching();
+  }
+
+  @Override
+  public void exitIfbr_interface_mode(Ifbr_interface_modeContext ctx) {
+    if (ctx.interface_mode().ACCESS() != null) {
+      _currentInterfaceOrRange.getBridgeSwitching().setSwitchportMode(SwitchportMode.ACCESS);
+    } else {
+      assert ctx.interface_mode().TRUNK() != null;
+      _currentInterfaceOrRange.getBridgeSwitching().setSwitchportMode(SwitchportMode.TRUNK);
+    }
+  }
+
+  @Override
+  public void exitIfbr_vlan_id(Ifbr_vlan_idContext ctx) {
+    Optional<Integer> maybeVlan = toInteger(ctx, ctx.id);
+    if (!maybeVlan.isPresent()) {
+      return;
+    }
+    _currentInterfaceOrRange
+        .getBridgeSwitching()
+        .getVlanMembers()
+        .add(new VlanRange(IntegerSpace.of(maybeVlan.get())));
   }
 
   @Override
@@ -3833,14 +3915,35 @@ public class ConfigurationBuilder extends FlatJuniperParserBaseListener
   public void enterRos_route4(Ros_route4Context ctx) {
     Prefix prefix = toNormalizedPrefix(ctx.prefix, "Static route destination");
     Map<Prefix, StaticRouteV4> staticRoutes = _currentRib.getStaticRoutes();
-    _currentStaticRoute = staticRoutes.computeIfAbsent(prefix, StaticRouteV4::new);
+    // Each route points at this RIB's "static defaults" so unset fields resolve through it.
+    _currentStaticRoute =
+        staticRoutes.computeIfAbsent(
+            prefix, p -> new StaticRouteV4(p, _currentRib.getStaticRouteDefaults()));
   }
 
   @Override
   public void enterRos_route6(Ros_route6Context ctx) {
     Prefix6 prefix = toNormalizedPrefix6(ctx.prefix, "Static route destination");
     Map<Prefix6, StaticRouteV6> staticRoutes = _currentRib.getStaticRoutesV6();
-    _currentStaticRoute = staticRoutes.computeIfAbsent(prefix, StaticRouteV6::new);
+    _currentStaticRoute =
+        staticRoutes.computeIfAbsent(
+            prefix, p -> new StaticRouteV6(p, _currentRib.getStaticRouteDefaultsV6()));
+  }
+
+  @Override
+  public void enterRos_defaults(Ros_defaultsContext ctx) {
+    // The shared "DEFAULTS rosr_common" rule is reached from both the v4 ("static") and v6 ("rib
+    // inet6.0 { static }") paths; the parent rule tells them apart. The rosr_* attribute handlers
+    // populate _currentStaticRoute, so point it at this RIB's static-route defaults object.
+    _currentStaticRoute =
+        ctx.getParent() instanceof Ro6_staticContext
+            ? _currentRib.getStaticRouteDefaultsV6()
+            : _currentRib.getStaticRouteDefaults();
+  }
+
+  @Override
+  public void exitRos_defaults(Ros_defaultsContext ctx) {
+    _currentStaticRoute = null;
   }
 
   @Override
@@ -3934,6 +4037,19 @@ public class ConfigurationBuilder extends FlatJuniperParserBaseListener
   }
 
   @Override
+  public void exitSyservd_forwarders(Syservd_forwardersContext ctx) {
+    _currentLogicalSystem.getDnsForwarders().add(toIp(ctx.name));
+  }
+
+  @Override
+  public void exitSyservddp_interface(Syservddp_interfaceContext ctx) {
+    String ifaceName = getInterfaceFullName(ctx.iface);
+    _currentLogicalSystem.getDnsProxyInterfaces().add(ifaceName);
+    _configuration.referenceStructure(
+        INTERFACE, ifaceName, SYSTEM_SERVICES_DNS_PROXY_INTERFACE, getLine(ctx.iface.getStart()));
+  }
+
+  @Override
   public void exitSovt_auto(Sovt_autoContext ctx) {
     _currentLogicalSystem
         .getOrInitSwitchOptions()
@@ -3961,18 +4077,24 @@ public class ConfigurationBuilder extends FlatJuniperParserBaseListener
 
   @Override
   public void exitSo_vrf_export(So_vrf_exportContext ctx) {
-    String policyName = toString(ctx.name);
-    _currentLogicalSystem.getOrInitSwitchOptions().setVrfExportPolicy(policyName);
-    _configuration.referenceStructure(
-        POLICY_STATEMENT, policyName, SWITCH_OPTIONS_VRF_EXPORT, getLine(ctx.start));
+    // vrf-export accepts a single policy or a bracketed list; reference each.
+    for (Junos_nameContext nameCtx : ctx.names.junos_name()) {
+      String policyName = toString(nameCtx);
+      _currentLogicalSystem.getOrInitSwitchOptions().setVrfExportPolicy(policyName);
+      _configuration.referenceStructure(
+          POLICY_STATEMENT, policyName, SWITCH_OPTIONS_VRF_EXPORT, getLine(nameCtx.getStart()));
+    }
   }
 
   @Override
   public void exitSo_vrf_import(So_vrf_importContext ctx) {
-    String policyName = toString(ctx.name);
-    _currentLogicalSystem.getOrInitSwitchOptions().setVrfImportPolicy(policyName);
-    _configuration.referenceStructure(
-        POLICY_STATEMENT, policyName, SWITCH_OPTIONS_VRF_IMPORT, getLine(ctx.start));
+    // vrf-import accepts a single policy or a bracketed list; reference each.
+    for (Junos_nameContext nameCtx : ctx.names.junos_name()) {
+      String policyName = toString(nameCtx);
+      _currentLogicalSystem.getOrInitSwitchOptions().setVrfImportPolicy(policyName);
+      _configuration.referenceStructure(
+          POLICY_STATEMENT, policyName, SWITCH_OPTIONS_VRF_IMPORT, getLine(nameCtx.getStart()));
+    }
   }
 
   @Override
@@ -4207,6 +4329,27 @@ public class ConfigurationBuilder extends FlatJuniperParserBaseListener
             .getKeys()
             .computeIfAbsent(name, JuniperAuthenticationKey::new);
     _currentAuthenticationKey = authenticationkey;
+  }
+
+  @Override
+  public void enterSe_key_chain(Se_key_chainContext ctx) {
+    // Legacy form of authentication-key-chains key-chain; same data model.
+    String name = toString(ctx.name);
+    int line = getLine(ctx.getStart());
+    _currentAuthenticationKeyChain =
+        _currentLogicalSystem
+            .getAuthenticationKeyChains()
+            .computeIfAbsent(name, n -> new JuniperAuthenticationKeyChain(n, line));
+    _configuration.defineFlattenedStructure(AUTHENTICATION_KEY_CHAIN, name, ctx, _parser);
+  }
+
+  @Override
+  public void enterSekc_key(Sekc_keyContext ctx) {
+    String name = toString(ctx.name);
+    _currentAuthenticationKey =
+        _currentAuthenticationKeyChain
+            .getKeys()
+            .computeIfAbsent(name, JuniperAuthenticationKey::new);
   }
 
   @Override
@@ -4600,12 +4743,33 @@ public class ConfigurationBuilder extends FlatJuniperParserBaseListener
 
   @Override
   public void enterSyn_server(Syn_serverContext ctx) {
-    String hostname = toString(ctx.hostname);
-    _currentLogicalSystem.getNtpServers().add(hostname);
+    String hostname = ctx.hostname.getText();
+    _currentNtpServer =
+        _currentLogicalSystem.getNtpServers().computeIfAbsent(hostname, NtpServer::new);
   }
 
   @Override
-  public void exitSyn_server_routing_instance(Syn_server_routing_instanceContext ctx) {
+  public void exitSyn_server(Syn_serverContext ctx) {
+    _currentNtpServer = null;
+  }
+
+  @Override
+  public void exitSyns_key(Syns_keyContext ctx) {
+    toInteger(ctx, ctx.id).ifPresent(_currentNtpServer::setKey);
+  }
+
+  @Override
+  public void exitSyn_authentication_key(Syn_authentication_keyContext ctx) {
+    toInteger(ctx, ctx.id).ifPresent(_currentLogicalSystem.getNtpAuthenticationKeys()::add);
+  }
+
+  @Override
+  public void exitSyn_trusted_key(Syn_trusted_keyContext ctx) {
+    toInteger(ctx, ctx.id).ifPresent(_currentLogicalSystem.getNtpTrustedKeys()::add);
+  }
+
+  @Override
+  public void exitSyns_routing_instance(Syns_routing_instanceContext ctx) {
     String name = toString(ctx.name);
     _configuration.referenceStructure(
         ROUTING_INSTANCE, name, NTP_SERVER_ROUTING_INSTANCE, getLine(ctx.getStart()));
@@ -4627,9 +4791,60 @@ public class ConfigurationBuilder extends FlatJuniperParserBaseListener
   }
 
   @Override
+  public void enterSys_file(Sys_fileContext ctx) {
+    String filename = toString(ctx.filename);
+    _currentSyslogFile =
+        _currentLogicalSystem.getSyslogFiles().computeIfAbsent(filename, JunosSyslogFile::new);
+  }
+
+  @Override
+  public void exitSys_file(Sys_fileContext ctx) {
+    _currentSyslogFile = null;
+  }
+
+  @Override
+  public void exitSysfa_file(Sysfa_fileContext ctx) {
+    _currentSyslogFile.setArchiveFileCount(toInt(ctx.count));
+  }
+
+  @Override
+  public void exitSysfa_size(Sysfa_sizeContext ctx) {
+    // Junos k/m/g suffixes are 1024-based; a bare value is already in bytes.
+    long multiplier;
+    if (ctx.K() != null) {
+      multiplier = 1024L;
+    } else if (ctx.M() != null) {
+      multiplier = 1024L * 1024;
+    } else if (ctx.G() != null) {
+      multiplier = 1024L * 1024 * 1024;
+    } else {
+      multiplier = 1L;
+    }
+    // Guard the value*multiplier product against overflow, then range-check the result using the
+    // same LongSpace idiom as the other numeric attributes (see toLongInSpace).
+    long value = toLong(ctx.size);
+    long sizeBytes = value > SYSLOG_ARCHIVE_SIZE_MAX_BYTES / multiplier ? -1L : value * multiplier;
+    if (!SYSLOG_ARCHIVE_SIZE_BYTES_RANGE.contains(sizeBytes)) {
+      warn(
+          ctx,
+          String.format(
+              "Expected syslog archive size in range %s bytes, but got '%s'",
+              SYSLOG_ARCHIVE_SIZE_BYTES_RANGE, getFullText(ctx)));
+      return;
+    }
+    _currentSyslogFile.setArchiveSizeBytes(sizeBytes);
+  }
+
+  @Override
   public void enterSys_host(Sys_hostContext ctx) {
     String hostname = toString(ctx.hostname);
-    _currentLogicalSystem.getSyslogHosts().add(hostname);
+    _currentSyslogHost =
+        _currentLogicalSystem.getSyslogHosts().computeIfAbsent(hostname, JunosSyslogHost::new);
+  }
+
+  @Override
+  public void exitSys_host(Sys_hostContext ctx) {
+    _currentSyslogHost = null;
   }
 
   @Override
@@ -6100,8 +6315,8 @@ public class ConfigurationBuilder extends FlatJuniperParserBaseListener
 
   @Override
   public void exitIsil_metric(Isil_metricContext ctx) {
-    int metric = toInt(ctx.dec());
-    _currentIsisInterfaceLevelSettings.setMetric(metric);
+    toInteger(ctx, ctx.isis_level_metric())
+        .ifPresent(metric -> _currentIsisInterfaceLevelSettings.setMetric(metric));
   }
 
   @Override
@@ -6756,6 +6971,11 @@ public class ConfigurationBuilder extends FlatJuniperParserBaseListener
   @Override
   public void exitPopst_accept(Popst_acceptContext ctx) {
     addPsThen(PsThenAccept.INSTANCE, ctx);
+  }
+
+  @Override
+  public void exitPopst_add_path(Popst_add_pathContext ctx) {
+    toInteger(ctx, ctx.count).ifPresent(count -> addPsThen(new PsThenAddPathSendCount(count), ctx));
   }
 
   @Override
@@ -7419,7 +7639,7 @@ public class ConfigurationBuilder extends FlatJuniperParserBaseListener
 
   @Override
   public void exitRosr_community(Rosr_communityContext ctx) {
-    _currentStaticRoute.getCommunities().add(toStandardCommunity(ctx.standard_community()));
+    _currentStaticRoute.addCommunity(toStandardCommunity(ctx.standard_community()));
   }
 
   @Override
@@ -8117,6 +8337,13 @@ public class ConfigurationBuilder extends FlatJuniperParserBaseListener
   }
 
   @Override
+  public void exitScoscld_import(Scoscld_importContext ctx) {
+    // The imported name may be "default", which is a built-in classifier.
+    referenceBuiltIn(
+        ctx.name, CLASS_OF_SERVICE_CLASSIFIER, CLASS_OF_SERVICE_CLASSIFIERS_DSCP_IMPORT);
+  }
+
+  @Override
   public void exitScoscld6_forwarding_class(Scoscld6_forwarding_classContext ctx) {
     referenceBuiltIn(
         ctx.fc,
@@ -8130,6 +8357,13 @@ public class ConfigurationBuilder extends FlatJuniperParserBaseListener
         ctx.fc,
         CLASS_OF_SERVICE_FORWARDING_CLASS,
         CLASS_OF_SERVICE_CLASSIFIERS_EXP_FORWARDING_CLASS);
+  }
+
+  @Override
+  public void exitScoscle_import(Scoscle_importContext ctx) {
+    // The imported name may be "default", which is a built-in classifier.
+    referenceBuiltIn(
+        ctx.name, CLASS_OF_SERVICE_CLASSIFIER, CLASS_OF_SERVICE_CLASSIFIERS_EXP_IMPORT);
   }
 
   @Override
@@ -8170,6 +8404,20 @@ public class ConfigurationBuilder extends FlatJuniperParserBaseListener
         ctx.fc,
         CLASS_OF_SERVICE_FORWARDING_CLASS,
         CLASS_OF_SERVICE_REWRITE_RULES_EXP_FORWARDING_CLASS);
+  }
+
+  @Override
+  public void exitScosrre_import(Scosrre_importContext ctx) {
+    // The imported name may be "default", which is a built-in rewrite-rule.
+    referenceBuiltIn(
+        ctx.name, CLASS_OF_SERVICE_REWRITE_RULE, CLASS_OF_SERVICE_REWRITE_RULES_EXP_IMPORT);
+  }
+
+  @Override
+  public void exitScosrri_import(Scosrri_importContext ctx) {
+    // The imported name may be "default", which is a built-in rewrite-rule.
+    referenceBuiltIn(
+        ctx.name, CLASS_OF_SERVICE_REWRITE_RULE, CLASS_OF_SERVICE_REWRITE_RULES_IEEE_802_1_IMPORT);
   }
 
   @Override
@@ -8810,10 +9058,95 @@ public class ConfigurationBuilder extends FlatJuniperParserBaseListener
   }
 
   @Override
+  public void exitSysh_facility(Sysh_facilityContext ctx) {
+    _currentSyslogHost.setFacilitySeverity(
+        toJunosSyslogFacility(ctx.facility), toJunosSyslogSeverity(ctx.severity));
+  }
+
+  @Override
+  public void exitSysh_port(Sysh_portContext ctx) {
+    _currentSyslogHost.setPort(toInt(ctx.num));
+  }
+
+  @Override
+  public void exitSysh_transport(Sysh_transportContext ctx) {
+    _currentSyslogHost.setTransportProtocol(toJunosSyslogTransportProtocol(ctx.protocol));
+  }
+
+  @Override
   public void exitSysh_routing_instance(Sysh_routing_instanceContext ctx) {
     String name = toString(ctx.ri);
+    _currentSyslogHost.setRoutingInstance(name);
     _configuration.referenceStructure(
         ROUTING_INSTANCE, name, SYSLOG_HOST_ROUTING_INSTANCE, getLine(ctx.ri.getStart()));
+  }
+
+  private static @Nonnull JunosSyslogFacility toJunosSyslogFacility(Syslog_facilityContext ctx) {
+    if (ctx.ANY() != null) {
+      return JunosSyslogFacility.ANY;
+    } else if (ctx.AUTHORIZATION() != null) {
+      return JunosSyslogFacility.AUTHORIZATION;
+    } else if (ctx.CHANGE_LOG() != null) {
+      return JunosSyslogFacility.CHANGE_LOG;
+    } else if (ctx.CONFLICT_LOG() != null) {
+      return JunosSyslogFacility.CONFLICT_LOG;
+    } else if (ctx.DAEMON() != null) {
+      return JunosSyslogFacility.DAEMON;
+    } else if (ctx.DFC() != null) {
+      return JunosSyslogFacility.DFC;
+    } else if (ctx.EXTERNAL() != null) {
+      return JunosSyslogFacility.EXTERNAL;
+    } else if (ctx.FIREWALL() != null) {
+      return JunosSyslogFacility.FIREWALL;
+    } else if (ctx.FTP() != null) {
+      return JunosSyslogFacility.FTP;
+    } else if (ctx.INTERACTIVE_COMMANDS() != null) {
+      return JunosSyslogFacility.INTERACTIVE_COMMANDS;
+    } else if (ctx.KERNEL() != null) {
+      return JunosSyslogFacility.KERNEL;
+    } else if (ctx.NTP() != null) {
+      return JunosSyslogFacility.NTP;
+    } else if (ctx.PFE() != null) {
+      return JunosSyslogFacility.PFE;
+    } else {
+      assert ctx.USER() != null;
+      return JunosSyslogFacility.USER;
+    }
+  }
+
+  private static @Nonnull JunosSyslogSeverity toJunosSyslogSeverity(Syslog_severityContext ctx) {
+    if (ctx.ANY() != null) {
+      return JunosSyslogSeverity.ANY;
+    } else if (ctx.NONE() != null) {
+      return JunosSyslogSeverity.NONE;
+    } else if (ctx.EMERGENCY() != null) {
+      return JunosSyslogSeverity.EMERGENCY;
+    } else if (ctx.ALERT() != null) {
+      return JunosSyslogSeverity.ALERT;
+    } else if (ctx.CRITICAL() != null) {
+      return JunosSyslogSeverity.CRITICAL;
+    } else if (ctx.ERROR() != null) {
+      return JunosSyslogSeverity.ERROR;
+    } else if (ctx.WARNING() != null) {
+      return JunosSyslogSeverity.WARNING;
+    } else if (ctx.NOTICE() != null) {
+      return JunosSyslogSeverity.NOTICE;
+    } else {
+      assert ctx.INFO() != null;
+      return JunosSyslogSeverity.INFO;
+    }
+  }
+
+  private static @Nonnull JunosSyslogTransportProtocol toJunosSyslogTransportProtocol(
+      Syslog_transport_protocolContext ctx) {
+    if (ctx.TCP() != null) {
+      return JunosSyslogTransportProtocol.TCP;
+    } else if (ctx.TLS() != null) {
+      return JunosSyslogTransportProtocol.TLS;
+    } else {
+      assert ctx.UDP() != null;
+      return JunosSyslogTransportProtocol.UDP;
+    }
   }
 
   @Override
@@ -9108,6 +9441,11 @@ public class ConfigurationBuilder extends FlatJuniperParserBaseListener
     return toIntegerInSpace(messageCtx, ctx, VLAN_RANGE, "vlan number");
   }
 
+  private @Nonnull Optional<Integer> toInteger(
+      ParserRuleContext messageCtx, Isis_level_metricContext ctx) {
+    return toIntegerInSpace(messageCtx, ctx, ISIS_LEVEL_METRIC_RANGE, "isis level metric");
+  }
+
   @Override
   public void exitMpls_admin_groups(Mpls_admin_groupsContext ctx) {
     String name = toString(ctx.name);
@@ -9176,6 +9514,13 @@ public class ConfigurationBuilder extends FlatJuniperParserBaseListener
         name,
         MPLS_LSP_SECONDARY_ADMIN_GROUP_INCLUDE_ANY,
         getLine(ctx.name.getStart()));
+  }
+
+  @Override
+  public void exitMplslsppol_filter(Mplslsppol_filterContext ctx) {
+    String name = toString(ctx.name);
+    _configuration.referenceStructure(
+        FIREWALL_FILTER, name, MPLS_LSP_POLICING_FILTER, getLine(ctx.name.getStart()));
   }
 
   @Override
@@ -9558,10 +9903,6 @@ public class ConfigurationBuilder extends FlatJuniperParserBaseListener
   }
 
   private static @Nonnull String toString(Tacplus_server_hostContext ctx) {
-    return ctx.getText();
-  }
-
-  private @Nonnull String toString(Name_or_ipContext ctx) {
     return ctx.getText();
   }
 

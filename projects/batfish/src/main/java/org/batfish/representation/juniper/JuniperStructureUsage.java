@@ -19,6 +19,7 @@ public enum JuniperStructureUsage implements StructureUsage {
   CLASS_OF_SERVICE_CLASSIFIERS_DSCP_FORWARDING_CLASS(
       "class-of-service classifiers dscp forwarding-class"),
   CLASS_OF_SERVICE_CLASSIFIERS_DSCP_CODE_POINTS("class-of-service classifiers dscp code-points"),
+  CLASS_OF_SERVICE_CLASSIFIERS_DSCP_IMPORT("class-of-service classifiers dscp import"),
   CLASS_OF_SERVICE_CLASSIFIERS_DSCP_IPV6_FORWARDING_CLASS(
       "class-of-service classifiers dscp-ipv6 forwarding-class"),
   CLASS_OF_SERVICE_CLASSIFIERS_DSCP_IPV6_CODE_POINTS(
@@ -26,6 +27,7 @@ public enum JuniperStructureUsage implements StructureUsage {
   CLASS_OF_SERVICE_CLASSIFIERS_EXP_FORWARDING_CLASS(
       "class-of-service classifiers exp forwarding-class"),
   CLASS_OF_SERVICE_CLASSIFIERS_EXP_CODE_POINTS("class-of-service classifiers exp code-points"),
+  CLASS_OF_SERVICE_CLASSIFIERS_EXP_IMPORT("class-of-service classifiers exp import"),
   CLASS_OF_SERVICE_CLASSIFIERS_IEEE_802_1_FORWARDING_CLASS(
       "class-of-service classifiers ieee-802.1 forwarding-class"),
   CLASS_OF_SERVICE_CLASSIFIERS_IEEE_802_1_CODE_POINTS(
@@ -70,10 +72,13 @@ public enum JuniperStructureUsage implements StructureUsage {
   CLASS_OF_SERVICE_REWRITE_RULES_EXP_FORWARDING_CLASS(
       "class-of-service rewrite-rules exp forwarding-class"),
   CLASS_OF_SERVICE_REWRITE_RULES_EXP_CODE_POINT("class-of-service rewrite-rules exp code-point"),
+  CLASS_OF_SERVICE_REWRITE_RULES_EXP_IMPORT("class-of-service rewrite-rules exp import"),
   CLASS_OF_SERVICE_REWRITE_RULES_IEEE_802_1_FORWARDING_CLASS(
       "class-of-service rewrite-rules ieee-802.1 forwarding-class"),
   CLASS_OF_SERVICE_REWRITE_RULES_IEEE_802_1_CODE_POINT(
       "class-of-service rewrite-rules ieee-802.1 code-point"),
+  CLASS_OF_SERVICE_REWRITE_RULES_IEEE_802_1_IMPORT(
+      "class-of-service rewrite-rules ieee-802.1 import"),
   CLASS_OF_SERVICE_REWRITE_RULES_INET_PRECEDENCE_FORWARDING_CLASS(
       "class-of-service rewrite-rules inet-precedence forwarding-class"),
   CLASS_OF_SERVICE_REWRITE_RULES_INET_PRECEDENCE_CODE_POINT(
@@ -131,6 +136,7 @@ public enum JuniperStructureUsage implements StructureUsage {
   MPLS_LSP_ADMIN_GROUP_EXCLUDE("mpls lsp admin-group exclude"),
   MPLS_LSP_ADMIN_GROUP_INCLUDE_ALL("mpls lsp admin-group include-all"),
   MPLS_LSP_ADMIN_GROUP_INCLUDE_ANY("mpls lsp admin-group include-any"),
+  MPLS_LSP_POLICING_FILTER("mpls lsp policing filter"),
   MPLS_LSP_PRIMARY_PATH("mpls lsp primary path"),
   MPLS_LSP_SECONDARY_ADMIN_GROUP_EXCLUDE("mpls lsp secondary admin-group exclude"),
   MPLS_LSP_SECONDARY_ADMIN_GROUP_INCLUDE_ALL("mpls lsp secondary admin-group include-all"),
@@ -186,6 +192,7 @@ public enum JuniperStructureUsage implements StructureUsage {
   TACPLUS_SERVER_ROUTING_INSTANCE("tacplus-server routing-instance"),
   RSTP_INTERFACE("rstp interface"),
   STP_INTERFACE("stp interface"),
+  SYSTEM_SERVICES_DNS_PROXY_INTERFACE("system services dns dns-proxy interface"),
   VLAN_INTERFACE("vlan interface"),
   VLAN_L3_INTERFACE("vlan l3-interface"),
   VSTP_INTERFACE("vstp interface"),

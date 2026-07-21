@@ -7,15 +7,29 @@ s_class_of_service
    CLASS_OF_SERVICE
    (
        apply
+       | scos_adaptive_shapers_null
+       | scos_application_traffic_control_null
        | scos_classifiers
        | scos_code_point_aliases
+       | scos_drop_profiles_null
        | scos_forwarding_classes
+       | scos_forwarding_policy_null
+       | scos_fragmentation_maps_null
        | scos_host_outbound_traffic
        | scos_interfaces
+       | scos_loss_priority_maps_null
+       | scos_non_strict_priority_scheduling_null
+       | scos_restricted_queues_null
        | scos_rewrite_rules
+       | scos_routing_instances_null
        | scos_scheduler_maps
        | scos_schedulers
-       | scos_null
+       | scos_shared_buffer_null
+       | scos_trace_options_null
+       | scos_traffic_control_profiles_null
+       | scos_translation_table_null
+       | scos_tri_color_null
+       | scos_virtual_channel_null
    )
 ;
 
@@ -50,11 +64,8 @@ scoscl_dscp
 
 scoscld_import
 :
-    IMPORT
-    (
-        DEFAULT
-        | name = junos_name
-    )
+    // "import" enters policy-expression lexer mode, so "default" arrives as a name.
+    IMPORT name = junos_name
 ;
 
 scoscld_forwarding_class
@@ -187,7 +198,14 @@ scoscl_exp
     EXP name = junos_name
     (
         scoscle_forwarding_class
+        | scoscle_import
     )
+;
+
+scoscle_import
+:
+    // "import" enters policy-expression lexer mode, so "default" arrives as a name.
+    IMPORT name = junos_name
 ;
 
 scoscl_ieee_802_1
@@ -285,12 +303,40 @@ scos_host_outbound_traffic
     HOST_OUTBOUND_TRAFFIC
     (
         scoshob_forwarding_class
+        | scoshob_ieee_802_1
     )
 ;
 
 scoshob_forwarding_class
 :
     FORWARDING_CLASS name = junos_name
+;
+
+// IEEE 802.1p marking of host (Routing Engine) outbound traffic.
+scoshob_ieee_802_1
+:
+    IEEE_802_1
+    (
+        scoshobi_default
+        | scoshobi_override_firewall
+        | scoshobi_rewrite_rules
+    )
+;
+
+scoshobi_default
+:
+    // Doc: three-bit binary number (000 through 111) or code-point alias.
+    DEFAULT value = ieee_802_1_code_point_or_alias
+;
+
+scoshobi_override_firewall
+:
+    OVERRIDE_FIREWALL
+;
+
+scoshobi_rewrite_rules
+:
+    REWRITE_RULES
 ;
 
 scos_interfaces
@@ -444,7 +490,9 @@ scosiiu_dscp_ipv6_rw
 
 scosiiu_exp_rw
 :
-    EXP name = junos_name PROTOCOL proto = scos_protocol_type
+    // The protocol clause is optional in practice: Junos accepts a bare "exp rewrite-name", even
+    // though the CLI reference lists protocol in the canonical syntax.
+    EXP name = junos_name (PROTOCOL proto = scos_protocol_type)?
 ;
 
 scos_protocol_type
@@ -502,7 +550,14 @@ scosrr_exp
     EXP name = junos_name
     (
         scosrre_forwarding_class
+        | scosrre_import
     )
+;
+
+scosrre_import
+:
+    // "import" enters policy-expression lexer mode, so "default" arrives as a name.
+    IMPORT name = junos_name
 ;
 
 scosrre_forwarding_class
@@ -523,7 +578,14 @@ scosrr_ieee_802_1
     IEEE_802_1 name = junos_name
     (
         scosrri_forwarding_class
+        | scosrri_import
     )
+;
+
+scosrri_import
+:
+    // "import" enters policy-expression lexer mode, so "default" arrives as a name.
+    IMPORT name = junos_name
 ;
 
 scosrri_forwarding_class
@@ -702,25 +764,64 @@ scoss_shaping_rate
     SHAPING_RATE PERCENT num = dec
 ;
 
-scos_null
+scos_adaptive_shapers_null
 :
-   (
-      ADAPTIVE_SHAPERS
-      | APPLICATION_TRAFFIC_CONTROL
-      | DROP_PROFILES
-      | FORWARDING_POLICY
-      | FRAGMENTATION_MAPS
-      | LOSS_PRIORITY_MAPS
-      | NON_STRICT_PRIORITY_SCHEDULING
-      | RESTRICTED_QUEUES
-      | ROUTING_INSTANCES
-      | SHARED_BUFFER
-      | TRACE_OPTIONS
-      | TRAFFIC_CONTROL_PROFILES
-      | TRANSLATION_TABLE
-      | TRI_COLOR
-      | VIRTUAL_CHANNEL
-   )
-   null_filler
+   ADAPTIVE_SHAPERS null_filler
+;
+scos_application_traffic_control_null
+:
+   APPLICATION_TRAFFIC_CONTROL null_filler
+;
+scos_drop_profiles_null
+:
+   DROP_PROFILES null_filler
+;
+scos_forwarding_policy_null
+:
+   FORWARDING_POLICY null_filler
+;
+scos_fragmentation_maps_null
+:
+   FRAGMENTATION_MAPS null_filler
+;
+scos_loss_priority_maps_null
+:
+   LOSS_PRIORITY_MAPS null_filler
+;
+scos_non_strict_priority_scheduling_null
+:
+   NON_STRICT_PRIORITY_SCHEDULING null_filler
+;
+scos_restricted_queues_null
+:
+   RESTRICTED_QUEUES null_filler
+;
+scos_routing_instances_null
+:
+   ROUTING_INSTANCES null_filler
+;
+scos_shared_buffer_null
+:
+   SHARED_BUFFER null_filler
+;
+scos_trace_options_null
+:
+   TRACE_OPTIONS null_filler
+;
+scos_traffic_control_profiles_null
+:
+   TRAFFIC_CONTROL_PROFILES null_filler
+;
+scos_translation_table_null
+:
+   TRANSLATION_TABLE null_filler
+;
+scos_tri_color_null
+:
+   TRI_COLOR null_filler
+;
+scos_virtual_channel_null
+:
+   VIRTUAL_CHANNEL null_filler
 ;
 

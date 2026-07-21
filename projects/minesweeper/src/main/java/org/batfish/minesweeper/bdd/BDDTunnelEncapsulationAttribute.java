@@ -120,6 +120,14 @@ public final class BDDTunnelEncapsulationAttribute {
     return new BDDTunnelEncapsulationAttribute(new BDDDomain<>(pred, _domain));
   }
 
+  /**
+   * Produces a new attribute by composing the underlying domain through the given pairing (see
+   * {@link BDD#veccompose(BDDPairing)}), for functional composition of symbolic routes.
+   */
+  public @Nonnull BDDTunnelEncapsulationAttribute veccompose(BDDPairing pairing) {
+    return new BDDTunnelEncapsulationAttribute(_domain.veccompose(pairing));
+  }
+
   public @Nonnull Value satAssignmentToValue(BDD model) {
     return _domain.satAssignmentToValue(model);
   }
@@ -130,6 +138,11 @@ public final class BDDTunnelEncapsulationAttribute {
 
   public BDD getIsValidConstraint() {
     return _domain.getIsValidConstraint();
+  }
+
+  /** Frees every BDD backing this attribute's underlying domain; see {@link BDDDomain#free}. */
+  public void free() {
+    _domain.free();
   }
 
   public int getNumBits() {

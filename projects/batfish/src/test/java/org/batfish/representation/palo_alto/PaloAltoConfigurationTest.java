@@ -38,6 +38,7 @@ import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.hasSize;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -49,12 +50,16 @@ import java.util.Optional;
 import javax.annotation.Nonnull;
 import javax.annotation.ParametersAreNonnullByDefault;
 import org.batfish.common.Warnings;
+import org.batfish.datamodel.Configuration;
+import org.batfish.datamodel.ConfigurationFormat;
 import org.batfish.datamodel.Flow;
 import org.batfish.datamodel.Ip;
 import org.batfish.datamodel.IpAccessList;
 import org.batfish.datamodel.IpProtocol;
 import org.batfish.datamodel.NamedPort;
 import org.batfish.datamodel.NetworkFactory;
+import org.batfish.datamodel.Prefix;
+import org.batfish.datamodel.route.nh.NextHopIp;
 import org.batfish.representation.palo_alto.SecurityRule.RuleType;
 import org.batfish.representation.palo_alto.Zone.Type;
 import org.junit.Before;
@@ -231,13 +236,13 @@ public final class PaloAltoConfigurationTest {
 
     // no lines should be returned since fromZone does not point to externalVsys
     assertEquals(
+        0L,
         generateCrossZoneCallsFromExternal(
                 fromZone,
                 new Zone(TO_ZONE_NAME, vsys),
                 ImmutableList.of(),
                 ImmutableList.of(externalVsys, vsys))
-            .count(),
-        0L);
+            .count());
   }
 
   @Test
@@ -290,10 +295,10 @@ public final class PaloAltoConfigurationTest {
 
     // no lines should be returned since fromZone is a layer-2 zone
     assertEquals(
+        0L,
         generateCrossZoneCalls(
                 fromZone, new Zone(TO_ZONE_NAME, vsys), ImmutableList.of(), ImmutableList.of(vsys))
-            .count(),
-        0L);
+            .count());
   }
 
   @Test
@@ -417,10 +422,10 @@ public final class PaloAltoConfigurationTest {
     externalVsys.getZones().put(EXTERNAL_FROM_ZONE_NAME, externalFromZone);
     // no lines should be returned since externalVsys has no external zones
     assertEquals(
+        0L,
         generateInterVsysCrossZoneCalls(
                 new Zone(FROM_ZONE_NAME, vsys), new Zone(TO_ZONE_NAME, vsys), externalVsys)
-            .count(),
-        0L);
+            .count());
   }
 
   @Test
@@ -438,10 +443,10 @@ public final class PaloAltoConfigurationTest {
 
     // no lines should be returned since externalVsys has no external zone pointing to vsys
     assertEquals(
+        0L,
         generateInterVsysCrossZoneCalls(
                 new Zone(FROM_ZONE_NAME, vsys), new Zone(TO_ZONE_NAME, vsys), externalVsys)
-            .count(),
-        0L);
+            .count());
   }
 
   @Test
@@ -504,7 +509,7 @@ public final class PaloAltoConfigurationTest {
     Vsys ingressSharedGateway = new Vsys(EXTERNAL_VSYS_NAME);
 
     // no lines should be returned since there are no interfaces in ingressSharedGateway
-    assertEquals(generateSgSgLines(sharedGateway, ingressSharedGateway).count(), 0L);
+    assertEquals(0L, generateSgSgLines(sharedGateway, ingressSharedGateway).count());
   }
 
   @Test
@@ -613,7 +618,7 @@ public final class PaloAltoConfigurationTest {
     vsys.getZones().put(EXTERNAL_TO_ZONE_NAME, externalToZone);
 
     // no lines should be returned since externalToZone does not point to sharedGateway
-    assertEquals(generateVsysSharedGatewayCalls(sharedGateway, vsys).count(), 0L);
+    assertEquals(0L, generateVsysSharedGatewayCalls(sharedGateway, vsys).count());
   }
 
   @Test
@@ -628,7 +633,7 @@ public final class PaloAltoConfigurationTest {
     // missing external zone on vsys
 
     // no lines should be returned since vsys has no external zone
-    assertEquals(generateVsysSharedGatewayCalls(sharedGateway, vsys).count(), 0L);
+    assertEquals(0L, generateVsysSharedGatewayCalls(sharedGateway, vsys).count());
   }
 
   @Test
@@ -642,7 +647,7 @@ public final class PaloAltoConfigurationTest {
     vsys.getZones().put(EXTERNAL_TO_ZONE_NAME, externalToZone);
 
     // no lines should be returned since externalToZone has no layer-3 zone
-    assertEquals(generateVsysSharedGatewayCalls(sharedGateway, vsys).count(), 0L);
+    assertEquals(0L, generateVsysSharedGatewayCalls(sharedGateway, vsys).count());
   }
 
   /** Covers universal and default case of no rule-type */
@@ -865,5 +870,110 @@ public final class PaloAltoConfigurationTest {
         getTraceElementForAppReference(
             new ApplicationOrApplicationGroupReference("undefined"), Optional.empty(), filename),
         equalTo(Optional.empty()));
+  }
+
+  @Test
+  public void testToVendorIndependentConfigurations_InterfaceAddressResolvesFromOwningVsys()
+      throws Exception {
+    PaloAltoConfiguration c = makeBaseMultiVsysConfig();
+    c.getVirtualSystems()
+        .get(DEFAULT_VSYS_NAME)
+        .getAddressObjects()
+        .put("ifaceObj", ipObj("1.1.1.1"));
+    c.getVirtualSystems().get("vsys2").getAddressObjects().put("ifaceObj", ipObj("2.2.2.2"));
+
+    Interface iface = new Interface("ethernet1/1", Interface.Type.LAYER3);
+    iface.addAddress(new InterfaceAddress(InterfaceAddress.Type.REFERENCE, "ifaceObj"));
+    c.getInterfaces().put(iface.getName(), iface);
+
+    Zone zone = new Zone("z2", c.getVirtualSystems().get("vsys2"));
+    zone.getInterfaceNames().add(iface.getName());
+    c.getVirtualSystems().get("vsys2").getZones().put(zone.getName(), zone);
+
+    VirtualRouter vr = c.getVirtualRouters().computeIfAbsent("vr2", VirtualRouter::new);
+    vr.getInterfaceNames().add(iface.getName());
+
+    Configuration vi = c.toVendorIndependentConfigurations().get(0);
+    assertEquals(
+        vi.getAllInterfaces().get(iface.getName()).getAddress(),
+        org.batfish.datamodel.ConcreteInterfaceAddress.parse("2.2.2.2/32"));
+  }
+
+  @Test
+  public void testToVendorIndependentConfigurations_BgpPeerAddressResolvesFromOwningVsys()
+      throws Exception {
+    PaloAltoConfiguration c = makeBaseMultiVsysConfig();
+    c.getVirtualSystems()
+        .get(DEFAULT_VSYS_NAME)
+        .getAddressObjects()
+        .put("peerObj", ipObj("1.1.1.1"));
+    c.getVirtualSystems().get("vsys2").getAddressObjects().put("peerObj", ipObj("2.2.2.2"));
+
+    Interface iface = new Interface("ethernet1/1", Interface.Type.LAYER3);
+    c.getInterfaces().put(iface.getName(), iface);
+    Zone zone = new Zone("z2", c.getVirtualSystems().get("vsys2"));
+    zone.getInterfaceNames().add(iface.getName());
+    c.getVirtualSystems().get("vsys2").getZones().put(zone.getName(), zone);
+
+    VirtualRouter vr = c.getVirtualRouters().computeIfAbsent("vr2", VirtualRouter::new);
+    vr.getInterfaceNames().add(iface.getName());
+    BgpVr bgp = vr.getOrCreateBgp();
+    bgp.setEnable(true);
+    bgp.setRouterId(Ip.parse("10.0.0.1"));
+    bgp.setLocalAs(65000L);
+    BgpPeerGroup pg = bgp.getOrCreatePeerGroup("pg");
+    pg.setEnable(true);
+    pg.updateAndGetIbgpType();
+    BgpPeer peer = pg.getOrCreatePeerGroup("peer1");
+    peer.setEnable(true);
+    peer.setPeerAddress(new InterfaceAddress(InterfaceAddress.Type.REFERENCE, "peerObj"));
+
+    Configuration vi = c.toVendorIndependentConfigurations().get(0);
+    org.batfish.datamodel.BgpProcess proc = vi.getVrfs().get(vr.getName()).getBgpProcess();
+    assertThat(proc.getActiveNeighbors().values(), hasSize(1));
+    assertEquals(
+        proc.getActiveNeighbors().values().iterator().next().getPeerAddress(), Ip.parse("2.2.2.2"));
+  }
+
+  @Test
+  public void testToVendorIndependentConfigurations_StaticRouteNextHopResolvesFromOwningVsys()
+      throws Exception {
+    PaloAltoConfiguration c = makeBaseMultiVsysConfig();
+    c.getVirtualSystems().get(DEFAULT_VSYS_NAME).getAddressObjects().put("nhObj", ipObj("1.1.1.1"));
+    c.getVirtualSystems().get("vsys2").getAddressObjects().put("nhObj", ipObj("2.2.2.2"));
+
+    Interface iface = new Interface("ethernet1/1", Interface.Type.LAYER3);
+    c.getInterfaces().put(iface.getName(), iface);
+    Zone zone = new Zone("z2", c.getVirtualSystems().get("vsys2"));
+    zone.getInterfaceNames().add(iface.getName());
+    c.getVirtualSystems().get("vsys2").getZones().put(zone.getName(), zone);
+
+    VirtualRouter vr = c.getVirtualRouters().computeIfAbsent("vr2", VirtualRouter::new);
+    vr.getInterfaceNames().add(iface.getName());
+    StaticRoute sr = new StaticRoute("sr1");
+    sr.setDestination(Prefix.parse("10.10.10.0/24"));
+    sr.setNextHopIp(new InterfaceAddress(InterfaceAddress.Type.REFERENCE, "nhObj"));
+    vr.getStaticRoutes().put(sr.getName(), sr);
+
+    Configuration vi = c.toVendorIndependentConfigurations().get(0);
+    org.batfish.datamodel.StaticRoute viSr =
+        vi.getVrfs().get(vr.getName()).getStaticRoutes().iterator().next();
+    assertEquals(((NextHopIp) viSr.getNextHop()).getIp(), Ip.parse("2.2.2.2"));
+  }
+
+  private static PaloAltoConfiguration makeBaseMultiVsysConfig() {
+    PaloAltoConfiguration c = new PaloAltoConfiguration();
+    c.setHostname("host");
+    c.setVendor(ConfigurationFormat.PALO_ALTO);
+    c.setWarnings(new Warnings(true, true, true));
+    c.getVirtualSystems().put(DEFAULT_VSYS_NAME, new Vsys(DEFAULT_VSYS_NAME));
+    c.getVirtualSystems().put("vsys2", new Vsys("vsys2"));
+    return c;
+  }
+
+  private static AddressObject ipObj(String ip) {
+    AddressObject obj = new AddressObject("obj");
+    obj.setIp(Ip.parse(ip));
+    return obj;
   }
 }

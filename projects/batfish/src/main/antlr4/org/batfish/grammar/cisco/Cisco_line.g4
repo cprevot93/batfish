@@ -155,22 +155,6 @@ l_vacant_message
   VACANT_MESSAGE message = ios_delimited_banner NEWLINE
 ;
 
-lc_null
-:
-   (
-      ACCOUNTING
-      | AUTHENTICATION
-      | AUTHORIZATION
-      | ENABLE_AUTHENTICATION
-      | IDLE_TIMEOUT
-      | LENGTH
-      | LOGIN_AUTHENTICATION
-      | PASSWORD
-      | SESSION_TIMEOUT
-      | SPEED
-   ) null_rest_of_line
-;
-
 s_line
 :
    LINE line_type

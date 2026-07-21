@@ -201,8 +201,6 @@ final class AristaConversions {
 
   static @Nonnull BgpAggregate toBgpAggregate(
       Prefix prefix, AristaBgpAggregateNetwork vsAggregate, Configuration c, Warnings w) {
-    // TODO: handle advertise-only
-    // TODO: handle as-set
     // TODO: handle match-map
     // TODO: verify undefined attribute-map can be treated as omitted
     String attributeMap = vsAggregate.getAttributeMap();
@@ -211,12 +209,21 @@ final class AristaConversions {
       attributeMap = null;
     }
     String attributePolicy = generateAggregateAttributePolicy(attributeMap, c);
+    // advertise-only generates the aggregate for advertisement to peers but does not install it in
+    // the main RIB.
+    boolean installInMainRib = !Boolean.TRUE.equals(vsAggregate.getAdvertiseOnly());
+    // EOS builds the aggregate's AS_PATH from the common leading AS_SEQUENCE of its contributors,
+    // with or without the as-set keyword.
+    // TODO: when as-set is set, model the divergent tail as an AS_SET segment (AsPathMode.AS_SET)
+    // instead of dropping it. Needs a device-observed lab to confirm the as-set rendering.
     return BgpAggregate.of(
         prefix,
         generateSuppressionPolicy(vsAggregate.getSummaryOnlyEffective(), c),
         // TODO: put match-map here
         null,
-        attributePolicy);
+        attributePolicy,
+        installInMainRib,
+        BgpAggregate.AsPathMode.COMMON_SEQUENCE);
   }
 
   static @Nonnull Map<Ip, BgpActivePeerConfig> getNeighbors(

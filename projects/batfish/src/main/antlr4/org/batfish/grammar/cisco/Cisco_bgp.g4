@@ -150,11 +150,6 @@ as_path_multipath_relax_rb_stanza
    NO? BGP? BESTPATH AS_PATH MULTIPATH_RELAX NEWLINE
 ;
 
-auto_summary_bgp_tail
-:
-   NO? AUTO_SUMMARY NEWLINE
-;
-
 bgp_af_import
 :
    IMPORT bgp_af_import_path
@@ -202,6 +197,7 @@ bgp_rb_stanza
    | bgp_redistribute_internal_rb_stanza
    | bgp_refresh_rb_stanza_null
    | bgp_regexp_rb_stanza_null
+   | bgp_suppress_inactive_rb_stanza
    | bgp_transport_rb_stanza_null
    | bgp_update_delay_rb_stanza_null
    | bgp_update_group_rb_stanza_null
@@ -282,6 +278,8 @@ bgp_log_neighbor_changes_rb_stanza_null: LOG_NEIGHBOR_CHANGES null_rest_of_line;
 bgp_maxas_limit_rb_stanza: MAXAS_LIMIT limit = dec NEWLINE;
 
 bgp_redistribute_internal_rb_stanza: REDISTRIBUTE_INTERNAL NEWLINE;
+
+bgp_suppress_inactive_rb_stanza: SUPPRESS_INACTIVE NEWLINE;
 
 bgp_refresh_rb_stanza_null: REFRESH null_rest_of_line;
 bgp_regexp_rb_stanza_null: REGEXP null_rest_of_line;
@@ -472,11 +470,6 @@ maximum_paths_bgp_tail
    )? SELECTIVE? NEWLINE
 ;
 
-maximum_prefix_bgp_tail
-:
-   MAXIMUM_PREFIX dec NEWLINE
-;
-
 neighbor_flat_rb_stanza
 :
    NEIGHBOR
@@ -627,11 +620,6 @@ no_redistribute_connected_rb_stanza
       CONNECTED
       | DIRECT
    ) null_rest_of_line
-;
-
-no_shutdown_rb_stanza
-:
-   NO SHUTDOWN NEWLINE
 ;
 
 null_bgp_tail
@@ -1013,11 +1001,6 @@ unsuppress_map_bgp_tail
 update_source_bgp_tail
 :
    UPDATE_SOURCE source = interface_name NEWLINE
-;
-
-use_af_group_bgp_tail
-:
-   USE AF_GROUP name = variable NEWLINE
 ;
 
 use_neighbor_group_bgp_tail

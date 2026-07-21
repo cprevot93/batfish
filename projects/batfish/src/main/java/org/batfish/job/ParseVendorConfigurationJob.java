@@ -79,6 +79,8 @@ import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosCombinedParser;
 import org.batfish.vendor.cisco_nxos.grammar.NxosControlPlaneExtractor;
 import org.batfish.vendor.sonic.grammar.SonicControlPlaneExtractor;
 import org.batfish.vendor.sonic.grammar.SonicControlPlaneExtractor.SonicFileType;
+import org.batfish.vendor.sros.grammar.SrosCombinedParser;
+import org.batfish.vendor.sros.grammar.SrosControlPlaneExtractor;
 
 @ParametersAreNonnullByDefault
 public class ParseVendorConfigurationJob extends BatfishJob<ParseVendorConfigurationResult> {
@@ -564,6 +566,24 @@ public class ParseVendorConfigurationJob extends BatfishJob<ParseVendorConfigura
                   _fileResults.get(filename).getWarnings(),
                   _fileResults.get(filename).getSilentSyntax());
           parseFile(filename, mrvParser, extractor);
+          vc = extractor.getVendorConfiguration();
+          vc.setFilename(filename);
+          break;
+        }
+
+      case NOKIA_SROS:
+        {
+          Entry<String, String> fileEntry = Iterables.getOnlyElement(_fileTexts.entrySet());
+          String filename = fileEntry.getKey();
+          String fileText = fileEntry.getValue();
+          SrosCombinedParser srosParser = new SrosCombinedParser(fileText, _settings);
+          ControlPlaneExtractor extractor =
+              new SrosControlPlaneExtractor(
+                  fileText,
+                  srosParser,
+                  _fileResults.get(filename).getWarnings(),
+                  _fileResults.get(filename).getSilentSyntax());
+          parseFile(filename, srosParser, extractor);
           vc = extractor.getVendorConfiguration();
           vc.setFilename(filename);
           break;

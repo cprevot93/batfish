@@ -5,16 +5,6 @@ options {
 }
 
 tokens {
-   ACL_NUM_APPLETALK,
-   ACL_NUM_EXTENDED,
-   ACL_NUM_EXTENDED_IPX,
-   ACL_NUM_EXTENDED_MAC,
-   ACL_NUM_IPX,
-   ACL_NUM_IPX_SAP,
-   ACL_NUM_MAC,
-   ACL_NUM_OTHER,
-   ACL_NUM_PROTOCOL_TYPE_CODE,
-   ACL_NUM_STANDARD,
    AS_PATH_SET_REGEX,
    BANNER_BODY,
    COMMUNITY_REGEX,
@@ -73,12 +63,7 @@ ACCESS_CLASS: 'access-class';
 
 ACCESS_GROUP: 'access-group';
 
-ACCESS_LIST
-:
-   'access-list'
-   {_enableAclNum = true; _enableDec = false;_inAccessList = true;}
-
-;
+ACCESS_LIST: 'access-list';
 
 ACCESS_LOG: 'access-log';
 
@@ -394,12 +379,7 @@ ARM_PROFILE: 'arm-profile';
 
 ARM_RF_DOMAIN_PROFILE: 'arm-rf-domain-profile';
 
-ARP
-:
-   'arp'
-   { _enableIpv6Address = false; }
-
-;
+ARP: 'arp';
 
 ARNS: 'arns';
 
@@ -976,6 +956,8 @@ CLUSTER_ID: 'cluster-id';
 
 CLUSTER_LIST_LENGTH: 'cluster-list-length';
 
+CMAC: 'cmac';
+
 CMD: 'cmd';
 
 CMTS: 'cmts';
@@ -997,12 +979,7 @@ COMMAND
    'command' -> pushMode ( M_Command )
 ;
 
-COMMANDER_ADDRESS
-:
-   'commander-address'
-   { _enableIpv6Address = false; }
-
-;
+COMMANDER_ADDRESS: 'commander-address';
 
 COMMANDS: 'commands';
 
@@ -1014,12 +991,7 @@ COMMON: 'common';
 
 COMMON_NAME: 'common-name';
 
-COMMUNITY
-:
-   'community'
-   { _enableIpv6Address = false; }
-
-;
+COMMUNITY: 'community';
 
 COMMUNITY_LIST: 'community-list' -> pushMode(M_CommunityList);
 
@@ -1959,12 +1931,7 @@ EXTEND: 'extend';
 
 EXTENDABLE: 'extendable';
 
-EXTENDED
-:
-   'extended'
-   { _enableDec = true; _enableAclNum = false; }
-
-;
+EXTENDED: 'extended';
 
 EXTENDED_COUNTERS: 'extended-counters';
 
@@ -2056,12 +2023,7 @@ FILTER: 'filter';
 
 FILTER_LIST: 'filter-list';
 
-FIREWALL
-:
-   'firewall'
-   { _enableIpv6Address = false; }
-
-;
+FIREWALL: 'firewall';
 
 FIREWALL_VISIBILITY: 'firewall-visibility';
 
@@ -2678,7 +2640,7 @@ INTERCEPT: 'intercept';
 INTERFACE
 :
    'int' 'erface'?
-   { _enableIpv6Address = false; if (lastTokenType() == NEWLINE || lastTokenType() == -1) {pushMode(M_Interface);}}
+   { if (lastTokenType() == NEWLINE || lastTokenType() == -1) {pushMode(M_Interface);}}
 
 ;
 
@@ -4823,10 +4785,7 @@ RTR_ADV: 'rtr-adv';
 
 RTSP: 'rtsp';
 
-RULE
-:
-   'rule' {_enableRegex = true;}
-;
+RULE: 'rule';
 
 RULE_NAME: 'rule-name';
 
@@ -5044,10 +5003,17 @@ SHA: 'sha';
 
 SHA1
 :
-   'sha1' -> pushMode ( M_SHA1 )
+   'sha1'
+   {
+     if (secondToLastTokenType() != AUTHENTICATION_KEY) {
+       pushMode(M_SHA1);
+     }
+   }
 ;
 
 SHA2_256_128: 'sha2-256-128';
+
+SHA256: 'sha256';
 
 SHA512: 'sha512';
 
@@ -5299,12 +5265,7 @@ STALEPATH_TIME: 'stalepath-time';
 
 STALE_ROUTE: 'stale-route';
 
-STANDARD
-:
-   'standard'
-   { _enableDec = true; _enableAclNum = false; }
-
-;
+STANDARD: 'standard';
 
 STANDBY: 'standby';
 
@@ -5426,6 +5387,8 @@ SUPPRESS: 'suppress';
 SUPPRESS_ARP: 'suppress-arp';
 
 SUPPRESS_FIB_PENDING: 'suppress-fib-pending';
+
+SUPPRESS_INACTIVE: 'suppress-inactive';
 
 SUPPRESS_MAP: 'suppress-map';
 
@@ -6260,12 +6223,7 @@ VPNV4: 'vpnv4';
 
 VPNV6: 'vpnv6';
 
-VRF
-:
-   'vrf'
-   {_enableIpv6Address = false;}
-
-;
+VRF: 'vrf';
 
 VRF_ALSO: 'vrf-also';
 
@@ -6455,96 +6413,6 @@ HEX
    '0x' F_HexDigit+
 ;
 
-VARIABLE
-:
-   (
-      (
-         F_Variable_RequiredVarChar
-         (
-            (
-               {!_enableIpv6Address}?
-
-               F_Variable_VarChar*
-            )
-            |
-            (
-               {_enableIpv6Address}?
-
-               F_Variable_VarChar_Ipv6*
-            )
-         )
-      )
-      |
-      (
-         (
-            F_Variable_VarChar
-            {!_enableIpv6Address}?
-
-            F_Variable_VarChar* F_Variable_RequiredVarChar F_Variable_VarChar*
-         )
-         |
-         (
-            F_Variable_VarChar_Ipv6
-            {_enableIpv6Address}?
-
-            F_Variable_VarChar_Ipv6* F_Variable_RequiredVarChar
-            F_Variable_VarChar_Ipv6*
-         )
-      )
-   )
-   {
-      if (_enableAclNum) {
-         _enableAclNum = false;
-         _enableDec = true;
-      }
-   }
-
-;
-
-ACL_NUM
-:
-   F_Digit
-   {_enableAclNum}?
-
-   F_Digit*
-   {
-	int val = Integer.parseInt(getText());
-	if ((1 <= val && val <= 99) || (1300 <= val && val <= 1999)) {
-		_type = ACL_NUM_STANDARD;
-	}
-	else if ((100 <= val && val <= 199) || (2000 <= val && val <= 2699)) {
-		_type = ACL_NUM_EXTENDED;
-	}
-	else if (200 <= val && val <= 299) {
-		_type = ACL_NUM_PROTOCOL_TYPE_CODE;
-	}
-	else if (600 <= val && val <= 699) {
-		_type = ACL_NUM_APPLETALK;
-	}
-   else if (700 <= val && val <= 799) {
-      _type = ACL_NUM_MAC;
-   }
-	else if (800 <= val && val <= 899) {
-		_type = ACL_NUM_IPX;
-	}
-	else if (900 <= val && val <= 999) {
-		_type = ACL_NUM_EXTENDED_IPX;
-	}
-	else if (1000 <= val && val <= 1099) {
-		_type = ACL_NUM_IPX_SAP;
-	}
-	else if (1100 <= val && val <= 1199) {
-		_type = ACL_NUM_EXTENDED_MAC;
-	}
-	else {
-		_type = ACL_NUM_OTHER;
-	}
-	_enableDec = true;
-	_enableAclNum = false;
-}
-
-;
-
 AMPERSAND
 :
    '&'
@@ -6663,38 +6531,21 @@ FORWARD_SLASH
    '/'
 ;
 
-IP_ADDRESS
-:
-  F_IpAddress {_enableIpAddress}?
-;
+IP_ADDRESS: F_IpAddress;
 
-IP_PREFIX
-:
-  F_IpPrefix {_enableIpAddress}?
-;
+IP_PREFIX: F_IpPrefix;
 
 IPV6_ADDRESS
 :
-  F_Ipv6Address {_enableIpv6Address}?
+  F_Ipv6Address
 ;
 
 IPV6_PREFIX
 :
-  F_Ipv6Prefix {_enableIpv6Address}?
+  F_Ipv6Prefix
 ;
 
-NEWLINE
-:
-  F_Newline
-  {
-    _enableIpv6Address = true;
-    _enableIpAddress = true;
-    _enableDec = true;
-    _enableRegex = false;
-    _enableAclNum = false;
-    _inAccessList = false;
-  }
-;
+NEWLINE: F_Newline;
 
 PAREN_LEFT
 :
@@ -6721,16 +6572,6 @@ PLUS
    '+'
 ;
 
-REGEX
-:
-   '/' {_enableRegex}?
-   (
-      ~('/' | '\\')
-      |
-      ( '\\' '/')
-   )* '/'
-;
-
 SEMICOLON
 :
    ';'
@@ -6743,6 +6584,16 @@ SINGLE_QUOTE
 
 UNDERSCORE: '_';
 
+// Lower priority than IP/IPV6 address and prefix tokens, which share a
+// character set with variable names. ANTLR maximal-munch + rule order let
+// those win on equal-length matches. Excludes ':' so that IPv6 addresses
+// tokenize as IPV6_ADDRESS and "keyword:value" trailers (e.g.
+// "Cryptochecksum:<hash>") split into separate tokens.
+VARIABLE
+:
+  F_Variable_VarChar_Ipv6* F_Variable_RequiredVarChar F_Variable_VarChar_Ipv6*
+;
+
 WS
 :
    F_Whitespace+ -> channel ( HIDDEN )
@@ -6753,26 +6604,23 @@ WS
 /////////////////////////////////////////
 UINT8
 :
-  F_Uint8 {_enableDec}?
+  F_Uint8
 ;
 
 UINT16
 :
-  F_Uint16 {_enableDec}?
+  F_Uint16
 ;
 
 UINT32
 :
-  F_Uint32 {_enableDec}?
+  F_Uint32
 ;
 
 // Lower priority than UINT*
 DEC
 :
-   F_Digit
-   {_enableDec}?
-
-   F_Digit*
+   F_Digit+
 ;
 
 DIGIT
@@ -8035,14 +7883,7 @@ M_RouteMap_NEWLINE
 
 M_RouteMap_VARIABLE
 :
-   F_NonWhitespace+
-   {
-      if (_enableAclNum) {
-         _enableAclNum = false;
-         _enableDec = true;
-      }
-   }
-   -> type ( VARIABLE ) , popMode
+   F_NonWhitespace+ -> type ( VARIABLE ) , popMode
 ;
 
 M_RouteMap_WS

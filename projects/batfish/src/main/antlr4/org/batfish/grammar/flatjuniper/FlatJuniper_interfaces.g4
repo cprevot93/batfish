@@ -23,27 +23,37 @@ eo_802_3ad
    )
 ;
 
-eo_auto_negotiation
+eo_auto_negotiation_null
 :
-   AUTO_NEGOTIATION
+   AUTO_NEGOTIATION null_filler
 ;
-
-eo_no_auto_negotiation
+eo_ethernet_switch_profile_null
 :
-   NO_AUTO_NEGOTIATION
+   ETHERNET_SWITCH_PROFILE null_filler
 ;
-
-eo_null
+eo_flow_control_null
 :
-   (
-      AUTO_NEGOTIATION
-      | FLOW_CONTROL
-      | IGNORE_L3_INCOMPLETES
-      | NO_AUTO_NEGOTIATION
-      | NO_FLOW_CONTROL
-      | LINK_MODE
-      | LOOPBACK
-   ) null_filler
+   FLOW_CONTROL null_filler
+;
+eo_ignore_l3_incompletes_null
+:
+   IGNORE_L3_INCOMPLETES null_filler
+;
+eo_no_auto_negotiation_null
+:
+   NO_AUTO_NEGOTIATION null_filler
+;
+eo_no_flow_control_null
+:
+   NO_FLOW_CONTROL null_filler
+;
+eo_link_mode_null
+:
+   LINK_MODE null_filler
+;
+eo_loopback_null
+:
+   LOOPBACK null_filler
 ;
 
 eo_redundant_parent
@@ -68,8 +78,16 @@ eo8023ad_lacp
 
 ether_options
 :
-   eo_802_3ad
-   | eo_null
+   apply
+   | eo_802_3ad
+   | eo_auto_negotiation_null
+   | eo_ethernet_switch_profile_null
+   | eo_flow_control_null
+   | eo_ignore_l3_incompletes_null
+   | eo_link_mode_null
+   | eo_loopback_null
+   | eo_no_auto_negotiation_null
+   | eo_no_flow_control_null
    | eo_redundant_parent
    | eo_speed
 ;
@@ -95,13 +113,27 @@ i_bandwidth
 i_common
 :
    apply
+   | i_aggregated_ether_options_null
    | i_arp_resp
    | i_description
    | i_common_physical
    | i_disable
    | i_enable
+   | i_encapsulation_null
+   | i_fabric_options_null
    | i_family
-   | i_null
+   | i_forwarding_class_accounting_null
+   | i_framing_null
+   | i_hold_time_null
+   | i_interface_transmit_statistics_null
+   | i_multiservice_options_null
+   | i_no_traps_null
+   | i_proxy_macip_advertisement_null
+   | i_redundant_ether_options_null
+   | i_sonet_options_null
+   | i_traceoptions_null
+   | i_traps_null
+   | i_tunnel_null
    | i_vlan_id
    | i_vlan_id_list
    | i_vlan_tagging
@@ -111,17 +143,31 @@ i_common
 i_common_physical
 :
     apply
+    | i_aggregated_ether_options_null
     | i_damping
     | i_description
     | i_disable
+    | i_encapsulation_null
     | i_ether_options
+    | i_fabric_options_null
     | i_fastether_options
+    | i_forwarding_class_accounting_null
+    | i_framing_null
     | i_gigether_options
+    | i_hold_time_null
+    | i_interface_transmit_statistics_null
     | i_mac
     | i_mtu
-    | i_null
+    | i_multiservice_options_null
+    | i_no_traps_null
+    | i_proxy_macip_advertisement_null
     | i_redundant_ether_options
+    | i_redundant_ether_options_null
+    | i_sonet_options_null
     | i_speed
+    | i_traceoptions_null
+    | i_traps_null
+    | i_tunnel_null
 ;
 
 i_damping
@@ -202,6 +248,7 @@ i_family
       | if_iso
       | if_primary
       | if_mpls
+      | if_vpls_null
    )
 ;
 
@@ -217,7 +264,8 @@ i_gigether_options
 
 i_input_vlan_map
 :
-   INPUT_VLAN_MAP i_vlan_action
+   // The rewrite action is optional; Junos accepts an empty "input-vlan-map {}" block.
+   INPUT_VLAN_MAP i_vlan_action?
 ;
 
 i_link_mode
@@ -242,30 +290,71 @@ i_native_vlan_id
    NATIVE_VLAN_ID id = dec
 ;
 
-i_null
+i_aggregated_ether_options_null
 :
-   (
-      AGGREGATED_ETHER_OPTIONS
-      | ENCAPSULATION
-      | FABRIC_OPTIONS
-      | FORWARDING_CLASS_ACCOUNTING
-      | FRAMING
-      | HOLD_TIME
-      | INTERFACE_TRANSMIT_STATISTICS
-      | MULTISERVICE_OPTIONS
-      | NO_TRAPS
-      | PROXY_MACIP_ADVERTISEMENT
-      | REDUNDANT_ETHER_OPTIONS
-      | SONET_OPTIONS
-      | TRACEOPTIONS
-      | TRAPS
-      | TUNNEL
-   ) null_filler
+   AGGREGATED_ETHER_OPTIONS null_filler
+;
+i_encapsulation_null
+:
+   ENCAPSULATION null_filler
+;
+i_fabric_options_null
+:
+   FABRIC_OPTIONS null_filler
+;
+i_forwarding_class_accounting_null
+:
+   FORWARDING_CLASS_ACCOUNTING null_filler
+;
+i_framing_null
+:
+   FRAMING null_filler
+;
+i_hold_time_null
+:
+   HOLD_TIME null_filler
+;
+i_interface_transmit_statistics_null
+:
+   INTERFACE_TRANSMIT_STATISTICS null_filler
+;
+i_multiservice_options_null
+:
+   MULTISERVICE_OPTIONS null_filler
+;
+i_no_traps_null
+:
+   NO_TRAPS null_filler
+;
+i_proxy_macip_advertisement_null
+:
+   PROXY_MACIP_ADVERTISEMENT null_filler
+;
+i_redundant_ether_options_null
+:
+   REDUNDANT_ETHER_OPTIONS null_filler
+;
+i_sonet_options_null
+:
+   SONET_OPTIONS null_filler
+;
+i_traceoptions_null
+:
+   TRACEOPTIONS null_filler
+;
+i_traps_null
+:
+   TRAPS null_filler
+;
+i_tunnel_null
+:
+   TUNNEL null_filler
 ;
 
 i_output_vlan_map
 :
-   OUTPUT_VLAN_MAP i_vlan_action
+   // The rewrite action is optional; Junos accepts an empty "output-vlan-map {}" block.
+   OUTPUT_VLAN_MAP i_vlan_action?
 ;
 
 i_peer_unit
@@ -302,6 +391,7 @@ i_unit
       | i_input_vlan_map
       | i_output_vlan_map
       | i_peer_unit
+      | i_vlan_tags_null
    )
 ;
 
@@ -325,6 +415,12 @@ i_vlan_tagging
    VLAN_TAGGING
 ;
 
+// Dual-tagged (Q-in-Q) outer/inner VLAN IDs. Not modeled.
+i_vlan_tags_null
+:
+   VLAN_TAGS OUTER outer = vlan_number (INNER inner = vlan_number)?
+;
+
 if_bridge
 :
    BRIDGE
@@ -333,6 +429,7 @@ if_bridge
       | if_storm_control
       | ifbr_filter
       | ifbr_interface_mode
+      | ifbr_vlan_id
       | ifbr_vlan_id_list
    )
 ;
@@ -369,12 +466,15 @@ if_inet
       apply
       | ifi_address
       | ifi_destination_udp_port
+      | ifi_dhcp_null
       | ifi_filter
       | ifi_mtu
       | ifi_no_redirects
-      | ifi_null
+      | ifi_policer_null
       | ifi_rpf_check
       | ifi_sampling_null
+      | ifi_service_null
+      | ifi_targeted_broadcast_null
       | ifi_tcp_mss
    )
 ;
@@ -401,9 +501,20 @@ ifi6_address
       | wildcard
    )
    (
-      ifi6a_preferred
+      ifi6a_ndp
+      | ifi6a_preferred
       | ifi6a_primary
    )?
+;
+
+// Static NDP entry: ndp <ip> (mac | multicast-mac) <mac> [publish]. Mirrors v4 static arp.
+ifi6a_ndp
+:
+   NDP ip = ipv6_address
+   (
+      MAC
+      | MULTICAST_MAC
+   ) MAC_ADDRESS PUBLISH?
 ;
 
 ifi6a_preferred: PREFERRED;
@@ -448,6 +559,12 @@ if_primary
    PRIMARY
 ;
 
+// family vpls (Layer 2 pseudowire). Contents (filter, etc.) are not modeled.
+if_vpls_null
+:
+   VPLS null_filler
+;
+
 if_storm_control
 :
     STORM_CONTROL null_filler
@@ -461,6 +578,11 @@ ifbr_filter
 ifbr_interface_mode
 :
    INTERFACE_MODE interface_mode
+;
+
+ifbr_vlan_id
+:
+   VLAN_ID id = vlan_number
 ;
 
 ifbr_vlan_id_list
@@ -542,14 +664,21 @@ ifi_no_redirects
    NO_REDIRECTS
 ;
 
-ifi_null
+ifi_dhcp_null
 :
-   (
-      DHCP
-      | POLICER
-      | SERVICE
-      | TARGETED_BROADCAST
-   ) null_filler
+   DHCP null_filler
+;
+ifi_policer_null
+:
+   POLICER null_filler
+;
+ifi_service_null
+:
+   SERVICE null_filler
+;
+ifi_targeted_broadcast_null
+:
+   TARGETED_BROADCAST null_filler
 ;
 
 ifi_sampling_null
@@ -757,7 +886,8 @@ int_null
 
 interface_mode
 :
-   TRUNK
+   ACCESS
+   | TRUNK
 ;
 
 intir_member

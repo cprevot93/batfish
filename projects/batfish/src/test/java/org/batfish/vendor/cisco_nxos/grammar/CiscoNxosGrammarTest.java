@@ -130,6 +130,7 @@ import static org.batfish.vendor.cisco_nxos.representation.CiscoNxosConfiguratio
 import static org.batfish.vendor.cisco_nxos.representation.CiscoNxosConfiguration.toJavaRegex;
 import static org.batfish.vendor.cisco_nxos.representation.CiscoNxosStructureType.BGP_NEIGHBOR;
 import static org.batfish.vendor.cisco_nxos.representation.CiscoNxosStructureType.OBJECT_GROUP_IP_ADDRESS;
+import static org.batfish.vendor.cisco_nxos.representation.CiscoNxosStructureType.ROUTER_ISIS;
 import static org.batfish.vendor.cisco_nxos.representation.CiscoNxosStructureType.ROUTE_MAP;
 import static org.batfish.vendor.cisco_nxos.representation.CiscoNxosStructureUsage.BGP_NEXTHOP_ROUTE_MAP;
 import static org.batfish.vendor.cisco_nxos.representation.Conversions.generatedAttributeMapName;
@@ -241,6 +242,7 @@ import org.batfish.datamodel.Ip6;
 import org.batfish.datamodel.IpProtocol;
 import org.batfish.datamodel.IpSpace;
 import org.batfish.datamodel.IpWildcard;
+import org.batfish.datamodel.IsoAddress;
 import org.batfish.datamodel.LineAction;
 import org.batfish.datamodel.LocalRoute;
 import org.batfish.datamodel.LongSpace;
@@ -283,6 +285,8 @@ import org.batfish.datamodel.eigrp.EigrpMetricValues;
 import org.batfish.datamodel.eigrp.EigrpMetricVersion;
 import org.batfish.datamodel.eigrp.EigrpProcess;
 import org.batfish.datamodel.eigrp.EigrpProcessMode;
+import org.batfish.datamodel.isis.IsisInterfaceSettings;
+import org.batfish.datamodel.isis.IsisLevel;
 import org.batfish.datamodel.matchers.HsrpGroupMatchers;
 import org.batfish.datamodel.matchers.IpAccessListMatchers;
 import org.batfish.datamodel.matchers.NssaSettingsMatchers;
@@ -370,11 +374,14 @@ import org.batfish.vendor.cisco_nxos.representation.IpPrefixList;
 import org.batfish.vendor.cisco_nxos.representation.IpPrefixListLine;
 import org.batfish.vendor.cisco_nxos.representation.Ipv6PrefixList;
 import org.batfish.vendor.cisco_nxos.representation.Ipv6PrefixListLine;
+import org.batfish.vendor.cisco_nxos.representation.IsisProcess;
+import org.batfish.vendor.cisco_nxos.representation.IsisVrfConfiguration;
 import org.batfish.vendor.cisco_nxos.representation.Lacp;
 import org.batfish.vendor.cisco_nxos.representation.Layer3Options;
 import org.batfish.vendor.cisco_nxos.representation.LiteralIpAddressSpec;
 import org.batfish.vendor.cisco_nxos.representation.LiteralPortSpec;
 import org.batfish.vendor.cisco_nxos.representation.NameServer;
+import org.batfish.vendor.cisco_nxos.representation.NtpAuthenticationKey;
 import org.batfish.vendor.cisco_nxos.representation.NtpServer;
 import org.batfish.vendor.cisco_nxos.representation.Nve;
 import org.batfish.vendor.cisco_nxos.representation.Nve.HostReachabilityProtocol;
@@ -2099,6 +2106,73 @@ public final class CiscoNxosGrammarTest {
       assertThat(p12345.getExternalAdminCost(), equalTo(22));
       assertThat(p12345.getMetricVersion(), equalTo(EigrpMetricVersion.V2));
     }
+  }
+
+  @Test
+  public void testIsisExtraction() {
+    CiscoNxosConfiguration c = parseVendorConfig("nxos_isis");
+    assertThat(c.getIsisProcesses(), hasKeys("UNDERLAY"));
+    IsisProcess proc = c.getIsisProcess("UNDERLAY");
+    assertThat(proc.getVrfs(), hasKeys(DEFAULT_VRF_NAME, "TENANT"));
+    {
+      IsisVrfConfiguration vrf = proc.getVrf(DEFAULT_VRF_NAME);
+      assertThat(vrf.getNetAddress(), equalTo(new IsoAddress("49.0001.0000.0000.0011.00")));
+      assertThat(vrf.getLevel(), equalTo(IsisLevel.LEVEL_2));
+    }
+    {
+      IsisVrfConfiguration vrf = proc.getVrf("TENANT");
+      assertThat(vrf.getNetAddress(), equalTo(new IsoAddress("49.0001.0000.0000.0099.00")));
+      assertThat(vrf.getLevel(), equalTo(IsisLevel.LEVEL_1_2));
+    }
+    {
+      Interface iface = c.getInterfaces().get("Ethernet1/1");
+      assertThat(iface.getIsisProcess(), equalTo("UNDERLAY"));
+      assertThat(iface.getIsisInterfaceCircuitType(), equalTo(IsisLevel.LEVEL_2));
+      assertTrue(iface.getIsisNetworkPointToPoint());
+    }
+    {
+      Interface iface = c.getInterfaces().get("loopback0");
+      assertThat(iface.getIsisProcess(), equalTo("UNDERLAY"));
+      assertThat(iface.getIsisInterfaceCircuitType(), nullValue());
+      assertFalse(iface.getIsisNetworkPointToPoint());
+    }
+  }
+
+  @Test
+  public void testIsisConversion() throws Exception {
+    Configuration c = parseConfig("nxos_isis");
+    org.batfish.datamodel.isis.IsisProcess proc = c.getDefaultVrf().getIsisProcess();
+    assertThat(proc, notNullValue());
+    assertThat(proc.getNetAddress(), equalTo(new IsoAddress("49.0001.0000.0000.0011.00")));
+    // is-type level-2: only level 2 is active.
+    assertThat(proc.getLevel1(), nullValue());
+    assertThat(proc.getLevel2(), notNullValue());
+    {
+      IsisInterfaceSettings isis = c.getAllInterfaces().get("Ethernet1/1").getIsis();
+      assertThat(isis, notNullValue());
+      assertTrue(isis.getPointToPoint());
+      assertThat(isis.getLevel1(), nullValue());
+      assertThat(isis.getLevel2(), notNullValue());
+    }
+    {
+      // Loopback with `ip router isis` but no circuit-type still gets level-2 from the process.
+      IsisInterfaceSettings isis = c.getAllInterfaces().get("loopback0").getIsis();
+      assertThat(isis, notNullValue());
+      assertThat(isis.getLevel2(), notNullValue());
+    }
+  }
+
+  @Test
+  public void testIsisReferences() throws Exception {
+    String hostname = "nxos_isis";
+    String filename = "configs/" + hostname;
+    Batfish batfish = getBatfishForConfigurationNames(hostname);
+    ConvertConfigurationAnswerElement ccae =
+        batfish.loadConvertConfigurationAnswerElementOrReparse(batfish.getSnapshot());
+
+    assertThat(ccae, hasDefinedStructure(filename, ROUTER_ISIS, "UNDERLAY"));
+    // Self-reference plus the two `ip router isis` interface references.
+    assertThat(ccae, hasNumReferrers(filename, ROUTER_ISIS, "UNDERLAY", 3));
   }
 
   @Test
@@ -5398,29 +5472,71 @@ public final class CiscoNxosGrammarTest {
   public void testNtpExtraction() {
     CiscoNxosConfiguration vc = parseVendorConfig("nxos_ntp");
 
+    assertTrue(vc.getNtpAuthenticate());
+
+    assertThat(vc.getNtpAuthenticationKeys(), hasKeys(1, 12345));
+    {
+      NtpAuthenticationKey key = vc.getNtpAuthenticationKeys().get(1);
+      assertThat(key.getMd5Value(), equalTo("012345678Abz"));
+    }
+    {
+      NtpAuthenticationKey key = vc.getNtpAuthenticationKeys().get(12345);
+      assertThat(key.getMd5Value(), equalTo("aSecondKey"));
+    }
+
+    assertThat(vc.getNtpTrustedKeys(), containsInAnyOrder(1, 12345));
+
     assertThat(vc.getNtpServers(), hasKeys("192.0.2.1", "192.0.2.2", "192.0.2.3", "192.0.2.4"));
     {
       NtpServer ntpServer = vc.getNtpServers().get("192.0.2.1");
       assertFalse(ntpServer.getPrefer());
       assertThat(ntpServer.getUseVrf(), nullValue());
+      assertThat(ntpServer.getKey(), nullValue());
     }
     {
       NtpServer ntpServer = vc.getNtpServers().get("192.0.2.2");
       assertFalse(ntpServer.getPrefer());
       assertThat(ntpServer.getUseVrf(), nullValue());
+      assertThat(ntpServer.getKey(), equalTo(12345));
     }
     {
       NtpServer ntpServer = vc.getNtpServers().get("192.0.2.3");
       assertFalse(ntpServer.getPrefer());
       assertThat(ntpServer.getUseVrf(), equalTo("management"));
+      assertThat(ntpServer.getKey(), equalTo(12345));
     }
     {
       NtpServer ntpServer = vc.getNtpServers().get("192.0.2.4");
       assertTrue(ntpServer.getPrefer());
       assertThat(ntpServer.getUseVrf(), nullValue());
+      assertThat(ntpServer.getKey(), nullValue());
     }
 
+    assertTrue(vc.isNtpServerAuthenticated("192.0.2.2"));
+    assertTrue(vc.isNtpServerAuthenticated("192.0.2.3"));
+    assertFalse(vc.isNtpServerAuthenticated("192.0.2.1"));
+    assertFalse(vc.isNtpServerAuthenticated("192.0.2.4"));
+
     assertThat(vc.getNtpSourceInterface(), equalTo("mgmt0"));
+  }
+
+  @Test
+  public void testNtpNoAuthenticateExtraction() {
+    CiscoNxosConfiguration vc = parseVendorConfig("nxos_ntp_no_authenticate");
+
+    assertFalse(vc.getNtpAuthenticate());
+
+    assertThat(vc.getNtpAuthenticationKeys(), hasKeys(1));
+    assertThat(vc.getNtpAuthenticationKeys().get(1).getMd5Value(), equalTo("012345678Abz"));
+
+    assertThat(vc.getNtpTrustedKeys(), containsInAnyOrder(1));
+
+    assertThat(vc.getNtpServers(), hasKeys("192.0.2.1", "192.0.2.2"));
+    assertThat(vc.getNtpServers().get("192.0.2.1").getKey(), equalTo(1));
+    assertThat(vc.getNtpServers().get("192.0.2.2").getKey(), nullValue());
+
+    assertFalse(vc.isNtpServerAuthenticated("192.0.2.1"));
+    assertFalse(vc.isNtpServerAuthenticated("192.0.2.2"));
   }
 
   @Test

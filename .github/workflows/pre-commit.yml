@@ -27,22 +27,27 @@ jobs:
     needs:
       - get_date
     steps:
-      - uses: actions/checkout@v6
-      - name: google-java-format cache
-        uses: actions/cache@v5
+      - uses: actions/checkout@v7
+      - name: Bazelisk cache
+        uses: actions/cache@v6
         with:
-          path: "~/.cache/google-java-format"
-          key: google-java-format-${{ hashFiles('tools/fix_java_format.sh') }}
-      - uses: actions/setup-java@v5
+          path: "~/.cache/bazelisk"
+          key: ${{runner.os}}-bazelisk-${{ hashFiles('.bazelversion') }}
+      - name: Bazel cache
+        uses: actions/cache@v6
         with:
-          distribution: "temurin"
-          java-version: "17"
+          path: "~/.cache/bazel"
+          key: ${{runner.os}}-bazel-format-${{ hashFiles('.bazelversion', 'MODULE.bazel', 'maven_install.json') }}
+          restore-keys: |
+            ${{runner.os}}-bazel-format-
       - name: Java Formatting
-        run: tools/fix_java_format.sh --check
+        run: bazel run //tools/format:format.check
+      - name: Buildifier
+        run: bazel run //:buildifier.check
   json_template:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
@@ -54,41 +59,44 @@ jobs:
   checkstyle:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - name: Checkstyle cache
-        uses: actions/cache@v5
+      - uses: actions/checkout@v7
+      - name: Bazelisk cache
+        uses: actions/cache@v6
         with:
-          path: "~/.cache/checkstyle"
-          key: checkstyle-${{ hashFiles('tools/run_checkstyle.sh') }}
-      - uses: actions/setup-java@v5
+          path: "~/.cache/bazelisk"
+          key: ${{runner.os}}-bazelisk-${{ hashFiles('.bazelversion') }}
+      - name: Bazel cache
+        uses: actions/cache@v6
         with:
-          distribution: "temurin"
-          java-version: "17"
+          path: "~/.cache/bazel"
+          key: ${{runner.os}}-bazel-checkstyle-${{ hashFiles('.bazelversion', 'MODULE.bazel', 'maven_install.json') }}
+          restore-keys: |
+            ${{runner.os}}-bazel-checkstyle-
       - name: Checkstyle
-        run: tools/run_checkstyle.sh
+        run: bazel run //tools/checkstyle:checkstyle.check
   bazel_build_test_and_pmd:
     needs:
       - get_date
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Bazelisk cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: "~/.cache/bazelisk"
           key: ${{runner.os}}-bazelisk-${{ hashFiles('.bazelversion') }}
       - name: Bazel cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: "~/.cache/bazel"
-          key: ${{runner.os}}-bazel-17-${{ hashFiles('.bazelversion', 'WORKSPACE', 'maven_install.json') }}-test-${{ needs.get_date.outputs.ymd }}
+          key: ${{runner.os}}-bazel-25-${{ hashFiles('.bazelversion', 'WORKSPACE', 'maven_install.json') }}-test-${{ needs.get_date.outputs.ymd }}
           restore-keys: |
-            ${{runner.os}}-bazel-17-${{ hashFiles('.bazelversion', 'WORKSPACE', 'maven_install.json') }}-test-
-            ${{runner.os}}-bazel-17-${{ hashFiles('.bazelversion', 'WORKSPACE', 'maven_install.json') }}-
+            ${{runner.os}}-bazel-25-${{ hashFiles('.bazelversion', 'WORKSPACE', 'maven_install.json') }}-test-
+            ${{runner.os}}-bazel-25-${{ hashFiles('.bazelversion', 'WORKSPACE', 'maven_install.json') }}-
       - uses: actions/setup-java@v5
         with:
           distribution: "temurin"
-          java-version: "17"
+          java-version: "25"
       - name: Bazel build and test
         run: |
           # Stop on first test failure for PRs; keep going for scheduled runs to see all failures
@@ -105,7 +113,7 @@ jobs:
       - name: Save JAR
         uses: actions/upload-artifact@v7
         with:
-          name: allinone_jar_17
+          name: allinone_jar_25
           path: workspace/allinone.jar
   code_cov:
     needs:
@@ -114,14 +122,14 @@ jobs:
       - get_date
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Bazelisk cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: "~/.cache/bazelisk"
           key: ${{runner.os}}-bazelisk-${{ hashFiles('.bazelversion') }}
       - name: Bazel cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: "~/.cache/bazel"
           key: ${{runner.os}}-bazel-${{ hashFiles('.bazelversion', 'WORKSPACE', 'maven_install.json') }}-junit-${{ needs.get_date.outputs.ymd }}
@@ -132,7 +140,7 @@ jobs:
       - uses: actions/setup-java@v5
         with:
           distribution: "temurin"
-          java-version: "17"
+          java-version: "25"
       - name: Bazel Junit Tests and Coverage
         run: |
           bazel coverage //projects/... \
@@ -141,7 +149,7 @@ jobs:
             --combined_report=lcov \
             --instrument_test_targets=false
       - name: Generate report
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         env:
           CODECOV_TOKEN: ${{ secrets.BATFISH_CODECOV_TOKEN }}
         with:

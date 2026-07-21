@@ -32995,6 +32995,8 @@
               "routerId" : "198.188.136.21",
               "aggregates" : [
                 {
+                  "asPathMode" : "NONE",
+                  "installInMainRib" : true,
                   "network" : "192.154.2.0/24",
                   "suppressionPolicy" : "~suppress~rp~summary-only~"
                 }
@@ -41067,7 +41069,9 @@
               "routerId" : "0.0.0.0",
               "aggregates" : [
                 {
+                  "asPathMode" : "NONE",
                   "attributePolicy" : "AGGREGATE-MAP",
+                  "installInMainRib" : true,
                   "network" : "192.168.0.0/16",
                   "suppressionPolicy" : "~suppress~rp~summary-only~"
                 }
@@ -51889,7 +51893,10 @@
                   "localIp" : "169.254.0.1",
                   "peerInterface" : "swp1",
                   "remoteAsns" : "1-65499,65501-4294967295",
-                  "replaceNonLocalAsesOnExport" : false
+                  "replaceNonLocalAsesOnExport" : false,
+                  "sessionVrf" : {
+                    "type" : "AnyVrf"
+                  }
                 },
                 "swp2" : {
                   "class" : "org.batfish.datamodel.BgpUnnumberedPeerConfig",
@@ -51942,7 +51949,10 @@
                   "localIp" : "169.254.0.1",
                   "peerInterface" : "swp2",
                   "remoteAsns" : "65500",
-                  "replaceNonLocalAsesOnExport" : false
+                  "replaceNonLocalAsesOnExport" : false,
+                  "sessionVrf" : {
+                    "type" : "AnyVrf"
+                  }
                 },
                 "swp3" : {
                   "class" : "org.batfish.datamodel.BgpUnnumberedPeerConfig",
@@ -51995,7 +52005,10 @@
                   "localIp" : "169.254.0.1",
                   "peerInterface" : "swp3",
                   "remoteAsns" : "65000",
-                  "replaceNonLocalAsesOnExport" : false
+                  "replaceNonLocalAsesOnExport" : false,
+                  "sessionVrf" : {
+                    "type" : "AnyVrf"
+                  }
                 }
               },
               "multipathEbgp" : true,
@@ -52245,7 +52258,10 @@
                   "localAs" : 65500,
                   "peerAddress" : "1.1.1.1",
                   "remoteAsns" : "1",
-                  "replaceNonLocalAsesOnExport" : false
+                  "replaceNonLocalAsesOnExport" : false,
+                  "sessionVrf" : {
+                    "type" : "AnyVrf"
+                  }
                 }
               },
               "tieBreaker" : "ARRIVAL_ORDER"
@@ -52292,7 +52308,10 @@
                   },
                   "peerAddress" : "1.1.1.2",
                   "remoteAsns" : "2",
-                  "replaceNonLocalAsesOnExport" : false
+                  "replaceNonLocalAsesOnExport" : false,
+                  "sessionVrf" : {
+                    "type" : "AnyVrf"
+                  }
                 }
               },
               "tieBreaker" : "ARRIVAL_ORDER"
@@ -60691,6 +60710,8 @@
               "routerId" : "0.0.0.0",
               "aggregates" : [
                 {
+                  "asPathMode" : "NONE",
+                  "installInMainRib" : true,
                   "network" : "1.0.0.0/8",
                   "suppressionPolicy" : "~suppress~rp~summary-only~"
                 }
@@ -115366,6 +115387,7 @@
             "switchportMode" : "NONE",
             "switchportTrunkEncapsulation" : "DOT1Q",
             "type" : "VLAN",
+            "vlan" : 1,
             "vrf" : "~NULL_VRF~"
           }
         },

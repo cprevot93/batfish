@@ -128,7 +128,6 @@ import static org.batfish.representation.cisco.CiscoStructureUsage.BGP_REDISTRIB
 import static org.batfish.representation.cisco.CiscoStructureUsage.BGP_ROUTE_MAP_ADVERTISE;
 import static org.batfish.representation.cisco.CiscoStructureUsage.BGP_ROUTE_MAP_UNSUPPRESS;
 import static org.batfish.representation.cisco.CiscoStructureUsage.BGP_UPDATE_SOURCE_INTERFACE;
-import static org.batfish.representation.cisco.CiscoStructureUsage.BGP_USE_AF_GROUP;
 import static org.batfish.representation.cisco.CiscoStructureUsage.BGP_USE_NEIGHBOR_GROUP;
 import static org.batfish.representation.cisco.CiscoStructureUsage.BGP_USE_SESSION_GROUP;
 import static org.batfish.representation.cisco.CiscoStructureUsage.CLASS_MAP_ACCESS_GROUP;
@@ -488,7 +487,6 @@ import org.batfish.grammar.cisco.CiscoParser.Allowas_in_bgp_tailContext;
 import org.batfish.grammar.cisco.CiscoParser.Always_compare_med_rb_stanzaContext;
 import org.batfish.grammar.cisco.CiscoParser.As_exprContext;
 import org.batfish.grammar.cisco.CiscoParser.As_path_multipath_relax_rb_stanzaContext;
-import org.batfish.grammar.cisco.CiscoParser.Auto_summary_bgp_tailContext;
 import org.batfish.grammar.cisco.CiscoParser.Bgp_address_familyContext;
 import org.batfish.grammar.cisco.CiscoParser.Bgp_asnContext;
 import org.batfish.grammar.cisco.CiscoParser.Bgp_bp_compare_routerid_rb_stanzaContext;
@@ -497,6 +495,7 @@ import org.batfish.grammar.cisco.CiscoParser.Bgp_conf_peers_rb_stanzaContext;
 import org.batfish.grammar.cisco.CiscoParser.Bgp_enforce_first_as_rb_stanzaContext;
 import org.batfish.grammar.cisco.CiscoParser.Bgp_listen_range_rb_stanzaContext;
 import org.batfish.grammar.cisco.CiscoParser.Bgp_redistribute_internal_rb_stanzaContext;
+import org.batfish.grammar.cisco.CiscoParser.Bgp_suppress_inactive_rb_stanzaContext;
 import org.batfish.grammar.cisco.CiscoParser.Cd_match_addressContext;
 import org.batfish.grammar.cisco.CiscoParser.Cd_set_isakmp_profileContext;
 import org.batfish.grammar.cisco.CiscoParser.Cd_set_peerContext;
@@ -633,7 +632,9 @@ import org.batfish.grammar.cisco.CiscoParser.If_ip_verifyContext;
 import org.batfish.grammar.cisco.CiscoParser.If_ip_vrf_forwardingContext;
 import org.batfish.grammar.cisco.CiscoParser.If_ip_vrf_sitemapContext;
 import org.batfish.grammar.cisco.CiscoParser.If_ipv6_traffic_filterContext;
+import org.batfish.grammar.cisco.CiscoParser.If_isis_enableContext;
 import org.batfish.grammar.cisco.CiscoParser.If_isis_metricContext;
+import org.batfish.grammar.cisco.CiscoParser.If_isis_passiveContext;
 import org.batfish.grammar.cisco.CiscoParser.If_member_interfaceContext;
 import org.batfish.grammar.cisco.CiscoParser.If_mtuContext;
 import org.batfish.grammar.cisco.CiscoParser.If_service_policyContext;
@@ -774,10 +775,14 @@ import org.batfish.grammar.cisco.CiscoParser.No_neighbor_activate_rb_stanzaConte
 import org.batfish.grammar.cisco.CiscoParser.No_neighbor_shutdown_rb_stanzaContext;
 import org.batfish.grammar.cisco.CiscoParser.No_redistribute_connected_rb_stanzaContext;
 import org.batfish.grammar.cisco.CiscoParser.No_route_map_stanzaContext;
-import org.batfish.grammar.cisco.CiscoParser.No_shutdown_rb_stanzaContext;
 import org.batfish.grammar.cisco.CiscoParser.Ntp_access_groupContext;
+import org.batfish.grammar.cisco.CiscoParser.Ntp_authenticateContext;
+import org.batfish.grammar.cisco.CiscoParser.Ntp_authentication_keyContext;
+import org.batfish.grammar.cisco.CiscoParser.Ntp_hash_algorithmContext;
+import org.batfish.grammar.cisco.CiscoParser.Ntp_keyContext;
 import org.batfish.grammar.cisco.CiscoParser.Ntp_serverContext;
 import org.batfish.grammar.cisco.CiscoParser.Ntp_source_interfaceContext;
+import org.batfish.grammar.cisco.CiscoParser.Ntp_trusted_keyContext;
 import org.batfish.grammar.cisco.CiscoParser.O_networkContext;
 import org.batfish.grammar.cisco.CiscoParser.O_serviceContext;
 import org.batfish.grammar.cisco.CiscoParser.Og_icmp_typeContext;
@@ -920,8 +925,6 @@ import org.batfish.grammar.cisco.CiscoParser.Roa_filterlistContext;
 import org.batfish.grammar.cisco.CiscoParser.Roa_nssaContext;
 import org.batfish.grammar.cisco.CiscoParser.Roa_rangeContext;
 import org.batfish.grammar.cisco.CiscoParser.Roa_stubContext;
-import org.batfish.grammar.cisco.CiscoParser.Roi_costContext;
-import org.batfish.grammar.cisco.CiscoParser.Roi_passiveContext;
 import org.batfish.grammar.cisco.CiscoParser.Route_distinguisherContext;
 import org.batfish.grammar.cisco.CiscoParser.Route_map_bgp_tailContext;
 import org.batfish.grammar.cisco.CiscoParser.Route_map_stanzaContext;
@@ -1064,7 +1067,6 @@ import org.batfish.grammar.cisco.CiscoParser.Uint32Context;
 import org.batfish.grammar.cisco.CiscoParser.Uint8Context;
 import org.batfish.grammar.cisco.CiscoParser.Unsuppress_map_bgp_tailContext;
 import org.batfish.grammar.cisco.CiscoParser.Update_source_bgp_tailContext;
-import org.batfish.grammar.cisco.CiscoParser.Use_af_group_bgp_tailContext;
 import org.batfish.grammar.cisco.CiscoParser.Use_neighbor_group_bgp_tailContext;
 import org.batfish.grammar.cisco.CiscoParser.Use_session_group_bgp_tailContext;
 import org.batfish.grammar.cisco.CiscoParser.VariableContext;
@@ -1166,6 +1168,7 @@ import org.batfish.representation.cisco.NetworkObjectGroup;
 import org.batfish.representation.cisco.NetworkObjectGroupAddressSpecifier;
 import org.batfish.representation.cisco.NetworkObjectInfo;
 import org.batfish.representation.cisco.NssaSettings;
+import org.batfish.representation.cisco.NtpAuthenticationKey;
 import org.batfish.representation.cisco.OspfNetworkType;
 import org.batfish.representation.cisco.OspfProcess;
 import org.batfish.representation.cisco.OspfRedistributionPolicy;
@@ -1494,8 +1497,6 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
   private String _currentIosNatPoolName;
 
   private Long _currentOspfArea;
-
-  private String _currentOspfInterface;
 
   private OspfProcess _currentOspfProcess;
 
@@ -1858,6 +1859,12 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
   public void exitNo_bgp_enforce_first_as_stanza(No_bgp_enforce_first_as_stanzaContext ctx) {
     BgpProcess proc = currentVrf().getBgpProcess();
     proc.setEnforceFirstAs(false);
+  }
+
+  @Override
+  public void exitBgp_suppress_inactive_rb_stanza(Bgp_suppress_inactive_rb_stanzaContext ctx) {
+    BgpProcess proc = currentVrf().getBgpProcess();
+    proc.getMasterBgpPeerGroup().setSuppressInactive(true);
   }
 
   @Override
@@ -4256,11 +4263,6 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
   }
 
   @Override
-  public void exitAuto_summary_bgp_tail(Auto_summary_bgp_tailContext ctx) {
-    todo(ctx);
-  }
-
-  @Override
   public void exitS_banner_ios(S_banner_iosContext ctx) {
     String bannerType = toBannerType(ctx.banner_header);
     if (bannerType == null) {
@@ -5695,6 +5697,20 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
     long metric = toLong(ctx.metric);
     for (Interface iface : _currentInterfaces) {
       iface.setIsisCost(metric);
+    }
+  }
+
+  @Override
+  public void exitIf_isis_enable(If_isis_enableContext ctx) {
+    for (Interface iface : _currentInterfaces) {
+      iface.setIsisInterfaceMode(IsisInterfaceMode.ACTIVE);
+    }
+  }
+
+  @Override
+  public void exitIf_isis_passive(If_isis_passiveContext ctx) {
+    for (Interface iface : _currentInterfaces) {
+      iface.setIsisInterfaceMode(IsisInterfaceMode.PASSIVE);
     }
   }
 
@@ -7595,13 +7611,6 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
   }
 
   @Override
-  public void exitNo_shutdown_rb_stanza(No_shutdown_rb_stanzaContext ctx) {
-    // TODO: see if it is always ok to set active on 'no shutdown'
-    _currentPeerGroup.setShutdown(false);
-    _currentPeerGroup.setActive(true);
-  }
-
-  @Override
   public void exitNtp_access_group(Ntp_access_groupContext ctx) {
     String name = ctx.name.getText();
     int line = ctx.name.getStart().getLine();
@@ -7614,6 +7623,58 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
   }
 
   @Override
+  public void exitNtp_authenticate(Ntp_authenticateContext ctx) {
+    _configuration.setNtpAuthenticate(true);
+  }
+
+  @Override
+  public void exitNtp_authentication_key(Ntp_authentication_keyContext ctx) {
+    Optional<Integer> maybeKeyNum = toInteger(ctx, ctx.key_num);
+    if (!maybeKeyNum.isPresent()) {
+      return;
+    }
+    NtpAuthenticationKey key =
+        _configuration
+            .getNtpAuthenticationKeys()
+            .computeIfAbsent(maybeKeyNum.get(), NtpAuthenticationKey::new);
+    key.setHashAlgorithm(toHashAlgorithm(ctx.hash_algorithm));
+    key.setValue(ctx.key.getText());
+  }
+
+  private NtpAuthenticationKey.HashAlgorithm toHashAlgorithm(Ntp_hash_algorithmContext ctx) {
+    if (ctx.CMAC_AES_128() != null) {
+      return NtpAuthenticationKey.HashAlgorithm.CMAC_AES_128;
+    } else if (ctx.HMAC_SHA1() != null) {
+      return NtpAuthenticationKey.HashAlgorithm.HMAC_SHA1;
+    } else if (ctx.HMAC_SHA2_256() != null) {
+      return NtpAuthenticationKey.HashAlgorithm.HMAC_SHA2_256;
+    } else if (ctx.MD5() != null) {
+      return NtpAuthenticationKey.HashAlgorithm.MD5;
+    } else {
+      throw convError(NtpAuthenticationKey.HashAlgorithm.class, ctx);
+    }
+  }
+
+  @Override
+  public void exitNtp_trusted_key(Ntp_trusted_keyContext ctx) {
+    Optional<Integer> maybeLow = toInteger(ctx, ctx.key_low);
+    if (!maybeLow.isPresent()) {
+      return;
+    }
+    int low = maybeLow.get();
+    int high = low;
+    if (ctx.key_high != null) {
+      Optional<Integer> maybeHigh = toInteger(ctx, ctx.key_high);
+      if (!maybeHigh.isPresent()) {
+        return;
+      }
+      high = maybeHigh.get();
+    }
+    _configuration.setNtpTrustedKeys(
+        _configuration.getNtpTrustedKeys().union(IntegerSpace.of(Range.closed(low, high))));
+  }
+
+  @Override
   public void exitNtp_server(Ntp_serverContext ctx) {
     Ntp ntp = _configuration.getCf().getNtp();
     String hostname = ctx.hostname.getText();
@@ -7622,6 +7683,13 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
       String vrfName = ctx.vrf.getText();
       server.setVrf(vrfName);
       initVrf(vrfName);
+    }
+    org.batfish.representation.cisco.NtpServer vsServer =
+        _configuration
+            .getNtpServers()
+            .computeIfAbsent(hostname, org.batfish.representation.cisco.NtpServer::new);
+    if (ctx.key != null) {
+      toInteger(ctx, ctx.key).ifPresent(vsServer::setKey);
     }
     if (ctx.PREFER() != null) {
       // TODO: implement
@@ -8676,20 +8744,6 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
     if (ctx.iname != null) {
       String ifaceName = getCanonicalInterfaceName(ctx.iname.getText());
       _configuration.referenceStructure(INTERFACE, ifaceName, usage, line);
-    }
-  }
-
-  @Override
-  public void exitRoi_cost(Roi_costContext ctx) {
-    Interface iface = _configuration.getInterfaces().get(_currentOspfInterface);
-    int cost = toInteger(ctx.cost);
-    iface.setOspfCost(cost);
-  }
-
-  @Override
-  public void exitRoi_passive(Roi_passiveContext ctx) {
-    if (ctx.ENABLE() != null) {
-      _currentOspfProcess.getPassiveInterfaces().add(_currentOspfInterface);
     }
   }
 
@@ -9761,14 +9815,6 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
     } else {
       throw new BatfishException("Unexpected context for use neighbor group");
     }
-  }
-
-  @Override
-  public void exitUse_af_group_bgp_tail(Use_af_group_bgp_tailContext ctx) {
-    String groupName = ctx.name.getText();
-    _configuration.referenceStructure(
-        BGP_AF_GROUP, groupName, BGP_USE_AF_GROUP, ctx.name.getStart().getLine());
-    todo(ctx);
   }
 
   @Override
@@ -10959,6 +11005,10 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
     return Optional.of(num);
   }
 
+  private @Nonnull Optional<Integer> toInteger(ParserRuleContext messageCtx, Ntp_keyContext ctx) {
+    return toIntegerInSpace(messageCtx, ctx, NTP_KEY_RANGE, "NTP key number");
+  }
+
   @Override
   public void visitErrorNode(ErrorNode errorNode) {
     Token token = errorNode.getSymbol();
@@ -10994,4 +11044,6 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
       IntegerSpace.of(Range.closed(0, 255));
   private static final IntegerSpace HSRP_VERSION_2_GROUP_RANGE =
       IntegerSpace.of(Range.closed(0, 4095));
+
+  private static final IntegerSpace NTP_KEY_RANGE = IntegerSpace.of(Range.closed(1, 65535));
 }

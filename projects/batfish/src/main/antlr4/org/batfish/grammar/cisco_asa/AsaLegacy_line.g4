@@ -147,22 +147,6 @@ l_transport
    ) prot += variable+ NEWLINE
 ;
 
-lc_null
-:
-   (
-      ACCOUNTING
-      | AUTHENTICATION
-      | AUTHORIZATION
-      | ENABLE_AUTHENTICATION
-      | IDLE_TIMEOUT
-      | LENGTH
-      | LOGIN_AUTHENTICATION
-      | PASSWORD
-      | SESSION_TIMEOUT
-      | SPEED
-   ) null_rest_of_line
-;
-
 s_line
 :
    LINE line_type

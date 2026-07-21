@@ -167,16 +167,6 @@ as_path_multipath_relax_rb_stanza
    NO? BGP? BESTPATH AS_PATH MULTIPATH_RELAX NEWLINE
 ;
 
-auto_summary_bgp_tail
-:
-   NO? AUTO_SUMMARY NEWLINE
-;
-
-bgp_advertise_inactive_rb_stanza
-:
-   BGP ADVERTISE_INACTIVE NEWLINE
-;
-
 //confederations are not currently implemented
 //not putting this under null so we can warn the user
 
@@ -315,11 +305,6 @@ inherit_peer_policy_bgp_tail
    INHERIT PEER_POLICY name = variable_permissive num = uint_legacy? NEWLINE
 ;
 
-inherit_peer_session_bgp_tail
-:
-   INHERIT PEER_SESSION name = variable_permissive NEWLINE
-;
-
 local_as_bgp_tail
 :
    LOCAL_AS bgp_asn
@@ -345,11 +330,6 @@ maximum_paths_bgp_tail
    (
       ECMP ecmp_paths = uint_legacy
    )? SELECTIVE? NEWLINE
-;
-
-maximum_prefix_bgp_tail
-:
-   MAXIMUM_PREFIX uint_legacy NEWLINE
 ;
 
 neighbor_block_address_family
@@ -806,7 +786,6 @@ router_bgp_stanza_tail
    | aggregate_address_rb_stanza
    | always_compare_med_rb_stanza
    | as_path_multipath_relax_rb_stanza
-   | bgp_advertise_inactive_rb_stanza
    | bgp_confederation_rb_stanza
    | bgp_listen_range_rb_stanza
    | bgp_maxas_limit_rb_stanza
@@ -877,11 +856,6 @@ subnet_bgp_tail
       prefix = IP_PREFIX
       | ipv6_prefix = IPV6_PREFIX
    ) NEWLINE
-;
-
-template_peer_address_family
-:
-   address_family_header bgp_tail* address_family_footer
 ;
 
 template_peer_policy_rb_stanza

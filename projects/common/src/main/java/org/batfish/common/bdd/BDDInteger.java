@@ -194,4 +194,94 @@ public abstract class BDDInteger implements Serializable {
   public BDDFactory getFactory() {
     return _factory;
   }
+
+  // ---- symbolic (integer-vs-integer) comparisons ------------------------------------------------
+  //
+  // The above leq/geq/range compare this integer against a *constant*. The methods below compare
+  // this integer against another *symbolic* BDDInteger, producing a BDD over both operands'
+  // variables: the set of assignments under which the relation holds. Both integers must have the
+  // same bit width. These are unsigned comparisons; _bitvec is most-significant-bit first.
+
+  /**
+   * The set of assignments under which this integer is strictly less than {@code other} (unsigned).
+   * Both integers must have the same width.
+   */
+  public BDD lt(BDDInteger other) {
+    return ltImpl(other, /* orEqual= */ false);
+  }
+
+  /**
+   * The set of assignments under which this integer is less than or equal to {@code other}
+   * (unsigned). Both integers must have the same width.
+   */
+  public BDD leq(BDDInteger other) {
+    return ltImpl(other, /* orEqual= */ true);
+  }
+
+  /**
+   * The set of assignments under which this integer is strictly greater than {@code other}
+   * (unsigned). Both integers must have the same width.
+   */
+  public BDD gt(BDDInteger other) {
+    return other.ltImpl(this, /* orEqual= */ false);
+  }
+
+  /**
+   * The set of assignments under which this integer is greater than or equal to {@code other}
+   * (unsigned). Both integers must have the same width.
+   */
+  public BDD geq(BDDInteger other) {
+    return other.ltImpl(this, /* orEqual= */ true);
+  }
+
+  /**
+   * The set of assignments under which this integer equals {@code other} bit-for-bit. Both integers
+   * must have the same width.
+   */
+  public BDD eq(BDDInteger other) {
+    return firstBitsEqual(other, _bitvec.length);
+  }
+
+  /**
+   * The set of assignments under which this integer and {@code other} agree on their first {@code
+   * numBits} (most-significant) bits, ignoring the lower bits. For an IP-valued integer this is
+   * "the two addresses are in the same {@code /numBits} subnet". {@code numBits == } the width
+   * reduces to {@link #eq}; {@code numBits == 0} is unconstrained ({@code one}). Both integers must
+   * have the same width.
+   */
+  public BDD firstBitsEqual(BDDInteger other, int numBits) {
+    checkArgument(_bitvec.length == other._bitvec.length, "operands must have equal width");
+    checkArgument(numBits >= 0 && numBits <= _bitvec.length, "numBits out of range: %s", numBits);
+    // _bitvec is most-significant-bit first, so the first numBits entries are the high bits.
+    BDD acc = _factory.one();
+    for (int i = 0; i < numBits; i++) {
+      // bit-i equal: biimp is the xnor, computed directly and preserving both operands.
+      acc = acc.andWith(_bitvec[i].biimp(other._bitvec[i]));
+    }
+    return acc;
+  }
+
+  /**
+   * Unsigned "this {@code <} other" (or {@code <=} when {@code orEqual}), as a
+   * most-significant-bit- first lexicographic comparison: scanning from the high bit, the result is
+   * determined at the first differing bit (this has 0, other has 1 => less). Implemented with a
+   * single backward sweep: {@code acc} is the relation on the suffix already processed; at each
+   * more-significant bit {@code acc' = (a < b) OR (a == b AND acc)}.
+   */
+  private BDD ltImpl(BDDInteger other, boolean orEqual) {
+    checkArgument(_bitvec.length == other._bitvec.length, "operands must have equal width");
+    // Base case on the empty suffix: equal (so <= is true, < is false).
+    BDD acc = orEqual ? _factory.one() : _factory.zero();
+    // Scan least-significant to most-significant (high index to low index).
+    for (int i = _bitvec.length - 1; i >= 0; i--) {
+      BDD a = _bitvec[i];
+      BDD b = other._bitvec[i];
+      // thisBitLess = !a & b ; bitsEqual = a <-> b.
+      BDD thisBitLess = b.diff(a); // b AND NOT a
+      BDD bitsEqual = a.biimp(b);
+      // acc = thisBitLess OR (bitsEqual AND acc)
+      acc = thisBitLess.orWith(bitsEqual.andWith(acc));
+    }
+    return acc;
+  }
 }

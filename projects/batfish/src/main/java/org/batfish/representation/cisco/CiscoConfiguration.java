@@ -466,6 +466,14 @@ public final class CiscoConfiguration extends VendorConfiguration {
 
   private String _ntpSourceInterface;
 
+  private boolean _ntpAuthenticate;
+
+  private final Map<Integer, NtpAuthenticationKey> _ntpAuthenticationKeys;
+
+  private IntegerSpace _ntpTrustedKeys;
+
+  private final Map<String, NtpServer> _ntpServers;
+
   private final Map<String, ObjectGroup> _objectGroups;
 
   private final Map<String, PortObjectGroup> _portObjectGroups;
@@ -542,6 +550,9 @@ public final class CiscoConfiguration extends VendorConfiguration {
     _networkObjectGroups = new TreeMap<>();
     _networkObjectInfos = new TreeMap<>();
     _networkObjects = new TreeMap<>();
+    _ntpAuthenticationKeys = new TreeMap<>();
+    _ntpTrustedKeys = IntegerSpace.EMPTY;
+    _ntpServers = new TreeMap<>();
     _objectGroups = new TreeMap<>();
     _prefixLists = new TreeMap<>();
     _prefix6Lists = new TreeMap<>();
@@ -764,6 +775,44 @@ public final class CiscoConfiguration extends VendorConfiguration {
 
   public String getNtpSourceInterface() {
     return _ntpSourceInterface;
+  }
+
+  public boolean getNtpAuthenticate() {
+    return _ntpAuthenticate;
+  }
+
+  public void setNtpAuthenticate(boolean ntpAuthenticate) {
+    _ntpAuthenticate = ntpAuthenticate;
+  }
+
+  public Map<Integer, NtpAuthenticationKey> getNtpAuthenticationKeys() {
+    return _ntpAuthenticationKeys;
+  }
+
+  public IntegerSpace getNtpTrustedKeys() {
+    return _ntpTrustedKeys;
+  }
+
+  public void setNtpTrustedKeys(IntegerSpace ntpTrustedKeys) {
+    _ntpTrustedKeys = ntpTrustedKeys;
+  }
+
+  public Map<String, NtpServer> getNtpServers() {
+    return _ntpServers;
+  }
+
+  /**
+   * Whether the NTP server with the given hostname is authenticated: NTP authentication is enabled,
+   * the server references a key, and that key is both defined via {@code ntp authentication-key}
+   * and trusted via {@code ntp trusted-key}.
+   */
+  public boolean isNtpServerAuthenticated(String hostname) {
+    NtpServer server = _ntpServers.get(hostname);
+    if (server == null || !_ntpAuthenticate) {
+      return false;
+    }
+    Integer key = server.getKey();
+    return key != null && _ntpAuthenticationKeys.containsKey(key) && _ntpTrustedKeys.contains(key);
   }
 
   public Map<String, Prefix6List> getPrefix6Lists() {
@@ -1177,11 +1226,10 @@ public final class CiscoConfiguration extends VendorConfiguration {
               .setAllowLocalAsIn(lpg.getAllowAsIn())
               .setAllowRemoteAsOut(ALWAYS) /* no outgoing remote-as check on IOS */
               /*
-               * On Cisco IOS, advertise-inactive is true by default. This can be modified by
-               * "bgp suppress-inactive" command,
-               * which we currently do not parse/extract. So we choose the default value here.
+               * On Cisco IOS, advertise-inactive is true by default. The "bgp suppress-inactive"
+               * command disables it.
                */
-              .setAdvertiseInactive(true)
+              .setAdvertiseInactive(!firstNonNull(lpg.getSuppressInactive(), Boolean.FALSE))
               .setSendCommunity(lpg.getSendCommunity())
               .setSendExtendedCommunity(lpg.getSendExtendedCommunity())
               .build();
@@ -1349,6 +1397,7 @@ public final class CiscoConfiguration extends VendorConfiguration {
         || name.startsWith("HundredGigabitEthernet")
         || name.startsWith("HundredGigE")
         || name.startsWith("FiftyGigE")
+        || name.startsWith("FiveGigabitEthernet")
         || name.startsWith("FortyGigE")
         || name.startsWith("FourHundredGigE")
         || name.startsWith("TenGigabitEthernet")
@@ -3295,7 +3344,6 @@ public final class CiscoConfiguration extends VendorConfiguration {
     markConcreteStructure(CiscoStructureType.BGP_NEIGHBOR);
     markConcreteStructure(CiscoStructureType.BGP_LISTEN_RANGE);
     // BGP inheritance. This is complicated, as there are many similar-but-overlapping concepts
-    markConcreteStructure(CiscoStructureType.BGP_AF_GROUP, CiscoStructureUsage.BGP_USE_AF_GROUP);
     markConcreteStructure(
         CiscoStructureType.BGP_NEIGHBOR_GROUP, CiscoStructureUsage.BGP_USE_NEIGHBOR_GROUP);
     markConcreteStructure(

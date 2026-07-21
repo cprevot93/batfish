@@ -197,6 +197,8 @@ import static org.batfish.representation.juniper.JuniperStructureUsage.POLICY_ST
 import static org.batfish.representation.juniper.JuniperStructureUsage.POLICY_STATEMENT_RTF_PREFIX_LIST;
 import static org.batfish.representation.juniper.JuniperStructureUsage.POLICY_STATEMENT_THEN_TUNNEL_ATTRIBUTE;
 import static org.batfish.representation.juniper.JuniperStructureUsage.SECURITY_POLICY_MATCH_APPLICATION;
+import static org.batfish.representation.juniper.JuniperStructureUsage.SWITCH_OPTIONS_VRF_EXPORT;
+import static org.batfish.representation.juniper.JuniperStructureUsage.SWITCH_OPTIONS_VRF_IMPORT;
 import static org.batfish.representation.juniper.RoutingInformationBase.RIB_IPV4_UNICAST;
 import static org.batfish.representation.juniper.RoutingInformationBase.RIB_IPV6_UNICAST;
 import static org.batfish.representation.juniper.RoutingInstance.OSPF_INTERNAL_SUMMARY_DISCARD_METRIC;
@@ -347,6 +349,8 @@ import org.batfish.datamodel.bgp.AddressFamily;
 import org.batfish.datamodel.bgp.AddressFamilyCapabilities;
 import org.batfish.datamodel.bgp.BgpConfederation;
 import org.batfish.datamodel.bgp.RouteDistinguisher;
+import org.batfish.datamodel.bgp.SessionVrfScope.OwnVrf;
+import org.batfish.datamodel.bgp.SessionVrfScope.SpecificVrf;
 import org.batfish.datamodel.bgp.community.ExtendedCommunity;
 import org.batfish.datamodel.bgp.community.StandardCommunity;
 import org.batfish.datamodel.collections.NodeInterfacePair;
@@ -451,9 +455,15 @@ import org.batfish.representation.juniper.InterfaceRangeMember;
 import org.batfish.representation.juniper.InterfaceRangeMemberRange;
 import org.batfish.representation.juniper.IpBgpGroup;
 import org.batfish.representation.juniper.IpUnknownProtocol;
+import org.batfish.representation.juniper.JuniperAuthenticationKeyChain;
 import org.batfish.representation.juniper.JuniperConfiguration;
 import org.batfish.representation.juniper.JuniperStructureType;
 import org.batfish.representation.juniper.JuniperStructureUsage;
+import org.batfish.representation.juniper.JunosSyslogFacility;
+import org.batfish.representation.juniper.JunosSyslogFile;
+import org.batfish.representation.juniper.JunosSyslogHost;
+import org.batfish.representation.juniper.JunosSyslogSeverity;
+import org.batfish.representation.juniper.JunosSyslogTransportProtocol;
 import org.batfish.representation.juniper.MulticastModeOptions;
 import org.batfish.representation.juniper.NamedBgpGroup;
 import org.batfish.representation.juniper.Nat;
@@ -491,6 +501,7 @@ import org.batfish.representation.juniper.PsFromValidationDatabase;
 import org.batfish.representation.juniper.PsProtocol;
 import org.batfish.representation.juniper.PsTerm;
 import org.batfish.representation.juniper.PsThen;
+import org.batfish.representation.juniper.PsThenAddPathSendCount;
 import org.batfish.representation.juniper.PsThenAigpOriginate;
 import org.batfish.representation.juniper.PsThenAsPathExpandAsList;
 import org.batfish.representation.juniper.PsThenAsPathExpandLastAs;
@@ -526,6 +537,7 @@ import org.batfish.representation.juniper.TcpFinNoAck;
 import org.batfish.representation.juniper.TcpNoFlag;
 import org.batfish.representation.juniper.TcpSynFin;
 import org.batfish.representation.juniper.TunnelAttribute;
+import org.batfish.representation.juniper.VlanMember;
 import org.batfish.representation.juniper.VlanRange;
 import org.batfish.representation.juniper.VlanReference;
 import org.batfish.representation.juniper.VniOptions;
@@ -1065,6 +1077,50 @@ public final class FlatJuniperGrammarTest {
   }
 
   @Test
+  public void testClassOfServiceImport() throws IOException {
+    // "import default" under a dscp/exp classifier and exp rewrite-rule references the built-in
+    // "default" classifier/rewrite-rule.
+    String hostname = "class-of-service-comprehensive";
+    String filename = "configs/" + hostname;
+    Batfish batfish = getBatfishForConfigurationNames(hostname);
+    batfish.loadConfigurations(batfish.getSnapshot());
+    ConvertConfigurationAnswerElement ccae =
+        batfish.loadConvertConfigurationAnswerElementOrReparse(batfish.getSnapshot());
+    assertThat(
+        ccae,
+        hasReferencedStructure(
+            filename,
+            org.batfish.representation.juniper.JuniperStructureType.CLASS_OF_SERVICE_CLASSIFIER,
+            "default",
+            org.batfish.representation.juniper.JuniperStructureUsage
+                .CLASS_OF_SERVICE_CLASSIFIERS_DSCP_IMPORT));
+    assertThat(
+        ccae,
+        hasReferencedStructure(
+            filename,
+            org.batfish.representation.juniper.JuniperStructureType.CLASS_OF_SERVICE_CLASSIFIER,
+            "default",
+            org.batfish.representation.juniper.JuniperStructureUsage
+                .CLASS_OF_SERVICE_CLASSIFIERS_EXP_IMPORT));
+    assertThat(
+        ccae,
+        hasReferencedStructure(
+            filename,
+            org.batfish.representation.juniper.JuniperStructureType.CLASS_OF_SERVICE_REWRITE_RULE,
+            "default",
+            org.batfish.representation.juniper.JuniperStructureUsage
+                .CLASS_OF_SERVICE_REWRITE_RULES_EXP_IMPORT));
+    assertThat(
+        ccae,
+        hasReferencedStructure(
+            filename,
+            org.batfish.representation.juniper.JuniperStructureType.CLASS_OF_SERVICE_REWRITE_RULE,
+            "default",
+            org.batfish.representation.juniper.JuniperStructureUsage
+                .CLASS_OF_SERVICE_REWRITE_RULES_IEEE_802_1_IMPORT));
+  }
+
+  @Test
   public void testClassOfServiceBuiltinForwardingClasses() throws IOException {
     String hostname = "class-of-service-builtin-forwarding-classes";
     String filename = "configs/" + hostname;
@@ -1176,8 +1232,196 @@ public final class FlatJuniperGrammarTest {
   }
 
   @Test
+  public void testSyslogHostExtraction() {
+    JuniperConfiguration c = parseJuniperConfig("juniper-syslog");
+    Map<String, JunosSyslogHost> hosts = c.getMasterLogicalSystem().getSyslogHosts();
+    assertThat(hosts, hasKeys("1.2.3.4", "2.3.4.5", "3.4.5.6", "4.5.6.7", "5.6.7.8", "6.7.8.9"));
+
+    // Host with multiple facility/severity pairs and a routing-instance; facility-override,
+    // source-address, and explicit-priority are recognized but not extracted.
+    JunosSyslogHost h1 = hosts.get("1.2.3.4");
+    assertThat(
+        h1.getFacilitySeverities(),
+        equalTo(
+            ImmutableMap.of(
+                JunosSyslogFacility.ANY, JunosSyslogSeverity.NOTICE,
+                JunosSyslogFacility.INTERACTIVE_COMMANDS, JunosSyslogSeverity.ANY)));
+    assertThat(h1.getPort(), nullValue());
+    assertThat(h1.getTransportProtocol(), nullValue());
+    assertThat(h1.getRoutingInstance(), equalTo("RI"));
+
+    // Full host: single facility/severity, port, transport, routing-instance
+    JunosSyslogHost full = hosts.get("2.3.4.5");
+    assertThat(
+        full.getFacilitySeverities(),
+        equalTo(ImmutableMap.of(JunosSyslogFacility.ANY, JunosSyslogSeverity.NOTICE)));
+    assertThat(full.getPort(), equalTo(6514));
+    assertThat(full.getTransportProtocol(), equalTo(JunosSyslogTransportProtocol.TCP));
+    assertThat(full.getRoutingInstance(), equalTo("mgmt"));
+
+    // Multiple facility/severity pairs on one host; other fields unset
+    JunosSyslogHost multi = hosts.get("3.4.5.6");
+    assertThat(
+        multi.getFacilitySeverities(),
+        equalTo(
+            ImmutableMap.of(
+                JunosSyslogFacility.KERNEL, JunosSyslogSeverity.ERROR,
+                JunosSyslogFacility.DAEMON, JunosSyslogSeverity.WARNING)));
+    assertThat(multi.getPort(), nullValue());
+    assertThat(multi.getTransportProtocol(), nullValue());
+    assertThat(multi.getRoutingInstance(), nullValue());
+
+    // Every facility paired with a severity so all facility/severity branches are covered.
+    JunosSyslogHost all = hosts.get("4.5.6.7");
+    assertThat(
+        all.getFacilitySeverities(),
+        equalTo(
+            ImmutableMap.<JunosSyslogFacility, JunosSyslogSeverity>builder()
+                .put(JunosSyslogFacility.ANY, JunosSyslogSeverity.ANY)
+                .put(JunosSyslogFacility.AUTHORIZATION, JunosSyslogSeverity.NONE)
+                .put(JunosSyslogFacility.CHANGE_LOG, JunosSyslogSeverity.EMERGENCY)
+                .put(JunosSyslogFacility.CONFLICT_LOG, JunosSyslogSeverity.ALERT)
+                .put(JunosSyslogFacility.DAEMON, JunosSyslogSeverity.CRITICAL)
+                .put(JunosSyslogFacility.DFC, JunosSyslogSeverity.ERROR)
+                .put(JunosSyslogFacility.EXTERNAL, JunosSyslogSeverity.WARNING)
+                .put(JunosSyslogFacility.FIREWALL, JunosSyslogSeverity.NOTICE)
+                .put(JunosSyslogFacility.FTP, JunosSyslogSeverity.INFO)
+                .put(JunosSyslogFacility.INTERACTIVE_COMMANDS, JunosSyslogSeverity.ANY)
+                .put(JunosSyslogFacility.KERNEL, JunosSyslogSeverity.NONE)
+                .put(JunosSyslogFacility.NTP, JunosSyslogSeverity.EMERGENCY)
+                .put(JunosSyslogFacility.PFE, JunosSyslogSeverity.ALERT)
+                .put(JunosSyslogFacility.USER, JunosSyslogSeverity.CRITICAL)
+                .build()));
+
+    // Remaining transport protocols: tls and udp (tcp covered above).
+    assertThat(
+        hosts.get("5.6.7.8").getTransportProtocol(), equalTo(JunosSyslogTransportProtocol.TLS));
+    assertThat(
+        hosts.get("6.7.8.9").getTransportProtocol(), equalTo(JunosSyslogTransportProtocol.UDP));
+  }
+
+  @Test
+  public void testSyslogHostConversion() {
+    // Vendor-independent conversion still emits the set of host IPs.
+    Configuration c = parseConfig("juniper-syslog");
+    assertThat(
+        c.getLoggingServers(),
+        equalTo(
+            ImmutableSortedSet.of(
+                "1.2.3.4", "2.3.4.5", "3.4.5.6", "4.5.6.7", "5.6.7.8", "6.7.8.9")));
+  }
+
+  @Test
+  public void testSyslogFileArchiveExtraction() {
+    JuniperConfiguration c = parseJuniperConfig("juniper-syslog-file-archive");
+    Map<String, JunosSyslogFile> files = c.getMasterLogicalSystem().getSyslogFiles();
+    assertThat(files, hasKeys("messages", "bytes-only", "count-only"));
+
+    // Archive size with unit (10m -> 10 * 1024 * 1024 bytes) and archive file count both set
+    JunosSyslogFile messages = files.get("messages");
+    assertThat(messages.getArchiveSizeBytes(), equalTo(10L * 1024 * 1024));
+    assertThat(messages.getArchiveFileCount(), equalTo(5));
+
+    // Archive size in bare bytes (no unit); no file count
+    JunosSyslogFile bytesOnly = files.get("bytes-only");
+    assertThat(bytesOnly.getArchiveSizeBytes(), equalTo(65536L));
+    assertThat(bytesOnly.getArchiveFileCount(), nullValue());
+
+    // Only archive file count; no size
+    JunosSyslogFile countOnly = files.get("count-only");
+    assertThat(countOnly.getArchiveSizeBytes(), nullValue());
+    assertThat(countOnly.getArchiveFileCount(), equalTo(3));
+  }
+
+  @Test
   public void testSystemServicesSshParsing() {
     parseJuniperConfig("system-services-ssh");
+  }
+
+  @Test
+  public void testNtpParsing() {
+    JuniperConfiguration vc = parseJuniperConfig("ntp");
+    assertThat(vc.getWarnings().getParseWarnings(), empty());
+  }
+
+  @Test
+  public void testNtpExtraction() {
+    JuniperConfiguration vc = parseJuniperConfig("ntp");
+
+    assertThat(
+        vc.getMasterLogicalSystem().getNtpAuthenticationKeys(), containsInAnyOrder(1, 2, 3, 4));
+    assertThat(
+        vc.getMasterLogicalSystem().getNtpTrustedKeys(), containsInAnyOrder(1, 2, 3, 5, 6, 7));
+
+    // Only servers are modeled, keyed by host (IPv4 and IPv6).
+    assertThat(
+        vc.getMasterLogicalSystem().getNtpServers(),
+        hasKeys("10.0.0.1", "10.0.0.2", "10.0.0.10", "10.0.0.11", "2001:db8::10"));
+
+    assertThat(vc.getMasterLogicalSystem().getNtpServers().get("10.0.0.1").getKey(), equalTo(1));
+    assertThat(vc.getMasterLogicalSystem().getNtpServers().get("10.0.0.2").getKey(), nullValue());
+    assertThat(vc.getMasterLogicalSystem().getNtpServers().get("10.0.0.10").getKey(), equalTo(4));
+    assertThat(vc.getMasterLogicalSystem().getNtpServers().get("10.0.0.11").getKey(), equalTo(5));
+    assertThat(
+        vc.getMasterLogicalSystem().getNtpServers().get("2001:db8::10").getKey(), nullValue());
+  }
+
+  @Test
+  public void testNtpAuthenticationConfigured() {
+    JuniperConfiguration vc = parseJuniperConfig("ntp");
+    Set<Integer> definedKeys = vc.getMasterLogicalSystem().getNtpAuthenticationKeys();
+    Set<Integer> trustedKeys = vc.getMasterLogicalSystem().getNtpTrustedKeys();
+
+    // Authenticated: key referenced, defined via authentication-key, and trusted
+    assertThat(
+        vc.getMasterLogicalSystem()
+            .getNtpServers()
+            .get("10.0.0.1")
+            .isAuthenticated(definedKeys, trustedKeys),
+        equalTo(true));
+    // Not authenticated: no key referenced
+    assertThat(
+        vc.getMasterLogicalSystem()
+            .getNtpServers()
+            .get("10.0.0.2")
+            .isAuthenticated(definedKeys, trustedKeys),
+        equalTo(false));
+    // Not authenticated: key defined but not trusted (key 4)
+    assertThat(
+        vc.getMasterLogicalSystem()
+            .getNtpServers()
+            .get("10.0.0.10")
+            .isAuthenticated(definedKeys, trustedKeys),
+        equalTo(false));
+    // Not authenticated: key trusted but not defined via authentication-key (key 5)
+    assertThat(
+        vc.getMasterLogicalSystem()
+            .getNtpServers()
+            .get("10.0.0.11")
+            .isAuthenticated(definedKeys, trustedKeys),
+        equalTo(false));
+  }
+
+  @Test
+  public void testNtpInvalidKey() {
+    // key-number 0 is out of the valid range (1..65534) at every site: server key,
+    // authentication-key, and trusted-key. Each occurrence should warn and be dropped
+    JuniperConfiguration vc = parseJuniperConfig("ntp-invalid-key");
+
+    List<String> comments =
+        vc.getWarnings().getParseWarnings().stream()
+            .map(ParseWarning::getComment)
+            .collect(Collectors.toList());
+    assertThat(comments, everyItem(containsString("Expected ntp key-number in range")));
+    assertThat(comments, hasSize(4));
+
+    // No defined or trusted keys are recorded
+    assertThat(vc.getMasterLogicalSystem().getNtpAuthenticationKeys(), empty());
+    assertThat(vc.getMasterLogicalSystem().getNtpTrustedKeys(), empty());
+
+    // The server is still created, but with no key recorded
+    assertThat(vc.getMasterLogicalSystem().getNtpServers(), hasKeys("10.0.0.1"));
+    assertThat(vc.getMasterLogicalSystem().getNtpServers().get("10.0.0.1").getKey(), nullValue());
   }
 
   @Test
@@ -1377,26 +1621,26 @@ public final class FlatJuniperGrammarTest {
 
   @Test
   public void testBgpForwardingContextConversion() {
-    // Test VI conversion: forwarding-context master → sessionVrf = "default"
+    // Test VI conversion: forwarding-context master → sessionVrf = SpecificVrf("default")
     Configuration c = parseConfig("bgp-forwarding-context");
 
     // VRF1 peer (protocol-level forwarding-context)
     BgpActivePeerConfig vrf1Peer =
         c.getVrfs().get("VRF1").getBgpProcess().getActiveNeighbors().get(Ip.parse("10.0.0.2"));
     assertThat(vrf1Peer, notNullValue());
-    assertThat(vrf1Peer.getSessionVrf(), equalTo(Configuration.DEFAULT_VRF_NAME));
+    assertThat(vrf1Peer.getSessionVrf(), equalTo(new SpecificVrf(Configuration.DEFAULT_VRF_NAME)));
 
     // VRF2 peer (group-level forwarding-context)
     BgpActivePeerConfig vrf2Peer =
         c.getVrfs().get("VRF2").getBgpProcess().getActiveNeighbors().get(Ip.parse("10.0.0.3"));
     assertThat(vrf2Peer, notNullValue());
-    assertThat(vrf2Peer.getSessionVrf(), equalTo(Configuration.DEFAULT_VRF_NAME));
+    assertThat(vrf2Peer.getSessionVrf(), equalTo(new SpecificVrf(Configuration.DEFAULT_VRF_NAME)));
 
-    // Default VRF peers should not have sessionVrf set
+    // Default VRF peers should not have sessionVrf set (own VRF)
     BgpProcess defaultProc = c.getDefaultVrf().getBgpProcess();
     if (defaultProc != null) {
       for (BgpActivePeerConfig peer : defaultProc.getActiveNeighbors().values()) {
-        assertThat(peer.getSessionVrf(), nullValue());
+        assertThat(peer.getSessionVrf(), equalTo(OwnVrf.instance()));
       }
     }
   }
@@ -1821,6 +2065,55 @@ public final class FlatJuniperGrammarTest {
   }
 
   @Test
+  public void testPolicyAddPathSendCountExtraction() {
+    String hostname = "juniper-policy-add-path-send-count";
+    JuniperConfiguration vc = parseJuniperConfig(hostname);
+    PsTerm term =
+        vc.getMasterLogicalSystem()
+            .getPolicyStatements()
+            .get("ADD-PATH-POLICY")
+            .getTerms()
+            .get("t1");
+    assertThat(term.getThens().getAllThens(), hasItem(new PsThenAddPathSendCount(16)));
+  }
+
+  @Test
+  public void testPolicyAddPathSendCountConversionWarning() throws IOException {
+    String hostname = "juniper-policy-add-path-send-count";
+    Batfish batfish = getBatfishForConfigurationNames(hostname);
+    ConvertConfigurationAnswerElement ccae =
+        batfish.loadConvertConfigurationAnswerElementOrReparse(batfish.getSnapshot());
+    SortedSet<Warning> riskyWarnings = ccae.getWarnings().get(hostname).getRiskyRedFlagWarnings();
+
+    // Group g1 applies the policy without group-level add-path send: dead config -> warning.
+    assertThat(
+        riskyWarnings,
+        hasItem(
+            WarningMatchers.hasText(
+                "RISK: policy-statement ADD-PATH-POLICY term t1: 'then add-path send-count 16' has"
+                    + " no effect because add-path send is not enabled at the BGP group level for"
+                    + " neighbor 10.0.0.1/32")));
+    // Group g2 enables group-level add-path send, so no warning is emitted for 10.0.0.2/32.
+    assertThat(
+        riskyWarnings,
+        not(
+            hasItem(
+                WarningMatchers.hasText(
+                    "RISK: policy-statement ADD-PATH-POLICY term t1: 'then add-path send-count 16'"
+                        + " has no effect because add-path send is not enabled at the BGP group"
+                        + " level for neighbor 10.0.0.2/32"))));
+    // Group g3 reaches the directive only through a `from policy` subroutine call: the warning
+    // names the inner policy that actually contains the directive.
+    assertThat(
+        riskyWarnings,
+        hasItem(
+            WarningMatchers.hasText(
+                "RISK: policy-statement SUBROUTINE-POLICY term t1: 'then add-path send-count 8' has"
+                    + " no effect because add-path send is not enabled at the BGP group level for"
+                    + " neighbor 10.0.0.3/32")));
+  }
+
+  @Test
   public void testBgpAddPathWarnings() throws IOException {
     String hostname = "juniper-bgp-add-path";
     Batfish batfish = getBatfishForConfigurationNames(hostname);
@@ -2098,7 +2391,7 @@ public final class FlatJuniperGrammarTest {
     Batfish batfish = getBatfishForConfigurationNames(hostname);
     ParseVendorConfigurationAnswerElement pvcae =
         batfish.loadParseVendorConfigurationAnswerElement(batfish.getSnapshot());
-    assertEquals(pvcae.getWarnings().size(), 1);
+    assertEquals(1, pvcae.getWarnings().size());
     assertThat(
         pvcae,
         hasParseWarning(
@@ -3368,6 +3661,32 @@ public final class FlatJuniperGrammarTest {
   }
 
   @Test
+  public void testDnsProxyParsing() {
+    JuniperConfiguration config = parseJuniperConfig("dns-proxy");
+    assertThat(config.getWarnings().getParseWarnings(), empty());
+  }
+
+  @Test
+  public void testDnsProxyExtraction() {
+    JuniperConfiguration config = parseJuniperConfig("dns-proxy");
+    assertThat(
+        config.getMasterLogicalSystem().getDnsProxyInterfaces(),
+        containsInAnyOrder("ge-0/0/0.0", "ge-0/0/1.0"));
+  }
+
+  @Test
+  public void testDnsProxyExtractionAbsent() {
+    JuniperConfiguration config = parseJuniperConfig("dns-no-proxy");
+    assertThat(config.getMasterLogicalSystem().getDnsProxyInterfaces(), empty());
+  }
+
+  @Test
+  public void testDnsForwardersExtraction() {
+    JuniperConfiguration config = parseJuniperConfig("dns-proxy");
+    assertThat(config.getMasterLogicalSystem().getDnsForwarders(), contains(Ip.parse("8.8.4.4")));
+  }
+
+  @Test
   public void testAggregateDefaults() {
     Configuration config = parseConfig("aggregate-defaults");
 
@@ -4492,6 +4811,17 @@ public final class FlatJuniperGrammarTest {
     assertThat(
         units1.get("ge-0/0/1.0").getPreferredAddress6(),
         equalTo(ConcreteInterfaceAddress6.parse("2001:db8::2/64")));
+  }
+
+  @Test
+  public void testInterfaceInet6Ndp() {
+    // A static NDP entry under an inet6 address parses; the address still converts normally.
+    JuniperConfiguration jc = parseJuniperConfig("interfaces-inet6-ndp");
+    Map<String, org.batfish.representation.juniper.Interface> units =
+        jc.getMasterLogicalSystem().getInterfaces().get("xe-0/2/2").getUnits();
+    assertThat(
+        units.get("xe-0/2/2.80").getAllAddresses6(),
+        contains(ConcreteInterfaceAddress6.parse("2001:468:ff:909::1/64")));
   }
 
   @Test
@@ -5671,13 +6001,6 @@ public final class FlatJuniperGrammarTest {
             hasComment(
                 "RISK: then accept/reject has no effect when then next term/next policy is also"
                     + " present in the same term: accept/reject does not fire"),
-            // metric/community before bare reject — dead since route is rejected
-            hasComment(
-                "RISK: then metric has no effect on the propagated route when then reject is"
-                    + " also present in the same term"),
-            hasComment(
-                "RISK: then community add RED has no effect on the propagated route when then"
-                    + " reject is also present in the same term"),
             // default-action with bare terminator — default-action is dead
             hasComment(
                 "RISK: then default-action is overridden by bare then accept/reject in the same"
@@ -7262,6 +7585,13 @@ public final class FlatJuniperGrammarTest {
   }
 
   @Test
+  public void testRouteFilterThenNextHop() {
+    // route-filter "<prefix> <match-type> next-hop self": match type precedes next-hop, so "self"
+    // must lex as the keyword (not an interface name). Should not crash.
+    parseConfig("route-filter-then-next-hop");
+  }
+
+  @Test
   public void testRoutingInstanceType() {
     Configuration c = parseConfig("routing-instance-type");
 
@@ -7509,6 +7839,98 @@ public final class FlatJuniperGrammarTest {
     assertThat(r1.getNextHopInterface(), contains("ge-0/0/0.0"));
     assertThat(r2.getNextTable(), equalTo("ri2.inet.0"));
     assertTrue(r3.getDrop());
+  }
+
+  @Test
+  public void testStaticRouteDefaultsExtraction() {
+    // "static defaults" attributes are captured per-RIB; inheritance into the routes happens at
+    // conversion. Defaults are scoped to the enclosing "static {}" block (per routing table and
+    // per routing-instance).
+    JuniperConfiguration c = parseJuniperConfig("junos-static-defaults");
+    Map<String, RoutingInstance> instances = c.getMasterLogicalSystem().getRoutingInstances();
+    Map<String, RoutingInformationBase> masterRibs = instances.get(DEFAULT_VRF_NAME).getRibs();
+
+    // Master inet.0 defaults.
+    StaticRouteV4 inet0Defaults = masterRibs.get(RIB_IPV4_UNICAST).getStaticRouteDefaults();
+    assertThat(inet0Defaults.getMetric(), equalTo(100));
+    assertThat(inet0Defaults.getDistance(), equalTo(50));
+    assertThat(inet0Defaults.getTag(), equalTo(1000L));
+    assertThat(inet0Defaults.getCommunities(), contains(StandardCommunity.of(65000, 1)));
+
+    // Master inet6.0 defaults are independent of inet.0 (different preference/tag, no community).
+    StaticRouteV6 inet6Defaults = masterRibs.get(RIB_IPV6_UNICAST).getStaticRouteDefaultsV6();
+    assertThat(inet6Defaults.getDistance(), equalTo(60));
+    assertThat(inet6Defaults.getTag(), equalTo(2000L));
+
+    // BLUE routing-instance has its own defaults, independent of the master instance.
+    StaticRouteV4 blueDefaults =
+        instances.get("BLUE").getRibs().get(RIB_IPV4_UNICAST).getStaticRouteDefaults();
+    assertThat(blueDefaults.getDistance(), equalTo(80));
+    assertThat(blueDefaults.getTag(), equalTo(3000L));
+
+    // RED routing-instance has no defaults block: its defaults object is empty (unset preference
+    // reads as the Junos system default 5).
+    StaticRouteV4 redDefaults =
+        instances.get("RED").getRibs().get(RIB_IPV4_UNICAST).getStaticRouteDefaults();
+    assertThat(redDefaults.getDistance(), equalTo(5));
+    assertThat(redDefaults.getTag(), nullValue());
+
+    // A route resolves inheritance through its getters (no separate inheritance step). The route
+    // that overrides only preference keeps its own preference but reads metric/tag/community from
+    // the inet.0 defaults.
+    StaticRouteV4 overridesPref =
+        masterRibs.get(RIB_IPV4_UNICAST).getStaticRoutes().get(Prefix.parse("10.200.2.0/24"));
+    assertThat(overridesPref.getDistance(), equalTo(7));
+    assertThat(overridesPref.getMetric(), equalTo(100));
+    assertThat(overridesPref.getTag(), equalTo(1000L));
+    assertThat(overridesPref.getCommunities(), contains(StandardCommunity.of(65000, 1)));
+  }
+
+  @Test
+  public void testStaticRouteDefaultsConversion() {
+    // At conversion, each static route inherits its RIB's "static defaults" for any field it does
+    // not set itself.
+    Configuration c = parseConfig("junos-static-defaults");
+    assertThat(
+        c,
+        hasDefaultVrf(
+            hasStaticRoutes(
+                containsInAnyOrder(
+                    // Inherits all of metric 100, preference 50, tag 1000.
+                    allOf(
+                        hasPrefix(Prefix.parse("10.200.1.0/24")),
+                        AbstractRouteDecoratorMatchers.hasMetric(100L),
+                        hasAdministrativeCost(50),
+                        hasTag(1000L)),
+                    // Overrides only preference (7); still inherits metric 100 and tag 1000.
+                    allOf(
+                        hasPrefix(Prefix.parse("10.200.2.0/24")),
+                        AbstractRouteDecoratorMatchers.hasMetric(100L),
+                        hasAdministrativeCost(7),
+                        hasTag(1000L))))));
+    // RED has no defaults: preference falls to the system default 5, and with no tag set the
+    // converted route carries Batfish's "no tag" sentinel (-1).
+    assertThat(
+        c,
+        hasVrf(
+            "RED",
+            hasStaticRoutes(
+                contains(
+                    allOf(
+                        hasPrefix(Prefix.parse("10.210.1.0/24")),
+                        hasAdministrativeCost(5),
+                        hasTag(-1L))))));
+    // BLUE inherits its own defaults, not the master instance's.
+    assertThat(
+        c,
+        hasVrf(
+            "BLUE",
+            hasStaticRoutes(
+                contains(
+                    allOf(
+                        hasPrefix(Prefix.parse("10.220.1.0/24")),
+                        hasAdministrativeCost(80),
+                        hasTag(3000L))))));
   }
 
   @Test
@@ -8434,12 +8856,6 @@ public final class FlatJuniperGrammarTest {
   }
 
   @Test
-  public void testJuniperNtp() {
-    // Parse with no warnings
-    parseJuniperConfig("juniper-ntp");
-  }
-
-  @Test
   public void testJuniperSyslog() {
     // Parse with no warnings
     parseJuniperConfig("juniper-syslog");
@@ -8521,6 +8937,55 @@ public final class FlatJuniperGrammarTest {
     assertThat(ipPrefixRoutes.getVni(), equalTo(1011));
     assertThat(ipPrefixRoutes.getImportPolicy(), equalTo("FOO-vrf-import"));
     assertThat(ipPrefixRoutes.getExportPolicy(), equalTo("FOO-vrf-export"));
+  }
+
+  @Test
+  public void testSwitchOptionsVrfImportExportReferences() throws IOException {
+    // GH-6305: policy-statements used by switch-options vrf-import/vrf-export must be marked as
+    // referenced (not orphans), for both the single-name and bracketed-list forms.
+    String hostname = "switch-options-vrf-import-list";
+    String filename = "configs/" + hostname;
+    Batfish batfish = getBatfishForConfigurationNames(hostname);
+    ConvertConfigurationAnswerElement ccae =
+        batfish.loadConvertConfigurationAnswerElementOrReparse(batfish.getSnapshot());
+
+    assertThat(
+        ccae,
+        hasReferencedStructure(
+            filename, POLICY_STATEMENT, "SINGLE_IMPORT", SWITCH_OPTIONS_VRF_IMPORT));
+    assertThat(
+        ccae,
+        hasReferencedStructure(
+            filename, POLICY_STATEMENT, "SINGLE_EXPORT", SWITCH_OPTIONS_VRF_EXPORT));
+    assertThat(
+        ccae,
+        hasReferencedStructure(
+            filename, POLICY_STATEMENT, "LIST_IMPORT_A", SWITCH_OPTIONS_VRF_IMPORT));
+    assertThat(
+        ccae,
+        hasReferencedStructure(
+            filename, POLICY_STATEMENT, "LIST_IMPORT_B", SWITCH_OPTIONS_VRF_IMPORT));
+    assertThat(
+        ccae,
+        hasReferencedStructure(
+            filename, POLICY_STATEMENT, "LIST_EXPORT_A", SWITCH_OPTIONS_VRF_EXPORT));
+    assertThat(
+        ccae,
+        hasReferencedStructure(
+            filename, POLICY_STATEMENT, "LIST_EXPORT_B", SWITCH_OPTIONS_VRF_EXPORT));
+
+    // Every referenced policy is defined, so none are flagged as undefined references.
+    for (String policy :
+        new String[] {
+          "SINGLE_IMPORT",
+          "SINGLE_EXPORT",
+          "LIST_IMPORT_A",
+          "LIST_IMPORT_B",
+          "LIST_EXPORT_A",
+          "LIST_EXPORT_B"
+        }) {
+      assertThat(ccae, hasNumReferrers(filename, POLICY_STATEMENT, policy, 1));
+    }
   }
 
   @Test
@@ -8891,15 +9356,15 @@ public final class FlatJuniperGrammarTest {
     assertThat(c, hasInterface("xe-0/0/0.0", isSwitchport()));
     assertThat(c, hasInterface("xe-0/0/0.0", hasSwitchPortMode(SwitchportMode.ACCESS)));
     Layer2Vni vni10 = c.getDefaultVrf().getLayer2Vnis().get(5010);
-    assertEquals(vni10.getVlan(), 10);
+    assertEquals(10, vni10.getVlan());
     assertEquals(vni10.getSourceAddress(), Ip.parse("10.84.249.26"));
-    assertEquals(vni10.getSrcVrf(), "default");
-    assertEquals(vni10.getUdpPort(), 4789);
+    assertEquals("default", vni10.getSrcVrf());
+    assertEquals(4789, vni10.getUdpPort());
     Layer2Vni vni20 = c.getDefaultVrf().getLayer2Vnis().get(5020);
-    assertEquals(vni20.getVlan(), 20);
+    assertEquals(20, vni20.getVlan());
     assertEquals(vni20.getSourceAddress(), Ip.parse("10.84.249.26"));
-    assertEquals(vni20.getSrcVrf(), "default");
-    assertEquals(vni20.getUdpPort(), 4789);
+    assertEquals("default", vni20.getSrcVrf());
+    assertEquals(4789, vni20.getUdpPort());
   }
 
   @Test
@@ -9778,6 +10243,83 @@ public final class FlatJuniperGrammarTest {
   public void testInterfacesVlanMap() {
     // Should not crash.
     parseConfig("interfaces-vlan-map");
+  }
+
+  @Test
+  public void testInterfacesDsc() {
+    // The fixed-name discard (dsc) interface parses and converts like any other interface.
+    Configuration c = parseConfig("interfaces-dsc");
+    assertThat(
+        c,
+        hasInterface(
+            "dsc.0", hasAllAddresses(contains(ConcreteInterfaceAddress.parse("198.32.11.6/32")))));
+  }
+
+  @Test
+  public void testInterfacesGigetherOptionsEmpty() {
+    // Empty gigether-options / ether-options blocks should not crash.
+    parseConfig("interfaces-gigether-options-empty");
+  }
+
+  @Test
+  public void testForwardingTableTraceoptions() {
+    // routing-options forwarding-table traceoptions should not crash.
+    parseConfig("forwarding-table-traceoptions");
+  }
+
+  @Test
+  public void testSecurityKeyChain() {
+    // Legacy "security key-chain" form (pre authentication-key-chains) extracts the same
+    // JuniperAuthenticationKeyChain model, including empty keys.
+    JuniperConfiguration jc = parseJuniperConfig("security-key-chain");
+    Map<String, JuniperAuthenticationKeyChain> keyChains =
+        jc.getMasterLogicalSystem().getAuthenticationKeyChains();
+    assertThat(keyChains.keySet(), containsInAnyOrder("BFD-BGP-MERIT", "BFD-BGP-OARNET"));
+    assertThat(keyChains.get("BFD-BGP-MERIT").getTolerance(), equalTo(30));
+    assertThat(keyChains.get("BFD-BGP-OARNET").getKeys().keySet(), containsInAnyOrder("0", "1"));
+  }
+
+  @Test
+  public void testInterfacesVlanTags() {
+    // Q-in-Q vlan-tags outer/inner should not crash.
+    parseConfig("interfaces-vlan-tags");
+  }
+
+  @Test
+  public void testInterfacesFamilyVpls() {
+    // family vpls and empty family bridge should not crash.
+    parseConfig("interfaces-family-vpls");
+  }
+
+  @Test
+  public void testIsisLevelIpv6Metric() {
+    // IS-IS per-level ipv6/ipv4 metric variants should not crash.
+    parseConfig("isis-level-ipv6-metric");
+  }
+
+  @Test
+  public void testInterfacesFamilyBridgeSwitching() {
+    // family bridge interface-mode (access/trunk) and single vlan-id populate BridgeSwitching.
+    JuniperConfiguration c = parseJuniperConfig("interfaces-family-bridge-switching");
+    Map<String, org.batfish.representation.juniper.Interface> ifaces =
+        c.getMasterLogicalSystem().getInterfaces();
+
+    org.batfish.representation.juniper.Interface accessUnit =
+        ifaces.get("ge-10/1/0").getUnits().get("ge-10/1/0.0");
+    assertThat(accessUnit.getBridgeSwitching().getSwitchportMode(), equalTo(SwitchportMode.ACCESS));
+    List<VlanMember> accessVlans = accessUnit.getBridgeSwitching().getVlanMembers();
+    assertThat(accessVlans, hasSize(1));
+    assertThat(((VlanRange) accessVlans.get(0)).getRange(), equalTo(IntegerSpace.of(620)));
+
+    org.batfish.representation.juniper.Interface trunkUnit =
+        ifaces.get("ge-10/1/1").getUnits().get("ge-10/1/1.0");
+    assertThat(trunkUnit.getBridgeSwitching().getSwitchportMode(), equalTo(SwitchportMode.TRUNK));
+
+    // Conversion: the access unit becomes a switchport access port on vlan 620.
+    Configuration vi = parseConfig("interfaces-family-bridge-switching");
+    org.batfish.datamodel.Interface viAccess = vi.getAllInterfaces().get("ge-10/1/0.0");
+    assertThat(viAccess.getSwitchportMode(), equalTo(SwitchportMode.ACCESS));
+    assertThat(viAccess.getAccessVlan(), equalTo(620));
   }
 
   @Test

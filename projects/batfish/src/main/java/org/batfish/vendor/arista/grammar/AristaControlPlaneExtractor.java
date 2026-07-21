@@ -178,9 +178,6 @@ import static org.batfish.vendor.arista.representation.AristaStructureUsage.TUNN
 import static org.batfish.vendor.arista.representation.AristaStructureUsage.TUNNEL_SOURCE;
 import static org.batfish.vendor.arista.representation.AristaStructureUsage.VXLAN_SELF_REF;
 import static org.batfish.vendor.arista.representation.AristaStructureUsage.VXLAN_SOURCE_INTERFACE;
-import static org.batfish.vendor.arista.representation.AristaStructureUsage.WCCP_GROUP_LIST;
-import static org.batfish.vendor.arista.representation.AristaStructureUsage.WCCP_REDIRECT_LIST;
-import static org.batfish.vendor.arista.representation.AristaStructureUsage.WCCP_SERVICE_LIST;
 import static org.batfish.vendor.arista.representation.eos.AristaRedistributeType.OSPF;
 import static org.batfish.vendor.arista.representation.eos.AristaRedistributeType.OSPF_EXTERNAL;
 import static org.batfish.vendor.arista.representation.eos.AristaRedistributeType.OSPF_INTERNAL;
@@ -252,7 +249,6 @@ import org.batfish.datamodel.SnmpCommunity;
 import org.batfish.datamodel.SnmpHost;
 import org.batfish.datamodel.SnmpServer;
 import org.batfish.datamodel.SubRange;
-import org.batfish.datamodel.SwitchportEncapsulationType;
 import org.batfish.datamodel.SwitchportMode;
 import org.batfish.datamodel.TcpFlags;
 import org.batfish.datamodel.TcpFlagsMatchConditions;
@@ -609,7 +605,9 @@ import org.batfish.vendor.arista.grammar.AristaParser.If_ip_inband_access_groupC
 import org.batfish.vendor.arista.grammar.AristaParser.If_ip_local_proxy_arp_eosContext;
 import org.batfish.vendor.arista.grammar.AristaParser.If_ip_virtual_routerContext;
 import org.batfish.vendor.arista.grammar.AristaParser.If_ipv6_traffic_filterContext;
+import org.batfish.vendor.arista.grammar.AristaParser.If_isis_enableContext;
 import org.batfish.vendor.arista.grammar.AristaParser.If_isis_metricContext;
+import org.batfish.vendor.arista.grammar.AristaParser.If_isis_passiveContext;
 import org.batfish.vendor.arista.grammar.AristaParser.If_member_interfaceContext;
 import org.batfish.vendor.arista.grammar.AristaParser.If_mtuContext;
 import org.batfish.vendor.arista.grammar.AristaParser.If_no_autostateContext;
@@ -710,7 +708,6 @@ import org.batfish.vendor.arista.grammar.AristaParser.Match_ip_access_list_rm_st
 import org.batfish.vendor.arista.grammar.AristaParser.Match_ip_prefix_list_rm_stanzaContext;
 import org.batfish.vendor.arista.grammar.AristaParser.Match_ipv6_access_list_rm_stanzaContext;
 import org.batfish.vendor.arista.grammar.AristaParser.Match_ipv6_prefix_list_rm_stanzaContext;
-import org.batfish.vendor.arista.grammar.AristaParser.Match_semanticsContext;
 import org.batfish.vendor.arista.grammar.AristaParser.Match_source_protocol_rm_stanzaContext;
 import org.batfish.vendor.arista.grammar.AristaParser.Match_tag_rm_stanzaContext;
 import org.batfish.vendor.arista.grammar.AristaParser.Net_is_stanzaContext;
@@ -854,7 +851,6 @@ import org.batfish.vendor.arista.grammar.AristaParser.SubrangeContext;
 import org.batfish.vendor.arista.grammar.AristaParser.Summary_address_is_stanzaContext;
 import org.batfish.vendor.arista.grammar.AristaParser.Suppressed_iis_stanzaContext;
 import org.batfish.vendor.arista.grammar.AristaParser.Switching_mode_stanzaContext;
-import org.batfish.vendor.arista.grammar.AristaParser.Switchport_trunk_encapsulationContext;
 import org.batfish.vendor.arista.grammar.AristaParser.Track_interfaceContext;
 import org.batfish.vendor.arista.grammar.AristaParser.Ts_hostContext;
 import org.batfish.vendor.arista.grammar.AristaParser.U_passwordContext;
@@ -879,7 +875,6 @@ import org.batfish.vendor.arista.grammar.AristaParser.Vni_numberContext;
 import org.batfish.vendor.arista.grammar.AristaParser.Vni_subrangeContext;
 import org.batfish.vendor.arista.grammar.AristaParser.Vrf_nameContext;
 import org.batfish.vendor.arista.grammar.AristaParser.Vrfd_descriptionContext;
-import org.batfish.vendor.arista.grammar.AristaParser.Wccp_idContext;
 import org.batfish.vendor.arista.representation.AccessListAddressSpecifier;
 import org.batfish.vendor.arista.representation.AccessListServiceSpecifier;
 import org.batfish.vendor.arista.representation.AnyAddressSpecifier;
@@ -911,7 +906,6 @@ import org.batfish.vendor.arista.representation.IsisProcess;
 import org.batfish.vendor.arista.representation.IsisRedistributionPolicy;
 import org.batfish.vendor.arista.representation.Keyring;
 import org.batfish.vendor.arista.representation.LoggingHost;
-import org.batfish.vendor.arista.representation.MatchSemantics;
 import org.batfish.vendor.arista.representation.MlagConfiguration;
 import org.batfish.vendor.arista.representation.NamedRsaPubKey;
 import org.batfish.vendor.arista.representation.NatPool;
@@ -4456,16 +4450,6 @@ public class AristaControlPlaneExtractor extends AristaParserBaseListener
     _currentIsakmpProfile = null;
   }
 
-  private MatchSemantics toMatchSemantics(Match_semanticsContext ctx) {
-    if (ctx.MATCH_ALL() != null) {
-      return MatchSemantics.MATCH_ALL;
-    } else if (ctx.MATCH_ANY() != null) {
-      return MatchSemantics.MATCH_ANY;
-    } else {
-      throw convError(MatchSemantics.class, ctx);
-    }
-  }
-
   @Override
   public void exitCd_match_address(Cd_match_addressContext ctx) {
     String name = ctx.name.getText();
@@ -5409,6 +5393,20 @@ public class AristaControlPlaneExtractor extends AristaParserBaseListener
     long metric = toLong(ctx.metric);
     for (Interface iface : _currentInterfaces) {
       iface.setIsisCost(metric);
+    }
+  }
+
+  @Override
+  public void exitIf_isis_enable(If_isis_enableContext ctx) {
+    for (Interface iface : _currentInterfaces) {
+      iface.setIsisInterfaceMode(IsisInterfaceMode.ACTIVE);
+    }
+  }
+
+  @Override
+  public void exitIf_isis_passive(If_isis_passiveContext ctx) {
+    for (Interface iface : _currentInterfaces) {
+      iface.setIsisInterfaceMode(IsisInterfaceMode.PASSIVE);
     }
   }
 
@@ -7575,25 +7573,6 @@ public class AristaControlPlaneExtractor extends AristaParserBaseListener
   }
 
   @Override
-  public void exitWccp_id(Wccp_idContext ctx) {
-    if (ctx.group_list != null) {
-      String name = ctx.group_list.getText();
-      int line = ctx.group_list.getStart().getLine();
-      _configuration.referenceStructure(IP_ACCESS_LIST, name, WCCP_GROUP_LIST, line);
-    }
-    if (ctx.redirect_list != null) {
-      String name = ctx.redirect_list.getText();
-      int line = ctx.redirect_list.getStart().getLine();
-      _configuration.referenceStructure(IP_ACCESS_LIST, name, WCCP_REDIRECT_LIST, line);
-    }
-    if (ctx.service_list != null) {
-      String name = ctx.service_list.getText();
-      int line = ctx.service_list.getStart().getLine();
-      _configuration.referenceStructure(IP_ACCESS_LIST, name, WCCP_SERVICE_LIST, line);
-    }
-  }
-
-  @Override
   public void exitIf_ip_virtual_router(If_ip_virtual_routerContext ctx) {
     todo(ctx);
   }
@@ -7744,18 +7723,6 @@ public class AristaControlPlaneExtractor extends AristaParserBaseListener
       throw convError(DscpType.class, ctx);
     }
     return val;
-  }
-
-  private SwitchportEncapsulationType toEncapsulation(Switchport_trunk_encapsulationContext ctx) {
-    if (ctx.DOT1Q() != null) {
-      return SwitchportEncapsulationType.DOT1Q;
-    } else if (ctx.ISL() != null) {
-      return SwitchportEncapsulationType.ISL;
-    } else if (ctx.NEGOTIATE() != null) {
-      return SwitchportEncapsulationType.NEGOTIATE;
-    } else {
-      throw convError(SwitchportEncapsulationType.class, ctx);
-    }
   }
 
   private EncryptionAlgorithm toEncryptionAlgorithm(Ike_encryptionContext ctx) {

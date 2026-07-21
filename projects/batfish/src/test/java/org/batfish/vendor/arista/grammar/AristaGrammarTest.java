@@ -50,6 +50,7 @@ import static org.batfish.datamodel.matchers.InterfaceMatchers.hasBandwidth;
 import static org.batfish.datamodel.matchers.InterfaceMatchers.hasDescription;
 import static org.batfish.datamodel.matchers.InterfaceMatchers.hasEncapsulationVlan;
 import static org.batfish.datamodel.matchers.InterfaceMatchers.hasInterfaceType;
+import static org.batfish.datamodel.matchers.InterfaceMatchers.hasIsis;
 import static org.batfish.datamodel.matchers.InterfaceMatchers.hasMlagId;
 import static org.batfish.datamodel.matchers.InterfaceMatchers.hasMtu;
 import static org.batfish.datamodel.matchers.InterfaceMatchers.hasSpeed;
@@ -59,6 +60,7 @@ import static org.batfish.datamodel.matchers.InterfaceMatchers.hasVrf;
 import static org.batfish.datamodel.matchers.InterfaceMatchers.isActive;
 import static org.batfish.datamodel.matchers.InterfaceMatchers.isSwitchport;
 import static org.batfish.datamodel.matchers.IpAccessListMatchers.hasLines;
+import static org.batfish.datamodel.matchers.IsisInterfaceSettingsMatchers.hasLevel2;
 import static org.batfish.datamodel.matchers.MapMatchers.hasKeys;
 import static org.batfish.datamodel.matchers.MlagMatchers.hasId;
 import static org.batfish.datamodel.matchers.MlagMatchers.hasPeerAddress;
@@ -668,6 +670,17 @@ public class AristaGrammarTest {
         c.getAllInterfaces().get("Ethernet1").getOspfSettings().getCost(),
         equalTo(OspfProcess.DEFAULT_INTERFACE_OSPF_COST));
     assertThat(c.getAllInterfaces().get("Ethernet2").getOspfSettings().getCost(), equalTo(42));
+  }
+
+  @Test
+  public void testIsisInterfaceEnable() throws IOException {
+    // Interface-level "isis enable" makes the interface an active IS-IS interface, and
+    // "isis passive" models it as passive. Both were previously dropped by the extractor.
+    Configuration c = parseConfig("arista-isis");
+    assertThat(c, hasInterface("Loopback0", hasIsis(hasLevel2(notNullValue()))));
+    assertThat(c, hasInterface("Loopback1", hasIsis(hasLevel2(notNullValue()))));
+    // Loopback2 has no interface-level IS-IS config, so it gets no IS-IS settings.
+    assertThat(c, hasInterface("Loopback2", hasIsis(nullValue())));
   }
 
   @Test
@@ -1595,12 +1608,15 @@ public class AristaGrammarTest {
         defaultVrfAggs,
         hasEntry(
             Prefix.parse("1.2.33.0/24"),
-            // TODO: Support advertise-only, as-set, and match-map
+            // advertise-only => installInMainRib=false
+            // TODO: Support as-set and match-map
             BgpAggregate.of(
                 Prefix.parse("1.2.33.0/24"),
                 SUMMARY_ONLY_SUPPRESSION_POLICY_NAME,
                 null,
-                "~BGP_AGGREGATE_ATTRIBUTE_MAP:ATTR_MAP~")));
+                "~BGP_AGGREGATE_ATTRIBUTE_MAP:ATTR_MAP~",
+                false,
+                BgpAggregate.AsPathMode.COMMON_SEQUENCE)));
     assertThat(
         defaultVrfAggs,
         hasEntry(
@@ -1609,13 +1625,20 @@ public class AristaGrammarTest {
                 Prefix.parse("1.2.44.0/24"),
                 SUMMARY_ONLY_SUPPRESSION_POLICY_NAME,
                 null,
-                "~BGP_AGGREGATE_ATTRIBUTE_MAP:null~")));
+                "~BGP_AGGREGATE_ATTRIBUTE_MAP:null~",
+                true,
+                BgpAggregate.AsPathMode.COMMON_SEQUENCE)));
     assertThat(
         defaultVrfAggs,
         hasEntry(
             Prefix.parse("1.2.55.0/24"),
             BgpAggregate.of(
-                Prefix.parse("1.2.55.0/24"), null, null, "~BGP_AGGREGATE_ATTRIBUTE_MAP:null~")));
+                Prefix.parse("1.2.55.0/24"),
+                null,
+                null,
+                "~BGP_AGGREGATE_ATTRIBUTE_MAP:null~",
+                true,
+                BgpAggregate.AsPathMode.COMMON_SEQUENCE)));
 
     // vrf FOO
     Map<Prefix, BgpAggregate> vrfFooAggs = c.getVrfs().get("FOO").getBgpProcess().getAggregates();
@@ -1626,7 +1649,12 @@ public class AristaGrammarTest {
             Prefix.parse("5.6.7.0/24"),
             // TODO Support as-set
             BgpAggregate.of(
-                Prefix.parse("5.6.7.0/24"), null, null, "~BGP_AGGREGATE_ATTRIBUTE_MAP:null~")));
+                Prefix.parse("5.6.7.0/24"),
+                null,
+                null,
+                "~BGP_AGGREGATE_ATTRIBUTE_MAP:null~",
+                true,
+                BgpAggregate.AsPathMode.COMMON_SEQUENCE)));
   }
 
   @Test
@@ -1775,6 +1803,36 @@ public class AristaGrammarTest {
   }
 
   @Test
+  public void testBgpAggregateAdvertiseOnly() throws IOException {
+    /*
+     * Config has static routes 1.1.1.0/24 and 2.2.2.0/24 redistributed into BGP, and aggregates:
+     * - 1.1.0.0/16 advertise-only
+     * - 2.2.0.0/16 summary-only advertise-only
+     *
+     * advertise-only means each aggregate is generated in the BGP RIB (for advertisement to peers)
+     * but is NOT installed in the main RIB.
+     */
+    String hostname = "bgp_aggregate_advertise_only";
+    Batfish batfish = getBatfishForConfigurationNames(hostname);
+    batfish.computeDataPlane(batfish.getSnapshot());
+    DataPlane dp = batfish.loadDataPlane(batfish.getSnapshot());
+
+    Prefix aggPrefix1 = Prefix.parse("1.1.0.0/16");
+    Prefix aggPrefix2 = Prefix.parse("2.2.0.0/16");
+
+    // Both aggregates are generated in the BGP RIB.
+    Set<Bgpv4Route> bgpRibRoutes = dp.getBgpRoutes().get(hostname, Configuration.DEFAULT_VRF_NAME);
+    assertThat(bgpRibRoutes, hasItem(hasPrefix(aggPrefix1)));
+    assertThat(bgpRibRoutes, hasItem(hasPrefix(aggPrefix2)));
+
+    // Neither aggregate is installed in the main RIB (advertise-only).
+    Set<AbstractRoute> mainRibRoutes =
+        dp.getRibs().get(hostname, Configuration.DEFAULT_VRF_NAME).getRoutes();
+    assertThat(mainRibRoutes, not(hasItem(hasPrefix(aggPrefix1))));
+    assertThat(mainRibRoutes, not(hasItem(hasPrefix(aggPrefix2))));
+  }
+
+  @Test
   public void testBgpAggregateWithLearnedSuppressedRoutes() throws IOException {
     /*
      * Snapshot contains c1, c2, and c3. c1 redistributes static routes 1.1.1.0/16 and 2.2.2.0/16
@@ -1863,6 +1921,47 @@ public class AristaGrammarTest {
           bgpRibRoutes,
           containsInAnyOrder(
               hasPrefix(learnedPrefix1), hasPrefix(aggPrefix1), hasPrefix(aggPrefix2)));
+    }
+  }
+
+  @Test
+  public void testBgpAggregateVrfSummaryOnly() throws IOException {
+    /*
+     * Snapshot contains c1, c2, and c3. All BGP sessions on c2 live in vrf vxlan_public under
+     * router bgp with an asdot AS (65166.10010 = 4270728986; c1 peers with it in asdot notation,
+     * c3 in asplain). c1 redistributes static routes 10.1.1.96/27 and 10.1.1.98/32 into BGP and
+     * advertises them to c2. c2 has `aggregate-address 0.0.0.0/0 summary-only advertise-only` in
+     * the vrf, so every learned route is a suppressed contributor of the default-route aggregate.
+     * c3 must receive ONLY the aggregate.
+     */
+    String snapshotName = "bgp-agg-vrf-summary-only";
+    String c1 = "c1";
+    String c2 = "c2";
+    String c3 = "c3";
+    Batfish batfish =
+        BatfishTestUtils.getBatfishFromTestrigText(
+            TestrigText.builder()
+                .setConfigurationFiles(
+                    SNAPSHOTS_PREFIX + snapshotName, ImmutableList.of(c1, c2, c3))
+                .build(),
+            _folder);
+    batfish.computeDataPlane(batfish.getSnapshot());
+    DataPlane dp = batfish.loadDataPlane(batfish.getSnapshot());
+
+    Prefix learnedPrefix1 = Prefix.parse("10.1.1.96/27");
+    Prefix learnedPrefix2 = Prefix.parse("10.1.1.98/32");
+    {
+      // c2's vrf BGP RIB has the learned contributors and the activated aggregate.
+      Set<Bgpv4Route> bgpRibRoutes = dp.getBgpRoutes().get(c2, "vxlan_public");
+      assertThat(
+          bgpRibRoutes,
+          containsInAnyOrder(
+              hasPrefix(learnedPrefix1), hasPrefix(learnedPrefix2), hasPrefix(Prefix.ZERO)));
+    }
+    {
+      // c3 receives only the aggregate; both contributors are suppressed VRF-wide.
+      Set<Bgpv4Route> bgpRibRoutes = dp.getBgpRoutes().get(c3, Configuration.DEFAULT_VRF_NAME);
+      assertThat(bgpRibRoutes, containsInAnyOrder(hasPrefix(Prefix.ZERO)));
     }
   }
 
@@ -5244,5 +5343,12 @@ public class AristaGrammarTest {
     AristaConfiguration vc = parseVendorConfig(hostname);
 
     assertTrue(vc.getAristaBgp().getDefaultVrf().getRedistributionPolicies().isEmpty());
+  }
+
+  @Test
+  public void testIpv6UnicastRoutingParsing() {
+    // Ensure "ipv6 unicast-routing" (bare and vrf-qualified) parses without warnings.
+    AristaConfiguration vc = parseVendorConfig("arista_ipv6_unicast_routing");
+    assertThat(vc.getWarnings().getParseWarnings(), empty());
   }
 }

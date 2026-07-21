@@ -34,9 +34,11 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedMap;
 import com.google.common.collect.ImmutableSortedSet;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Ordering;
 import com.google.common.collect.Range;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -52,6 +54,7 @@ import java.util.Map.Entry;
 import java.util.NavigableMap;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Queue;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
@@ -136,6 +139,7 @@ import org.batfish.datamodel.bgp.EvpnAddressFamily;
 import org.batfish.datamodel.bgp.Ipv4UnicastAddressFamily;
 import org.batfish.datamodel.bgp.Layer3VniConfig;
 import org.batfish.datamodel.bgp.RouteDistinguisher;
+import org.batfish.datamodel.bgp.SessionVrfScope.SpecificVrf;
 import org.batfish.datamodel.bgp.community.Community;
 import org.batfish.datamodel.bgp.community.ExtendedCommunity;
 import org.batfish.datamodel.dataplane.rib.RibId;
@@ -704,6 +708,14 @@ public final class JuniperConfiguration extends VendorConfiguration {
           }
         }
       }
+      // `then add-path send-count` in an export policy is silently ignored by Junos unless add-path
+      // send is enabled at the BGP group/neighbor level. Warn if an export policy uses it but this
+      // neighbor does not have add-path send enabled (path-count set).
+      boolean addPathSendEnabled =
+          addPath != null && addPath.getSend() != null && addPath.getSend().getPathCount() != null;
+      if (!addPathSendEnabled) {
+        warnUnreachableAddPathSendCount(ig.getExportPolicies(), prefix);
+      }
       ipv4AfSettingsBuilder.setAllowLocalAsIn(allowLocalAsIn);
       Boolean advertisePeerAs = ig.getAdvertisePeerAs();
       if (advertisePeerAs == null) {
@@ -865,10 +877,11 @@ public final class JuniperConfiguration extends VendorConfiguration {
       // forwarding-context: resolve the VRF from which the BGP TCP session is sourced
       String forwardingContext = ig.getForwardingContext();
       if (forwardingContext != null) {
-        neighbor.setSessionVrf(
-            forwardingContext.equals(DEFAULT_ROUTING_INSTANCE_NAME)
-                ? Configuration.DEFAULT_VRF_NAME
-                : forwardingContext);
+        neighbor.setSessionVrfScope(
+            new SpecificVrf(
+                forwardingContext.equals(DEFAULT_ROUTING_INSTANCE_NAME)
+                    ? Configuration.DEFAULT_VRF_NAME
+                    : forwardingContext));
       }
       neighbor.setBgpProcess(proc);
       neighbor.setIpv4UnicastAddressFamily(
@@ -2091,6 +2104,14 @@ public final class JuniperConfiguration extends VendorConfiguration {
       newIface.adminDown();
     }
     EthernetSwitching es = iface.getEthernetSwitching();
+    BridgeSwitching bs = iface.getBridgeSwitching();
+    // family ethernet-switching and family bridge are mutually exclusive L2 switching families;
+    // both map to the same VI switchport attributes.
+    SwitchportMode switchingMode =
+        es != null ? es.getSwitchportMode() : bs != null ? bs.getSwitchportMode() : null;
+    List<VlanMember> switchingVlanMembers =
+        es != null ? es.getVlanMembers() : bs != null ? bs.getVlanMembers() : ImmutableList.of();
+    Integer switchingNativeVlan = es != null ? es.getNativeVlan() : null;
     if (_indirectAccessPorts.containsKey(name)) {
       newIface.setSwitchport(true);
       newIface.setSwitchportMode(SwitchportMode.ACCESS);
@@ -2099,9 +2120,9 @@ public final class JuniperConfiguration extends VendorConfiguration {
               .getNamedVlans()
               .get(_indirectAccessPorts.get(name).getName())
               .getVlanId());
-    } else if (es != null) {
-      if (es.getSwitchportMode() == null || es.getSwitchportMode() == SwitchportMode.ACCESS) {
-        Integer accessVlan = computeAccessVlan(iface.getName(), es.getVlanMembers());
+    } else if (es != null || bs != null) {
+      if (switchingMode == null || switchingMode == SwitchportMode.ACCESS) {
+        Integer accessVlan = computeAccessVlan(iface.getName(), switchingVlanMembers);
         newIface.setAccessVlan(accessVlan);
         if (accessVlan != null) {
           newIface.setSwitchport(true);
@@ -2111,12 +2132,12 @@ public final class JuniperConfiguration extends VendorConfiguration {
           newIface.setSwitchportMode(SwitchportMode.NONE);
         }
       }
-      if (es.getSwitchportMode() == SwitchportMode.TRUNK) {
+      if (switchingMode == SwitchportMode.TRUNK) {
         newIface.setSwitchportTrunkEncapsulation(SwitchportEncapsulationType.DOT1Q);
-        newIface.setAllowedVlans(vlanMembersToIntegerSpace(es.getVlanMembers()));
+        newIface.setAllowedVlans(vlanMembersToIntegerSpace(switchingVlanMembers));
         // default is no native vlan, untagged are dropped.
         // https://www.juniper.net/documentation/en_US/junos/topics/reference/configuration-statement/native-vlan-id-edit-interfaces-qfx-series.html
-        newIface.setNativeVlan(es.getNativeVlan());
+        newIface.setNativeVlan(switchingNativeVlan);
         newIface.setSwitchport(true);
         newIface.setSwitchportMode(SwitchportMode.TRUNK);
       }
@@ -3519,6 +3540,10 @@ public final class JuniperConfiguration extends VendorConfiguration {
     _masterLogicalSystem.setDefaultRoutingInstance(ls.getDefaultRoutingInstance());
     _masterLogicalSystem.getDnsServers().clear();
     _masterLogicalSystem.getDnsServers().addAll(ls.getDnsServers());
+    _masterLogicalSystem.getDnsForwarders().clear();
+    _masterLogicalSystem.getDnsForwarders().addAll(ls.getDnsForwarders());
+    _masterLogicalSystem.getDnsProxyInterfaces().clear();
+    _masterLogicalSystem.getDnsProxyInterfaces().addAll(ls.getDnsProxyInterfaces());
     _masterLogicalSystem.getFirewallFilters().putAll(ls.getFirewallFilters());
     _masterLogicalSystem.getSecurityPolicies().putAll(ls.getSecurityPolicies());
     _masterLogicalSystem.getAddressBooks().putAll(ls.getAddressBooks());
@@ -3564,7 +3589,12 @@ public final class JuniperConfiguration extends VendorConfiguration {
     _masterLogicalSystem.setNatDestination(ls.getNatDestination());
     _masterLogicalSystem.setNatSource(ls.getNatSource());
     _masterLogicalSystem.setNatStatic(ls.getNatStatic());
-    // TODO: something with NTP servers?
+    _masterLogicalSystem.getNtpServers().clear();
+    _masterLogicalSystem.getNtpServers().putAll(ls.getNtpServers());
+    _masterLogicalSystem.getNtpAuthenticationKeys().clear();
+    _masterLogicalSystem.getNtpAuthenticationKeys().addAll(ls.getNtpAuthenticationKeys());
+    _masterLogicalSystem.getNtpTrustedKeys().clear();
+    _masterLogicalSystem.getNtpTrustedKeys().addAll(ls.getNtpTrustedKeys());
     _masterLogicalSystem.getPolicyStatements().putAll(ls.getPolicyStatements());
     _masterLogicalSystem.getConditions().putAll(ls.getConditions());
     _masterLogicalSystem.getPrefixLists().putAll(ls.getPrefixLists());
@@ -3608,8 +3638,8 @@ public final class JuniperConfiguration extends VendorConfiguration {
         convertAuthenticationKeyChains(_masterLogicalSystem.getAuthenticationKeyChains()));
     _c.setDnsServers(_masterLogicalSystem.getDnsServers());
     _c.setDomainName(_masterLogicalSystem.getDefaultRoutingInstance().getDomainName());
-    _c.setLoggingServers(_masterLogicalSystem.getSyslogHosts());
-    _c.setNtpServers(_masterLogicalSystem.getNtpServers());
+    _c.setLoggingServers(ImmutableSortedSet.copyOf(_masterLogicalSystem.getSyslogHosts().keySet()));
+    _c.setNtpServers(ImmutableSortedSet.copyOf(_masterLogicalSystem.getNtpServers().keySet()));
     _c.setTacacsServers(_masterLogicalSystem.getTacplusServers());
     _c.getVendorFamily().setJuniper(_masterLogicalSystem.getJf());
     _c.setDeviceModel(DeviceModel.JUNIPER_UNSPECIFIED);
@@ -3838,7 +3868,8 @@ public final class JuniperConfiguration extends VendorConfiguration {
         _c.getSnmpTrapServers().addAll(snmpServer.getHosts().keySet());
       }
 
-      // static routes
+      // static routes. Each route's getters resolve "static defaults" inheritance on read, so no
+      // explicit inheritance step is needed here.
       for (StaticRouteV4 route : ri.getRibs().get(RIB_IPV4_UNICAST).getStaticRoutes().values()) {
         vrf.getStaticRoutes().addAll(toStaticRoutes(route));
       }
@@ -4878,6 +4909,55 @@ public final class JuniperConfiguration extends VendorConfiguration {
       PrefixList prefixList = e.getValue();
       if (!prefixList.getHasIpv6() && prefixList.getPrefixes().isEmpty()) {
         _w.redFlag("Empty prefix-list: '" + name + "'");
+      }
+    }
+  }
+
+  /**
+   * Warns if any policy reachable from the given export policies uses {@code then add-path
+   * send-count} while add-path send is not enabled at the BGP group/neighbor level. Junos silently
+   * ignores the policy-level directive in that case, so the action is dead config.
+   *
+   * <p>Reachability follows {@code from policy} subroutine calls (including conjunction form)
+   * transitively, since a subroutine's {@code then} actions execute as part of evaluating the
+   * calling policy.
+   *
+   * @param exportPolicies names of policies exported toward the neighbor
+   * @param neighbor the neighbor prefix, for the warning message
+   */
+  private void warnUnreachableAddPathSendCount(List<String> exportPolicies, Prefix neighbor) {
+    Set<String> visited = new HashSet<>();
+    Queue<String> queue = new ArrayDeque<>(exportPolicies);
+    while (!queue.isEmpty()) {
+      String policyName = queue.remove();
+      if (!visited.add(policyName)) {
+        continue;
+      }
+      PolicyStatement policy = _masterLogicalSystem.getPolicyStatements().get(policyName);
+      if (policy == null) {
+        continue;
+      }
+      for (PsTerm term :
+          Iterables.concat(ImmutableList.of(policy.getDefaultTerm()), policy.getTerms().values())) {
+        for (PsThen then : term.getThens().getAllThens()) {
+          if (then instanceof PsThenAddPathSendCount) {
+            _w.riskyRedFlag(
+                "policy-statement %s term %s: 'then add-path send-count %d' has no effect because"
+                    + " add-path send is not enabled at the BGP group level for neighbor %s",
+                policyName,
+                term.getName(),
+                ((PsThenAddPathSendCount) then).getSendCount(),
+                neighbor);
+          }
+        }
+        // Follow `from policy` subroutine calls transitively.
+        PsFroms froms = term.getFroms();
+        for (PsFromPolicyStatement from : froms.getFromPolicyStatements()) {
+          queue.add(from.getPolicyStatement());
+        }
+        for (PsFromPolicyStatementConjunction from : froms.getFromPolicyStatementConjunctions()) {
+          queue.addAll(from.getConjuncts());
+        }
       }
     }
   }

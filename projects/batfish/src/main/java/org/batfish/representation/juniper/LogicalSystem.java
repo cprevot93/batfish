@@ -13,6 +13,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.annotation.ParametersAreNonnullByDefault;
 import org.batfish.datamodel.Configuration;
+import org.batfish.datamodel.Ip;
 import org.batfish.datamodel.LineAction;
 import org.batfish.datamodel.vendor_family.juniper.JuniperFamily;
 import org.batfish.representation.juniper.Nat.Type;
@@ -47,6 +48,10 @@ public class LogicalSystem implements Serializable {
   private RoutingInstance _defaultRoutingInstance;
 
   private NavigableSet<String> _dnsServers;
+
+  private final NavigableSet<Ip> _dnsForwarders;
+
+  private final Set<String> _dnsProxyInterfaces;
 
   private final Map<String, Integer> _dscpAliases;
 
@@ -94,7 +99,11 @@ public class LogicalSystem implements Serializable {
 
   private @Nullable Nat _natStatic;
 
-  private NavigableSet<String> _ntpServers;
+  private final Map<String, NtpServer> _ntpServers;
+
+  private final Set<Integer> _ntpAuthenticationKeys;
+
+  private final Set<Integer> _ntpTrustedKeys;
 
   private final Map<String, Condition> _conditions;
 
@@ -112,7 +121,9 @@ public class LogicalSystem implements Serializable {
 
   private final Map<String, Srlg> _srlgs;
 
-  private NavigableSet<String> _syslogHosts;
+  private Map<String, JunosSyslogFile> _syslogFiles;
+
+  private Map<String, JunosSyslogHost> _syslogHosts;
 
   private NavigableSet<String> _tacplusServers;
 
@@ -142,6 +153,8 @@ public class LogicalSystem implements Serializable {
     _defaultCrossZoneAction = LineAction.PERMIT;
     _defaultRoutingInstance = new RoutingInstance(Configuration.DEFAULT_VRF_NAME);
     _dnsServers = new TreeSet<>();
+    _dnsForwarders = new TreeSet<>();
+    _dnsProxyInterfaces = new TreeSet<>();
     _dscpAliases = new TreeMap<>();
     _expAliases = new TreeMap<>();
     _ieee8021pAliases = new TreeMap<>();
@@ -160,7 +173,9 @@ public class LogicalSystem implements Serializable {
     _ipsecProposals = new TreeMap<>();
     _ipsecVpns = new TreeMap<>();
     _jf = new JuniperFamily();
-    _ntpServers = new TreeSet<>();
+    _ntpServers = new TreeMap<>();
+    _ntpAuthenticationKeys = new TreeSet<>();
+    _ntpTrustedKeys = new TreeSet<>();
     _prefixLists = new TreeMap<>();
     _conditions = new TreeMap<>();
     _policyStatements = new TreeMap<>();
@@ -171,7 +186,8 @@ public class LogicalSystem implements Serializable {
     _securityPolicies = new TreeMap<>();
     _snmpClientLists = new TreeMap<>();
     _srlgs = new HashMap<>();
-    _syslogHosts = new TreeSet<>();
+    _syslogFiles = new TreeMap<>();
+    _syslogHosts = new TreeMap<>();
     _tacplusServers = new TreeSet<>();
     _tunnelAttributes = new TreeMap<>();
     _namedVlans = new TreeMap<>();
@@ -248,6 +264,14 @@ public class LogicalSystem implements Serializable {
 
   public NavigableSet<String> getDnsServers() {
     return _dnsServers;
+  }
+
+  public NavigableSet<Ip> getDnsForwarders() {
+    return _dnsForwarders;
+  }
+
+  public Set<String> getDnsProxyInterfaces() {
+    return _dnsProxyInterfaces;
   }
 
   public Map<String, Integer> getDscpAliases() {
@@ -365,8 +389,16 @@ public class LogicalSystem implements Serializable {
     return _natStatic;
   }
 
-  public NavigableSet<String> getNtpServers() {
+  public @Nonnull Map<String, NtpServer> getNtpServers() {
     return _ntpServers;
+  }
+
+  public @Nonnull Set<Integer> getNtpAuthenticationKeys() {
+    return _ntpAuthenticationKeys;
+  }
+
+  public @Nonnull Set<Integer> getNtpTrustedKeys() {
+    return _ntpTrustedKeys;
   }
 
   public Nat getOrCreateNat(Nat.Type natType) {
@@ -437,7 +469,11 @@ public class LogicalSystem implements Serializable {
     return _snmpClientLists;
   }
 
-  public NavigableSet<String> getSyslogHosts() {
+  public Map<String, JunosSyslogFile> getSyslogFiles() {
+    return _syslogFiles;
+  }
+
+  public Map<String, JunosSyslogHost> getSyslogHosts() {
     return _syslogHosts;
   }
 
@@ -505,7 +541,11 @@ public class LogicalSystem implements Serializable {
     _natStatic = natStatic;
   }
 
-  public void setSyslogHosts(NavigableSet<String> syslogHosts) {
+  public void setSyslogFiles(Map<String, JunosSyslogFile> syslogFiles) {
+    _syslogFiles = syslogFiles;
+  }
+
+  public void setSyslogHosts(Map<String, JunosSyslogHost> syslogHosts) {
     _syslogHosts = syslogHosts;
   }
 }

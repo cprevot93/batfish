@@ -100,7 +100,6 @@ import static org.batfish.representation.cisco_asa.AsaStructureUsage.BGP_REDISTR
 import static org.batfish.representation.cisco_asa.AsaStructureUsage.BGP_ROUTE_MAP_ADVERTISE;
 import static org.batfish.representation.cisco_asa.AsaStructureUsage.BGP_ROUTE_MAP_UNSUPPRESS;
 import static org.batfish.representation.cisco_asa.AsaStructureUsage.BGP_UPDATE_SOURCE_INTERFACE;
-import static org.batfish.representation.cisco_asa.AsaStructureUsage.BGP_USE_AF_GROUP;
 import static org.batfish.representation.cisco_asa.AsaStructureUsage.BGP_USE_NEIGHBOR_GROUP;
 import static org.batfish.representation.cisco_asa.AsaStructureUsage.BGP_USE_SESSION_GROUP;
 import static org.batfish.representation.cisco_asa.AsaStructureUsage.CLASS_MAP_ACCESS_GROUP;
@@ -343,6 +342,7 @@ import org.batfish.datamodel.IsoAddress;
 import org.batfish.datamodel.Line;
 import org.batfish.datamodel.LineAction;
 import org.batfish.datamodel.LineType;
+import org.batfish.datamodel.LongSpace;
 import org.batfish.datamodel.NamedPort;
 import org.batfish.datamodel.OriginType;
 import org.batfish.datamodel.Prefix;
@@ -456,7 +456,6 @@ import org.batfish.grammar.cisco_asa.AsaParser.Asa_nat_optional_argsContext;
 import org.batfish.grammar.cisco_asa.AsaParser.Asa_twice_nat_destinationContext;
 import org.batfish.grammar.cisco_asa.AsaParser.Asa_twice_nat_dynamicContext;
 import org.batfish.grammar.cisco_asa.AsaParser.Asa_twice_nat_staticContext;
-import org.batfish.grammar.cisco_asa.AsaParser.Auto_summary_bgp_tailContext;
 import org.batfish.grammar.cisco_asa.AsaParser.Bgp_address_familyContext;
 import org.batfish.grammar.cisco_asa.AsaParser.Bgp_asnContext;
 import org.batfish.grammar.cisco_asa.AsaParser.Bgp_conf_identifier_rb_stanzaContext;
@@ -464,6 +463,7 @@ import org.batfish.grammar.cisco_asa.AsaParser.Bgp_conf_peers_rb_stanzaContext;
 import org.batfish.grammar.cisco_asa.AsaParser.Bgp_enforce_first_as_stanzaContext;
 import org.batfish.grammar.cisco_asa.AsaParser.Bgp_listen_range_rb_stanzaContext;
 import org.batfish.grammar.cisco_asa.AsaParser.Bgp_redistribute_internal_rb_stanzaContext;
+import org.batfish.grammar.cisco_asa.AsaParser.Bgp_suppress_inactive_rb_stanzaContext;
 import org.batfish.grammar.cisco_asa.AsaParser.Cd_match_addressContext;
 import org.batfish.grammar.cisco_asa.AsaParser.Cd_set_isakmp_profileContext;
 import org.batfish.grammar.cisco_asa.AsaParser.Cd_set_peerContext;
@@ -697,10 +697,14 @@ import org.batfish.grammar.cisco_asa.AsaParser.No_neighbor_activate_rb_stanzaCon
 import org.batfish.grammar.cisco_asa.AsaParser.No_neighbor_shutdown_rb_stanzaContext;
 import org.batfish.grammar.cisco_asa.AsaParser.No_redistribute_connected_rb_stanzaContext;
 import org.batfish.grammar.cisco_asa.AsaParser.No_route_map_stanzaContext;
-import org.batfish.grammar.cisco_asa.AsaParser.No_shutdown_rb_stanzaContext;
 import org.batfish.grammar.cisco_asa.AsaParser.Ntp_access_groupContext;
+import org.batfish.grammar.cisco_asa.AsaParser.Ntp_authenticateContext;
+import org.batfish.grammar.cisco_asa.AsaParser.Ntp_authentication_keyContext;
+import org.batfish.grammar.cisco_asa.AsaParser.Ntp_hash_algorithmContext;
+import org.batfish.grammar.cisco_asa.AsaParser.Ntp_keyContext;
 import org.batfish.grammar.cisco_asa.AsaParser.Ntp_serverContext;
 import org.batfish.grammar.cisco_asa.AsaParser.Ntp_source_interfaceContext;
+import org.batfish.grammar.cisco_asa.AsaParser.Ntp_trusted_keyContext;
 import org.batfish.grammar.cisco_asa.AsaParser.O_networkContext;
 import org.batfish.grammar.cisco_asa.AsaParser.O_serviceContext;
 import org.batfish.grammar.cisco_asa.AsaParser.Og_icmp_typeContext;
@@ -876,11 +880,9 @@ import org.batfish.grammar.cisco_asa.AsaParser.S_ip_tacacs_source_interfaceConte
 import org.batfish.grammar.cisco_asa.AsaParser.S_l2tp_classContext;
 import org.batfish.grammar.cisco_asa.AsaParser.S_lineContext;
 import org.batfish.grammar.cisco_asa.AsaParser.S_loggingContext;
-import org.batfish.grammar.cisco_asa.AsaParser.S_mac_access_listContext;
 import org.batfish.grammar.cisco_asa.AsaParser.S_mac_access_list_extendedContext;
 import org.batfish.grammar.cisco_asa.AsaParser.S_mtuContext;
-import org.batfish.grammar.cisco_asa.AsaParser.S_no_access_list_extendedContext;
-import org.batfish.grammar.cisco_asa.AsaParser.S_no_access_list_standardContext;
+import org.batfish.grammar.cisco_asa.AsaParser.S_no_access_listContext;
 import org.batfish.grammar.cisco_asa.AsaParser.S_ntpContext;
 import org.batfish.grammar.cisco_asa.AsaParser.S_policy_mapContext;
 import org.batfish.grammar.cisco_asa.AsaParser.S_routeContext;
@@ -959,7 +961,6 @@ import org.batfish.grammar.cisco_asa.AsaParser.Switching_mode_stanzaContext;
 import org.batfish.grammar.cisco_asa.AsaParser.Switchport_trunk_encapsulationContext;
 import org.batfish.grammar.cisco_asa.AsaParser.T_serverContext;
 import org.batfish.grammar.cisco_asa.AsaParser.T_source_interfaceContext;
-import org.batfish.grammar.cisco_asa.AsaParser.Template_peer_address_familyContext;
 import org.batfish.grammar.cisco_asa.AsaParser.Template_peer_policy_rb_stanzaContext;
 import org.batfish.grammar.cisco_asa.AsaParser.Template_peer_session_rb_stanzaContext;
 import org.batfish.grammar.cisco_asa.AsaParser.Tl_objectContext;
@@ -968,11 +969,9 @@ import org.batfish.grammar.cisco_asa.AsaParser.Track_interfaceContext;
 import org.batfish.grammar.cisco_asa.AsaParser.Ts_hostContext;
 import org.batfish.grammar.cisco_asa.AsaParser.U_passwordContext;
 import org.batfish.grammar.cisco_asa.AsaParser.U_roleContext;
-import org.batfish.grammar.cisco_asa.AsaParser.Uint16Context;
 import org.batfish.grammar.cisco_asa.AsaParser.Uint32Context;
 import org.batfish.grammar.cisco_asa.AsaParser.Unsuppress_map_bgp_tailContext;
 import org.batfish.grammar.cisco_asa.AsaParser.Update_source_bgp_tailContext;
-import org.batfish.grammar.cisco_asa.AsaParser.Use_af_group_bgp_tailContext;
 import org.batfish.grammar.cisco_asa.AsaParser.Use_neighbor_group_bgp_tailContext;
 import org.batfish.grammar.cisco_asa.AsaParser.Use_session_group_bgp_tailContext;
 import org.batfish.grammar.cisco_asa.AsaParser.VariableContext;
@@ -1059,6 +1058,7 @@ import org.batfish.representation.cisco_asa.NetworkObjectGroup;
 import org.batfish.representation.cisco_asa.NetworkObjectGroupAddressSpecifier;
 import org.batfish.representation.cisco_asa.NetworkObjectInfo;
 import org.batfish.representation.cisco_asa.NssaSettings;
+import org.batfish.representation.cisco_asa.NtpAuthenticationKey;
 import org.batfish.representation.cisco_asa.OspfNetwork;
 import org.batfish.representation.cisco_asa.OspfNetworkType;
 import org.batfish.representation.cisco_asa.OspfProcess;
@@ -1137,6 +1137,8 @@ public class AsaControlPlaneExtractor extends AsaParserBaseListener
     implements SilentSyntaxListener, ControlPlaneExtractor {
   private static final String INLINE_SERVICE_OBJECT_NAME = "~INLINE_SERVICE_OBJECT~";
   private static final IntegerSpace PROTOCOL_DISTANCE_RANGE = IntegerSpace.of(Range.closed(1, 255));
+
+  private static final LongSpace NTP_KEY_RANGE = LongSpace.of(Range.closed(1L, 4294967295L));
 
   @VisibleForTesting static final String SERIAL_LINE = "serial";
 
@@ -1255,6 +1257,25 @@ public class AsaControlPlaneExtractor extends AsaParserBaseListener
 
   private static long toLong(DecContext ctx) {
     return Long.parseLong(ctx.getText());
+  }
+
+  /**
+   * Convert a {@link ParserRuleContext} whose text is guaranteed to represent a valid signed 64-bit
+   * decimal integer to a {@link Long} if it is contained in the provided {@code space}, or else
+   * {@link Optional#empty}.
+   */
+  private @Nonnull Optional<Long> toLongInSpace(
+      ParserRuleContext messageCtx, ParserRuleContext ctx, LongSpace space, String name) {
+    long num = Long.parseLong(ctx.getText());
+    if (!space.contains(num)) {
+      warn(messageCtx, String.format("Expected %s in range %s, but got '%d'", name, space, num));
+      return Optional.empty();
+    }
+    return Optional.of(num);
+  }
+
+  private @Nonnull Optional<Long> toLong(ParserRuleContext messageCtx, Ntp_keyContext ctx) {
+    return toLongInSpace(messageCtx, ctx, NTP_KEY_RANGE, "NTP key number");
   }
 
   private static List<SubRange> toRange(RangeContext ctx) {
@@ -2134,8 +2155,6 @@ public class AsaControlPlaneExtractor extends AsaParserBaseListener
       name = ctx.name.getText();
     } else if (ctx.shortname != null) {
       name = ctx.shortname.getText();
-    } else if (ctx.num != null) {
-      name = ctx.num.getText();
     } else {
       throw new BatfishException("Could not determine acl name");
     }
@@ -3335,24 +3354,8 @@ public class AsaControlPlaneExtractor extends AsaParserBaseListener
   }
 
   @Override
-  public void enterS_mac_access_list(S_mac_access_listContext ctx) {
-    String name = ctx.num.getText();
-    _currentMacAccessList =
-        _configuration.getMacAccessLists().computeIfAbsent(name, MacAccessList::new);
-    _configuration.defineStructure(MAC_ACCESS_LIST, name, ctx);
-  }
-
-  @Override
   public void enterS_mac_access_list_extended(S_mac_access_list_extendedContext ctx) {
-    String name;
-    if (ctx.num != null) {
-      name = ctx.num.getText();
-
-    } else if (ctx.name != null) {
-      name = ctx.name.getText();
-    } else {
-      throw new BatfishException("Could not determine name of extended mac access-list");
-    }
+    String name = ctx.name.getText();
     _currentMacAccessList =
         _configuration.getMacAccessLists().computeIfAbsent(name, MacAccessList::new);
     _configuration.defineStructure(MAC_ACCESS_LIST, name, ctx);
@@ -3577,8 +3580,6 @@ public class AsaControlPlaneExtractor extends AsaParserBaseListener
     String name;
     if (ctx.name != null) {
       name = ctx.name.getText();
-    } else if (ctx.num != null) {
-      name = ctx.num.getText();
     } else {
       throw new BatfishException("Invalid standard access-list name");
     }
@@ -3831,11 +3832,6 @@ public class AsaControlPlaneExtractor extends AsaParserBaseListener
   }
 
   @Override
-  public void exitAuto_summary_bgp_tail(Auto_summary_bgp_tailContext ctx) {
-    todo(ctx);
-  }
-
-  @Override
   public void exitS_banner_asa(S_banner_asaContext ctx) {
     String bannerType = toBannerType(ctx.banner_header);
     if (bannerType == null) {
@@ -3891,6 +3887,12 @@ public class AsaControlPlaneExtractor extends AsaParserBaseListener
   public void exitBgp_redistribute_internal_rb_stanza(
       Bgp_redistribute_internal_rb_stanzaContext ctx) {
     todo(ctx); // TODO(https://github.com/batfish/batfish/issues/3230)
+  }
+
+  @Override
+  public void exitBgp_suppress_inactive_rb_stanza(Bgp_suppress_inactive_rb_stanzaContext ctx) {
+    BgpProcess proc = currentVrf().getBgpProcess();
+    proc.getMasterBgpPeerGroup().setSuppressInactive(true);
   }
 
   @Override
@@ -6831,13 +6833,6 @@ public class AsaControlPlaneExtractor extends AsaParserBaseListener
   }
 
   @Override
-  public void exitNo_shutdown_rb_stanza(No_shutdown_rb_stanzaContext ctx) {
-    // TODO: see if it is always ok to set active on 'no shutdown'
-    _currentPeerGroup.setShutdown(false);
-    _currentPeerGroup.setActive(true);
-  }
-
-  @Override
   public void exitNtp_access_group(Ntp_access_groupContext ctx) {
     String name = ctx.name.getText();
     int line = ctx.name.getStart().getLine();
@@ -6850,6 +6845,46 @@ public class AsaControlPlaneExtractor extends AsaParserBaseListener
   }
 
   @Override
+  public void exitNtp_authenticate(Ntp_authenticateContext ctx) {
+    _configuration.setNtpAuthenticate(true);
+  }
+
+  @Override
+  public void exitNtp_authentication_key(Ntp_authentication_keyContext ctx) {
+    Optional<Long> maybeKeyNum = toLong(ctx, ctx.key_num);
+    if (!maybeKeyNum.isPresent()) {
+      return;
+    }
+    NtpAuthenticationKey key =
+        _configuration
+            .getNtpAuthenticationKeys()
+            .computeIfAbsent(maybeKeyNum.get(), NtpAuthenticationKey::new);
+    key.setHashAlgorithm(toHashAlgorithm(ctx.hash_algorithm));
+    key.setValue(ctx.key.getText());
+  }
+
+  private NtpAuthenticationKey.HashAlgorithm toHashAlgorithm(Ntp_hash_algorithmContext ctx) {
+    if (ctx.CMAC() != null) {
+      return NtpAuthenticationKey.HashAlgorithm.CMAC;
+    } else if (ctx.MD5() != null) {
+      return NtpAuthenticationKey.HashAlgorithm.MD5;
+    } else if (ctx.SHA1() != null) {
+      return NtpAuthenticationKey.HashAlgorithm.SHA1;
+    } else if (ctx.SHA256() != null) {
+      return NtpAuthenticationKey.HashAlgorithm.SHA256;
+    } else if (ctx.SHA512() != null) {
+      return NtpAuthenticationKey.HashAlgorithm.SHA512;
+    } else {
+      throw convError(NtpAuthenticationKey.HashAlgorithm.class, ctx);
+    }
+  }
+
+  @Override
+  public void exitNtp_trusted_key(Ntp_trusted_keyContext ctx) {
+    toLong(ctx, ctx.key).ifPresent(_configuration.getNtpTrustedKeys()::add);
+  }
+
+  @Override
   public void exitNtp_server(Ntp_serverContext ctx) {
     Ntp ntp = _configuration.getCf().getNtp();
     String hostname = ctx.hostname.getText();
@@ -6858,6 +6893,13 @@ public class AsaControlPlaneExtractor extends AsaParserBaseListener
       String vrfName = ctx.vrf.getText();
       server.setVrf(vrfName);
       initVrf(vrfName);
+    }
+    org.batfish.representation.cisco_asa.NtpServer vsServer =
+        _configuration
+            .getNtpServers()
+            .computeIfAbsent(hostname, org.batfish.representation.cisco_asa.NtpServer::new);
+    if (ctx.key != null) {
+      toLong(ctx, ctx.key).ifPresent(vsServer::setKey);
     }
     if (ctx.PREFER() != null) {
       // TODO: implement
@@ -8309,14 +8351,9 @@ public class AsaControlPlaneExtractor extends AsaParserBaseListener
   }
 
   @Override
-  public void exitS_no_access_list_extended(S_no_access_list_extendedContext ctx) {
-    String name = ctx.ACL_NUM_EXTENDED().getText();
+  public void exitS_no_access_list(S_no_access_listContext ctx) {
+    String name = ctx.name.getText();
     _configuration.getExtendedAcls().remove(name);
-  }
-
-  @Override
-  public void exitS_no_access_list_standard(S_no_access_list_standardContext ctx) {
-    String name = ctx.ACL_NUM_STANDARD().getText();
     _configuration.getStandardAcls().remove(name);
   }
 
@@ -8538,10 +8575,6 @@ public class AsaControlPlaneExtractor extends AsaParserBaseListener
                 .map(AsaControlPlaneExtractor::toStandardCommunity)
                 .collect(ImmutableList.toImmutableList()));
     _currentRouteMapClause.addSetLine(line);
-  }
-
-  private int toUint16(Uint16Context ctx) {
-    return Integer.parseInt(ctx.getText());
   }
 
   private long toUint32(Uint32Context ctx) {
@@ -8896,11 +8929,6 @@ public class AsaControlPlaneExtractor extends AsaParserBaseListener
   }
 
   @Override
-  public void exitTemplate_peer_address_family(Template_peer_address_familyContext ctx) {
-    popPeer();
-  }
-
-  @Override
   public void exitTemplate_peer_policy_rb_stanza(Template_peer_policy_rb_stanzaContext ctx) {
     _currentIpPeerGroup = null;
     _currentIpv6PeerGroup = null;
@@ -8976,14 +9004,6 @@ public class AsaControlPlaneExtractor extends AsaParserBaseListener
     } else {
       throw new BatfishException("Unexpected context for use neighbor group");
     }
-  }
-
-  @Override
-  public void exitUse_af_group_bgp_tail(Use_af_group_bgp_tailContext ctx) {
-    String groupName = ctx.name.getText();
-    _configuration.referenceStructure(
-        BGP_AF_GROUP, groupName, BGP_USE_AF_GROUP, ctx.name.getStart().getLine());
-    todo(ctx);
   }
 
   @Override

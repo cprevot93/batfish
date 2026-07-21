@@ -1,0 +1,78 @@
+package org.batfish.vendor.sros.grammar;
+
+import static com.google.common.base.Preconditions.checkArgument;
+
+import java.util.Set;
+import javax.annotation.Nonnull;
+import org.antlr.v4.runtime.ParserRuleContext;
+import org.batfish.common.NetworkSnapshot;
+import org.batfish.common.Warnings;
+import org.batfish.grammar.BatfishParseTreeWalker;
+import org.batfish.grammar.ControlPlaneExtractor;
+import org.batfish.grammar.ImplementedRules;
+import org.batfish.grammar.silent_syntax.SilentSyntaxCollection;
+import org.batfish.vendor.VendorConfiguration;
+import org.batfish.vendor.sros.grammar.SrosParser.Sros_configurationContext;
+
+/** Extracts data from an SR-OS parse tree into a {@link SrosConfiguration}. */
+public final class SrosControlPlaneExtractor implements ControlPlaneExtractor {
+
+  public SrosControlPlaneExtractor(
+      String fileText,
+      SrosCombinedParser combinedParser,
+      Warnings warnings,
+      SilentSyntaxCollection silentSyntax) {
+    _text = fileText;
+    _parser = combinedParser;
+    _w = warnings;
+    _silentSyntax = silentSyntax;
+  }
+
+  @Override
+  public Set<String> implementedRuleNames() {
+    return ImplementedRules.getImplementedRules(SrosConfigurationBuilder.class);
+  }
+
+  @Override
+  public VendorConfiguration getVendorConfiguration() {
+    return _configuration;
+  }
+
+  @Override
+  public void processParseTree(NetworkSnapshot snapshot, ParserRuleContext tree) {
+    checkArgument(
+        tree instanceof Sros_configurationContext,
+        "Expected %s, not %s",
+        Sros_configurationContext.class,
+        tree.getClass());
+    SrosConfigurationBuilder cb = new SrosConfigurationBuilder(_parser, _text, _w, _silentSyntax);
+    new BatfishParseTreeWalker(_parser).walk(cb, tree);
+    _configuration = cb.getConfiguration();
+
+    // Reduce the canonical statement tree (delete edits + apply-groups expansion), then
+    // populate the typed feature model from it.
+    SrosStatementTree root = cb.getTree();
+    SrosPreprocessor.preprocess(root, _w);
+
+    // For the annotate tool, track which tree nodes the feature extractor reads (it has no
+    // visit-tracking code of its own — see SrosStatementTree), then report the rest as silently
+    // ignored. SR-OS has no `_null` grammar rules, so this replaces the parse-time mechanism that
+    // grammar-driven vendors use. Tracking starts after preprocessing so that the preprocessor's
+    // tree walk does not count as "read".
+    boolean annotate = _parser.getSettings().getPrintParseTree();
+    if (annotate) {
+      root.beginVisitTracking();
+    }
+    SrosFeatureExtractor.extract(root, _configuration, _w, _parser, _text);
+    if (annotate) {
+      root.endVisitTracking();
+      SrosSilentSyntax.sweep(root, _silentSyntax, _text);
+    }
+  }
+
+  private org.batfish.vendor.sros.representation.SrosConfiguration _configuration;
+  private final @Nonnull SrosCombinedParser _parser;
+  private final @Nonnull String _text;
+  private final @Nonnull Warnings _w;
+  private final @Nonnull SilentSyntaxCollection _silentSyntax;
+}

@@ -454,12 +454,16 @@ s_security
    (
       apply
       | se_address_book
+      | se_alg_null
+      | se_application_tracking_null
       | se_authentication_key_chain
       | se_certificates
+      | se_flow_null
       | se_ike
       | se_ipsec
+      | se_key_chain
+      | se_log_null
       | se_nat
-      | se_null
       | se_policies
       | se_screen
       | se_zones
@@ -496,6 +500,31 @@ se_certificates
    )
 ;
 
+// Legacy form of "security authentication-key-chains key-chain". Mirrors
+// se_authentication_key_chain, but a key may be empty.
+se_key_chain
+:
+   KEY_CHAIN name = junos_name
+   (
+      apply
+      | sea_description
+      | sea_tolerance
+      | sekc_key
+   )
+;
+
+sekc_key
+:
+   KEY name = junos_name
+   (
+      apply
+      | seak_algorithm
+      | seak_options
+      | seak_secret
+      | seak_start_time
+   )
+;
+
 se_ike
 :
    IKE
@@ -527,14 +556,21 @@ se_nat
    )
 ;
 
-se_null
+se_alg_null
 :
-   (
-      ALG
-      | APPLICATION_TRACKING
-      | FLOW
-      | LOG
-   ) null_filler
+   ALG null_filler
+;
+se_application_tracking_null
+:
+   APPLICATION_TRACKING null_filler
+;
+se_flow_null
+:
+   FLOW null_filler
+;
+se_log_null
+:
+   LOG null_filler
 ;
 
 se_policies
@@ -552,7 +588,8 @@ se_screen
     SCREEN
     (
         ses_ids_option
-        | ses_null
+        | ses_traceoptions_null
+        | ses_trap_null
     )
 ;
 
@@ -1291,9 +1328,13 @@ ses_ids_option
    )+
 ;
 
-ses_null
+ses_traceoptions_null
 :
-   ( TRACEOPTIONS | TRAP ) null_filler
+   TRACEOPTIONS null_filler
+;
+ses_trap_null
+:
+   TRAP null_filler
 ;
 
 seso_alarm

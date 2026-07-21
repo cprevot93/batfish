@@ -45,6 +45,7 @@ p_mpls
        | mpls_optimize_timer_null
        | mpls_path
        | mpls_path_mtu_null
+       | mpls_preference_null
        | mpls_record_null
        | mpls_smart_optimize_timer_null
        | mpls_statistics_null
@@ -62,6 +63,20 @@ mpls_admin_groups
 mpls_path
 :
    PATH name = junos_name
+   (
+      apply
+      | mplsp_hop_null
+   )
+;
+
+// A path hop: (address | hostname) <loose | strict>. Hops are not modeled.
+mplsp_hop_null
+:
+   (ip_address | ipv6_address)
+   (
+      LOOSE
+      | STRICT
+   )?
 ;
 
 mpls_interface
@@ -95,14 +110,20 @@ mpls_label_switched_path
       | mplslsp_bandwidth_null
       | mplslsp_conditional_metric_null
       | mplslsp_cross_credibility_cspf_null
+      | mplslsp_description_null
+      | mplslsp_fast_reroute_null
+      | mplslsp_from_null
       | mplslsp_hop_limit_null
       | mplslsp_in_place_lsp_bandwidth_update_null
       | mplslsp_install_null
       | mplslsp_link_protection_null
+      | mplslsp_metric_null
+      | mplslsp_no_cspf_null
       | mplslsp_no_decrement_ttl_null
       | mplslsp_no_self_ping_null
       | mplslsp_optimize_hold_dead_delay_null
       | mplslsp_optimize_timer_null
+      | mplslsp_policing
       | mplslsp_primary
       | mplslsp_priority_null
       | mplslsp_random_null
@@ -265,6 +286,51 @@ mplslsp_cross_credibility_cspf_null
    CROSS_CREDIBILITY_CSPF null_filler
 ;
 
+mplslsp_description_null
+:
+   DESCRIPTION null_filler
+;
+
+mplslsp_from_null
+:
+   FROM (ip_address | ipv6_address)
+;
+
+mplslsp_metric_null
+:
+   METRIC uint32
+;
+
+mplslsp_no_cspf_null
+:
+   NO_CSPF null_filler
+;
+
+// policing { filter <name>; no-auto-policing; }
+mplslsp_policing
+:
+   POLICING
+   (
+      mplslsppol_filter
+      | mplslsppol_no_auto_policing
+   )
+;
+
+mplslsppol_filter
+:
+   FILTER name = filter_name
+;
+
+mplslsppol_no_auto_policing
+:
+   NO_AUTO_POLICING
+;
+
+mplslsp_fast_reroute_null
+:
+   FAST_REROUTE null_filler
+;
+
 mplslsp_hop_limit_null
 :
    HOP_LIMIT uint8
@@ -378,6 +444,11 @@ mpls_optimize_timer_null
 mpls_path_mtu_null
 :
    PATH_MTU null_filler
+;
+
+mpls_preference_null
+:
+   PREFERENCE uint32
 ;
 
 mpls_record_null

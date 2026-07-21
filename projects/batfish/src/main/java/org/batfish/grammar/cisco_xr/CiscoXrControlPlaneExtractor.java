@@ -52,7 +52,6 @@ import static org.batfish.representation.cisco_xr.CiscoXrStructureUsage.BGP_ADDI
 import static org.batfish.representation.cisco_xr.CiscoXrStructureUsage.BGP_AGGREGATE_ROUTE_POLICY;
 import static org.batfish.representation.cisco_xr.CiscoXrStructureUsage.BGP_DEFAULT_ORIGINATE_ROUTE_POLICY;
 import static org.batfish.representation.cisco_xr.CiscoXrStructureUsage.BGP_INHERITED_PEER_POLICY;
-import static org.batfish.representation.cisco_xr.CiscoXrStructureUsage.BGP_INHERITED_SESSION;
 import static org.batfish.representation.cisco_xr.CiscoXrStructureUsage.BGP_LISTEN_RANGE_PEER_GROUP;
 import static org.batfish.representation.cisco_xr.CiscoXrStructureUsage.BGP_NEIGHBOR_PEER_GROUP;
 import static org.batfish.representation.cisco_xr.CiscoXrStructureUsage.BGP_NEIGHBOR_ROUTE_POLICY_IN;
@@ -284,6 +283,7 @@ import org.batfish.datamodel.SwitchportEncapsulationType;
 import org.batfish.datamodel.SwitchportMode;
 import org.batfish.datamodel.TcpFlags;
 import org.batfish.datamodel.TcpFlagsMatchConditions;
+import org.batfish.datamodel.bgp.RouteDistinguisher;
 import org.batfish.datamodel.bgp.community.ExtendedCommunity;
 import org.batfish.datamodel.bgp.community.StandardCommunity;
 import org.batfish.datamodel.eigrp.ClassicMetric;
@@ -323,8 +323,6 @@ import org.batfish.datamodel.routing_policy.expr.VarIsisLevel;
 import org.batfish.datamodel.routing_policy.expr.VarLong;
 import org.batfish.datamodel.routing_policy.expr.VarOrigin;
 import org.batfish.datamodel.routing_policy.expr.VarRouteType;
-import org.batfish.datamodel.tracking.DecrementPriority;
-import org.batfish.datamodel.tracking.TrackAction;
 import org.batfish.datamodel.vendor_family.cisco_xr.Aaa;
 import org.batfish.datamodel.vendor_family.cisco_xr.AaaAccounting;
 import org.batfish.datamodel.vendor_family.cisco_xr.AaaAccountingCommands;
@@ -395,9 +393,7 @@ import org.batfish.grammar.cisco_xr.CiscoXrParser.Aspsee_neighbor_isContext;
 import org.batfish.grammar.cisco_xr.CiscoXrParser.Aspsee_originates_fromContext;
 import org.batfish.grammar.cisco_xr.CiscoXrParser.Aspsee_passes_throughContext;
 import org.batfish.grammar.cisco_xr.CiscoXrParser.Aspsee_unique_lengthContext;
-import org.batfish.grammar.cisco_xr.CiscoXrParser.Auto_summary_bgp_tailContext;
 import org.batfish.grammar.cisco_xr.CiscoXrParser.Bgp_address_familyContext;
-import org.batfish.grammar.cisco_xr.CiscoXrParser.Bgp_advertise_inactive_rb_stanzaContext;
 import org.batfish.grammar.cisco_xr.CiscoXrParser.Bgp_asnContext;
 import org.batfish.grammar.cisco_xr.CiscoXrParser.Bgp_confederation_rb_stanzaContext;
 import org.batfish.grammar.cisco_xr.CiscoXrParser.Bgp_listen_range_rb_stanzaContext;
@@ -581,7 +577,6 @@ import org.batfish.grammar.cisco_xr.CiscoXrParser.Iftunnel_protectionContext;
 import org.batfish.grammar.cisco_xr.CiscoXrParser.Iftunnel_sourceContext;
 import org.batfish.grammar.cisco_xr.CiscoXrParser.Ike_encryptionContext;
 import org.batfish.grammar.cisco_xr.CiscoXrParser.Inherit_peer_policy_bgp_tailContext;
-import org.batfish.grammar.cisco_xr.CiscoXrParser.Inherit_peer_session_bgp_tailContext;
 import org.batfish.grammar.cisco_xr.CiscoXrParser.Int_compContext;
 import org.batfish.grammar.cisco_xr.CiscoXrParser.Int_exprContext;
 import org.batfish.grammar.cisco_xr.CiscoXrParser.Interface_ipv4_addressContext;
@@ -629,7 +624,6 @@ import org.batfish.grammar.cisco_xr.CiscoXrParser.Logging_console_severityContex
 import org.batfish.grammar.cisco_xr.CiscoXrParser.Logging_source_interfaceContext;
 import org.batfish.grammar.cisco_xr.CiscoXrParser.Logging_trap_set_severityContext;
 import org.batfish.grammar.cisco_xr.CiscoXrParser.Logging_trap_severityContext;
-import org.batfish.grammar.cisco_xr.CiscoXrParser.Match_semanticsContext;
 import org.batfish.grammar.cisco_xr.CiscoXrParser.Maximum_paths_bgp_tailContext;
 import org.batfish.grammar.cisco_xr.CiscoXrParser.Maximum_peers_bgp_tailContext;
 import org.batfish.grammar.cisco_xr.CiscoXrParser.Mldp_address_familyContext;
@@ -761,8 +755,10 @@ import org.batfish.grammar.cisco_xr.CiscoXrParser.Rodl_acl_inContext;
 import org.batfish.grammar.cisco_xr.CiscoXrParser.Rodl_acl_outContext;
 import org.batfish.grammar.cisco_xr.CiscoXrParser.Rodl_route_policyContext;
 import org.batfish.grammar.cisco_xr.CiscoXrParser.Ror_routing_instanceContext;
-import org.batfish.grammar.cisco_xr.CiscoXrParser.Ror_routing_instance_nullContext;
+import org.batfish.grammar.cisco_xr.CiscoXrParser.Ror_routing_instance_ospf_nullContext;
+import org.batfish.grammar.cisco_xr.CiscoXrParser.Ror_routing_instance_rip_nullContext;
 import org.batfish.grammar.cisco_xr.CiscoXrParser.Rorri_protocolContext;
+import org.batfish.grammar.cisco_xr.CiscoXrParser.Route_distinguisherContext;
 import org.batfish.grammar.cisco_xr.CiscoXrParser.Route_nexthopContext;
 import org.batfish.grammar.cisco_xr.CiscoXrParser.Route_policy_bgp_tailContext;
 import org.batfish.grammar.cisco_xr.CiscoXrParser.Route_policy_nameContext;
@@ -861,10 +857,8 @@ import org.batfish.grammar.cisco_xr.CiscoXrParser.Suppressed_iis_stanzaContext;
 import org.batfish.grammar.cisco_xr.CiscoXrParser.Switchport_trunk_encapsulationContext;
 import org.batfish.grammar.cisco_xr.CiscoXrParser.T_serverContext;
 import org.batfish.grammar.cisco_xr.CiscoXrParser.T_source_interfaceContext;
-import org.batfish.grammar.cisco_xr.CiscoXrParser.Template_peer_address_familyContext;
 import org.batfish.grammar.cisco_xr.CiscoXrParser.Template_peer_policy_rb_stanzaContext;
 import org.batfish.grammar.cisco_xr.CiscoXrParser.Template_peer_session_rb_stanzaContext;
-import org.batfish.grammar.cisco_xr.CiscoXrParser.Track_actionContext;
 import org.batfish.grammar.cisco_xr.CiscoXrParser.Track_interfaceContext;
 import org.batfish.grammar.cisco_xr.CiscoXrParser.Ts_hostContext;
 import org.batfish.grammar.cisco_xr.CiscoXrParser.U_passwordContext;
@@ -961,7 +955,6 @@ import org.batfish.representation.cisco_xr.LiteralUint16;
 import org.batfish.representation.cisco_xr.LiteralUint16Range;
 import org.batfish.representation.cisco_xr.LiteralUint32;
 import org.batfish.representation.cisco_xr.MasterBgpPeerGroup;
-import org.batfish.representation.cisco_xr.MatchSemantics;
 import org.batfish.representation.cisco_xr.NamedBgpPeerGroup;
 import org.batfish.representation.cisco_xr.NamedRsaPubKey;
 import org.batfish.representation.cisco_xr.NeighborIsAsPathSetElem;
@@ -1199,6 +1192,31 @@ public class CiscoXrControlPlaneExtractor extends CiscoXrParserBaseListener
     }
     String[] parts = ctx.asn4b.getText().split("\\.");
     return (Long.parseLong(parts[0]) << 16) + Long.parseLong(parts[1]);
+  }
+
+  private @Nullable RouteDistinguisher toRouteDistinguisher(
+      ParserRuleContext messageCtx, Route_distinguisherContext ctx) {
+    // The M_Rd lexer mode produces at most UINT32 tokens, so both the ASN and the
+    // assigned number are guaranteed to fit in 32 bits here.
+    long admin2 = toLong(ctx.uint_legacy());
+    if (ctx.IP_ADDRESS() != null) {
+      if (admin2 > 0xFFFFL) {
+        warn(messageCtx, "Invalid route distinguisher: " + ctx.getText());
+        return null;
+      }
+      return RouteDistinguisher.from(toIp(ctx.IP_ADDRESS()), (int) admin2);
+    }
+    long asn = toAsNum(ctx.bgp_asn());
+    if (asn <= 0xFFFFL) {
+      // type 0: 2-byte ASN administrator, 4-byte assigned number
+      return RouteDistinguisher.from((int) asn, admin2);
+    }
+    if (admin2 <= 0xFFFFL) {
+      // type 2: 4-byte ASN administrator, 2-byte assigned number
+      return RouteDistinguisher.from(asn, (int) admin2);
+    }
+    warn(messageCtx, "Invalid route distinguisher: " + ctx.getText());
+    return null;
   }
 
   private static Ip toIp(TerminalNode t) {
@@ -2148,15 +2166,6 @@ public class CiscoXrControlPlaneExtractor extends CiscoXrParserBaseListener
     _no = ctx.NO() != null;
   }
 
-  private @Nullable TrackAction toTrackAction(Track_actionContext ctx) {
-    if (ctx.track_action_decrement() != null) {
-      int subtrahend = toInteger(ctx.track_action_decrement().subtrahend);
-      return new DecrementPriority(subtrahend);
-    } else {
-      return convProblem(TrackAction.class, ctx, null);
-    }
-  }
-
   @Override
   public void enterInterface_is_stanza(Interface_is_stanzaContext ctx) {
     Interface iface = getOrAddInterface(ctx.iname);
@@ -2999,7 +3008,10 @@ public class CiscoXrControlPlaneExtractor extends CiscoXrParserBaseListener
 
   @Override
   public void exitBgp_vrf_rd(Bgp_vrf_rdContext ctx) {
-    todo(ctx);
+    RouteDistinguisher rd = toRouteDistinguisher(ctx, ctx.route_distinguisher());
+    if (rd != null) {
+      currentVrf().setRouteDistinguisher(rd);
+    }
   }
 
   @Override
@@ -3138,11 +3150,6 @@ public class CiscoXrControlPlaneExtractor extends CiscoXrParserBaseListener
   }
 
   @Override
-  public void exitAuto_summary_bgp_tail(Auto_summary_bgp_tailContext ctx) {
-    todo(ctx);
-  }
-
-  @Override
   public void exitS_banner_ios(S_banner_iosContext ctx) {
     String bannerType = toBannerType(ctx.banner_header);
     if (bannerType == null) {
@@ -3177,11 +3184,6 @@ public class CiscoXrControlPlaneExtractor extends CiscoXrParserBaseListener
     } else {
       return null;
     }
-  }
-
-  @Override
-  public void exitBgp_advertise_inactive_rb_stanza(Bgp_advertise_inactive_rb_stanzaContext ctx) {
-    _currentPeerGroup.setAdvertiseInactive(true);
   }
 
   @Override
@@ -3251,16 +3253,6 @@ public class CiscoXrControlPlaneExtractor extends CiscoXrParserBaseListener
       clusterId = toIp(ctx.IP_ADDRESS());
     }
     _currentPeerGroup.setClusterId(clusterId);
-  }
-
-  private MatchSemantics toMatchSemantics(Match_semanticsContext ctx) {
-    if (ctx.MATCH_ALL() != null) {
-      return MatchSemantics.MATCH_ALL;
-    } else if (ctx.MATCH_ANY() != null) {
-      return MatchSemantics.MATCH_ANY;
-    } else {
-      throw convError(MatchSemantics.class, ctx);
-    }
   }
 
   @Override
@@ -4403,27 +4395,6 @@ public class CiscoXrControlPlaneExtractor extends CiscoXrParserBaseListener
       // May not hit this since parser for peer-policy does not have
       // recursion.
       _currentNamedPeerGroup.setGroupName(groupName);
-    } else if (_currentPeerGroup == proc.getMasterBgpPeerGroup()) {
-      // Intentional identity comparison above
-      throw new BatfishException("Invalid peer context for inheritance");
-    } else {
-      todo(ctx);
-    }
-  }
-
-  @Override
-  public void exitInherit_peer_session_bgp_tail(Inherit_peer_session_bgp_tailContext ctx) {
-    BgpProcess proc = currentVrf().getBgpProcess();
-    String sessionName = ctx.name.getText();
-    _configuration.referenceStructure(
-        BGP_TEMPLATE_PEER_SESSION,
-        sessionName,
-        BGP_INHERITED_SESSION,
-        ctx.name.getStart().getLine());
-    if (_currentIpPeerGroup != null) {
-      _currentIpPeerGroup.setPeerSession(sessionName);
-    } else if (_currentNamedPeerGroup != null) {
-      _currentNamedPeerGroup.setPeerSession(sessionName);
     } else if (_currentPeerGroup == proc.getMasterBgpPeerGroup()) {
       // Intentional identity comparison above
       throw new BatfishException("Invalid peer context for inheritance");
@@ -5891,7 +5862,12 @@ public class CiscoXrControlPlaneExtractor extends CiscoXrParserBaseListener
   }
 
   @Override
-  public void exitRor_routing_instance_null(Ror_routing_instance_nullContext ctx) {
+  public void exitRor_routing_instance_ospf_null(Ror_routing_instance_ospf_nullContext ctx) {
+    todo(ctx);
+  }
+
+  @Override
+  public void exitRor_routing_instance_rip_null(Ror_routing_instance_rip_nullContext ctx) {
     todo(ctx);
   }
 
@@ -6332,11 +6308,6 @@ public class CiscoXrControlPlaneExtractor extends CiscoXrParserBaseListener
     _configuration.setTacacsSourceInterface(ifaceName);
     _configuration.referenceStructure(
         INTERFACE, ifaceName, TACACS_SOURCE_INTERFACE, ctx.iname.getStart().getLine());
-  }
-
-  @Override
-  public void exitTemplate_peer_address_family(Template_peer_address_familyContext ctx) {
-    popPeer();
   }
 
   @Override

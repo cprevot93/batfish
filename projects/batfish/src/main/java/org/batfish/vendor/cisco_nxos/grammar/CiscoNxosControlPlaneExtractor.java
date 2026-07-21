@@ -120,6 +120,7 @@ import static org.batfish.vendor.cisco_nxos.representation.CiscoNxosStructureUsa
 import static org.batfish.vendor.cisco_nxos.representation.CiscoNxosStructureUsage.INTERFACE_IP_RIP_ROUTE_FILTER_PREFIX_LIST;
 import static org.batfish.vendor.cisco_nxos.representation.CiscoNxosStructureUsage.INTERFACE_IP_RIP_ROUTE_FILTER_ROUTE_MAP;
 import static org.batfish.vendor.cisco_nxos.representation.CiscoNxosStructureUsage.INTERFACE_IP_ROUTER_EIGRP;
+import static org.batfish.vendor.cisco_nxos.representation.CiscoNxosStructureUsage.INTERFACE_IP_ROUTER_ISIS;
 import static org.batfish.vendor.cisco_nxos.representation.CiscoNxosStructureUsage.INTERFACE_IP_ROUTER_OSPF;
 import static org.batfish.vendor.cisco_nxos.representation.CiscoNxosStructureUsage.INTERFACE_IP_ROUTER_RIP;
 import static org.batfish.vendor.cisco_nxos.representation.CiscoNxosStructureUsage.INTERFACE_SELF_REFERENCE;
@@ -173,6 +174,7 @@ import static org.batfish.vendor.cisco_nxos.representation.CiscoNxosStructureUsa
 import static org.batfish.vendor.cisco_nxos.representation.CiscoNxosStructureUsage.RIP_AF6_REDISTRIBUTE_INSTANCE;
 import static org.batfish.vendor.cisco_nxos.representation.CiscoNxosStructureUsage.RIP_AF6_REDISTRIBUTE_ROUTE_MAP;
 import static org.batfish.vendor.cisco_nxos.representation.CiscoNxosStructureUsage.ROUTER_EIGRP_SELF_REFERENCE;
+import static org.batfish.vendor.cisco_nxos.representation.CiscoNxosStructureUsage.ROUTER_ISIS_SELF_REFERENCE;
 import static org.batfish.vendor.cisco_nxos.representation.CiscoNxosStructureUsage.ROUTER_OSPFV3_SELF_REFERENCE;
 import static org.batfish.vendor.cisco_nxos.representation.CiscoNxosStructureUsage.ROUTER_OSPF_SELF_REFERENCE;
 import static org.batfish.vendor.cisco_nxos.representation.CiscoNxosStructureUsage.ROUTER_RIP_SELF_REFERENCE;
@@ -237,6 +239,7 @@ import org.batfish.datamodel.Ip;
 import org.batfish.datamodel.Ip6;
 import org.batfish.datamodel.IpProtocol;
 import org.batfish.datamodel.IpWildcard;
+import org.batfish.datamodel.IsoAddress;
 import org.batfish.datamodel.LineAction;
 import org.batfish.datamodel.LinkLocalAddress;
 import org.batfish.datamodel.LongSpace;
@@ -251,6 +254,7 @@ import org.batfish.datamodel.UniverseIpSpace;
 import org.batfish.datamodel.bgp.RouteDistinguisher;
 import org.batfish.datamodel.bgp.community.ExtendedCommunity;
 import org.batfish.datamodel.bgp.community.StandardCommunity;
+import org.batfish.datamodel.isis.IsisLevel;
 import org.batfish.grammar.BatfishCombinedParser;
 import org.batfish.grammar.SilentSyntaxListener;
 import org.batfish.grammar.UnrecognizedLineToken;
@@ -392,6 +396,7 @@ import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Ihg_priorityContext
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Ihg_timersContext;
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Ihg_trackContext;
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Ihgam_key_chainContext;
+import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Iip6r_isisContext;
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Iip6r_ospfv3Context;
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Iip_port_access_groupContext;
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Iipdl_prefix_listContext;
@@ -409,10 +414,13 @@ import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Iipp_jp_policy_rout
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Iipp_neighbor_policy_prefix_listContext;
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Iipp_neighbor_policy_route_mapContext;
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Iipr_eigrpContext;
+import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Iipr_isisContext;
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Iipr_ospfContext;
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Iipr_ripContext;
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Iiprip_rf_prefix_listContext;
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Iiprip_rf_route_mapContext;
+import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Iisis_circuit_typeContext;
+import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Iisis_networkContext;
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Il_min_linksContext;
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Inherit_sequence_numberContext;
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Inoip_forwardContext;
@@ -458,6 +466,7 @@ import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Ipv6_prefix_listCon
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Ipv6_prefix_list_line_prefix_lengthContext;
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Ipv6_routeContext;
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Isis_instanceContext;
+import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Isis_levelContext;
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Ispt_qosContext;
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Ispt_queuingContext;
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Last_as_num_prependsContext;
@@ -479,12 +488,17 @@ import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Name_serverContext;
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.No_ip_route_networkContext;
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.No_sysds_shutdownContext;
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.No_sysds_switchportContext;
+import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Ntp_authenticateContext;
+import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Ntp_authentication_keyContext;
+import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Ntp_authentication_key_numberContext;
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Ntp_serverContext;
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Ntp_source_interfaceContext;
+import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Ntp_trusted_keyContext;
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Ntpag_peerContext;
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Ntpag_query_onlyContext;
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Ntpag_serveContext;
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Ntpag_serve_onlyContext;
+import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Ntps_keyContext;
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Ntps_preferContext;
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Ntps_use_vrfContext;
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Nve_host_reachabilityContext;
@@ -608,6 +622,9 @@ import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Recaf6_redistribute
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Recaf_default_metricContext;
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Recaf_ipv4Context;
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Recaf_ipv6Context;
+import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Ri_is_typeContext;
+import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Ri_netContext;
+import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Ri_vrfContext;
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Rip_instanceContext;
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Rm_continueContext;
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Rmm_as_numberContext;
@@ -675,6 +692,7 @@ import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Route_target_or_aut
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Router_bgpContext;
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Router_eigrpContext;
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Router_eigrp_process_tagContext;
+import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Router_isisContext;
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Router_isis_process_tagContext;
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Router_ospfContext;
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Router_ospf_nameContext;
@@ -805,11 +823,14 @@ import org.batfish.vendor.cisco_nxos.representation.IpPrefixListLine;
 import org.batfish.vendor.cisco_nxos.representation.Ipv6AccessList;
 import org.batfish.vendor.cisco_nxos.representation.Ipv6PrefixList;
 import org.batfish.vendor.cisco_nxos.representation.Ipv6PrefixListLine;
+import org.batfish.vendor.cisco_nxos.representation.IsisProcess;
+import org.batfish.vendor.cisco_nxos.representation.IsisVrfConfiguration;
 import org.batfish.vendor.cisco_nxos.representation.Layer3Options;
 import org.batfish.vendor.cisco_nxos.representation.LiteralIpAddressSpec;
 import org.batfish.vendor.cisco_nxos.representation.LiteralPortSpec;
 import org.batfish.vendor.cisco_nxos.representation.LoggingServer;
 import org.batfish.vendor.cisco_nxos.representation.NameServer;
+import org.batfish.vendor.cisco_nxos.representation.NtpAuthenticationKey;
 import org.batfish.vendor.cisco_nxos.representation.NtpServer;
 import org.batfish.vendor.cisco_nxos.representation.Nve;
 import org.batfish.vendor.cisco_nxos.representation.Nve.HostReachabilityProtocol;
@@ -902,6 +923,7 @@ public final class CiscoNxosControlPlaneExtractor extends CiscoNxosParserBaseLis
   private static final IntegerSpace BGP_EBGP_MULTIHOP_TTL_RANGE =
       IntegerSpace.of(Range.closed(2, 255));
   private static final IntegerSpace BGP_INHERIT_RANGE = IntegerSpace.of(Range.closed(1, 65535));
+  private static final IntegerSpace NTP_KEY_RANGE = IntegerSpace.of(Range.closed(1, 65535));
   private static final IntegerSpace BGP_MAXAS_LIMIT_RANGE = IntegerSpace.of(Range.closed(1, 512));
   private static final IntegerSpace BGP_MAXIMUM_PATHS_RANGE = IntegerSpace.of(Range.closed(1, 64));
   private static final IntegerSpace BGP_NEIGHBOR_DESCRIPTION_LENGTH_RANGE =
@@ -1180,6 +1202,17 @@ public final class CiscoNxosControlPlaneExtractor extends CiscoNxosParserBaseLis
     return Long.parseLong(ctx.getText());
   }
 
+  private static @Nonnull IsisLevel toIsisLevel(Isis_levelContext ctx) {
+    if (ctx.LEVEL_1() != null) {
+      return IsisLevel.LEVEL_1;
+    } else if (ctx.LEVEL_2() != null) {
+      return IsisLevel.LEVEL_2;
+    } else {
+      assert ctx.LEVEL_1_2() != null;
+      return IsisLevel.LEVEL_1_2;
+    }
+  }
+
   private static @Nonnull PortSpec toPortSpec(Acllal4tcp_port_spec_port_groupContext ctx) {
     return new PortGroupPortSpec(ctx.name.getText());
   }
@@ -1342,6 +1375,8 @@ public final class CiscoNxosControlPlaneExtractor extends CiscoNxosParserBaseLis
   private Optional<Integer> _currentHsrpGroupNumber;
   private List<Interface> _currentInterfaces;
   private IpAccessList _currentIpAccessList;
+  private IsisProcess _currentIsisProcess;
+  private IsisVrfConfiguration _currentIsisVrf;
   private Optional<Long> _currentIpAccessListLineNum;
   private IpPrefixList _currentIpPrefixList;
 
@@ -2381,6 +2416,41 @@ public final class CiscoNxosControlPlaneExtractor extends CiscoNxosParserBaseLis
   }
 
   @Override
+  public void exitIipr_isis(Iipr_isisContext ctx) {
+    Optional<String> tagOrErr = toString(ctx, ctx.tag);
+    if (!tagOrErr.isPresent()) {
+      return;
+    }
+    String isisProc = tagOrErr.get();
+    _currentInterfaces.forEach(iface -> iface.setIsisProcess(isisProc));
+    _c.referenceStructure(
+        ROUTER_ISIS, isisProc, INTERFACE_IP_ROUTER_ISIS, ctx.tag.getStart().getLine());
+  }
+
+  @Override
+  public void exitIip6r_isis(Iip6r_isisContext ctx) {
+    // `ipv6 router isis` is parsed but not modeled; still resolve the structure reference so the
+    // process tag is not reported as undefined.
+    Optional<String> tagOrErr = toString(ctx, ctx.tag);
+    if (!tagOrErr.isPresent()) {
+      return;
+    }
+    _c.referenceStructure(
+        ROUTER_ISIS, tagOrErr.get(), INTERFACE_IP_ROUTER_ISIS, ctx.tag.getStart().getLine());
+  }
+
+  @Override
+  public void exitIisis_circuit_type(Iisis_circuit_typeContext ctx) {
+    IsisLevel level = toIsisLevel(ctx.level);
+    _currentInterfaces.forEach(iface -> iface.setIsisInterfaceCircuitType(level));
+  }
+
+  @Override
+  public void exitIisis_network(Iisis_networkContext ctx) {
+    _currentInterfaces.forEach(iface -> iface.setIsisNetworkPointToPoint(true));
+  }
+
+  @Override
   public void enterIp_access_list(Ip_access_listContext ctx) {
     Optional<String> nameOpt = toString(ctx, ctx.name);
     if (!nameOpt.isPresent()) {
@@ -2742,6 +2812,32 @@ public final class CiscoNxosControlPlaneExtractor extends CiscoNxosParserBaseLis
   @Override
   public void exitNtp_server(Ntp_serverContext ctx) {
     _currentNtpServer = null;
+  }
+
+  @Override
+  public void exitNtps_key(Ntps_keyContext ctx) {
+    toInteger(ctx, ctx.ntp_authentication_key_number()).ifPresent(_currentNtpServer::setKey);
+  }
+
+  @Override
+  public void exitNtp_authenticate(Ntp_authenticateContext ctx) {
+    _c.setNtpAuthenticate(true);
+  }
+
+  @Override
+  public void exitNtp_authentication_key(Ntp_authentication_keyContext ctx) {
+    Optional<Integer> maybeKeyNum = toInteger(ctx, ctx.num);
+    if (!maybeKeyNum.isPresent()) {
+      return;
+    }
+    NtpAuthenticationKey key =
+        _c.getNtpAuthenticationKeys().computeIfAbsent(maybeKeyNum.get(), NtpAuthenticationKey::new);
+    key.setMd5Value(ctx.md5.getText());
+  }
+
+  @Override
+  public void exitNtp_trusted_key(Ntp_trusted_keyContext ctx) {
+    toInteger(ctx, ctx.key).ifPresent(_c.getNtpTrustedKeys()::add);
   }
 
   @Override
@@ -3280,6 +3376,54 @@ public final class CiscoNxosControlPlaneExtractor extends CiscoNxosParserBaseLis
     _currentEigrpProcess = null;
     _currentEigrpVrf = null;
     _currentEigrpVrfIpAf = null;
+  }
+
+  @Override
+  public void enterRouter_isis(Router_isisContext ctx) {
+    Optional<String> processTagOrErr = toString(ctx, ctx.tag);
+    if (processTagOrErr.isPresent()) {
+      String processTag = processTagOrErr.get();
+      _currentIsisProcess = _c.getOrCreateIsisProcess(processTag);
+      _c.defineStructure(ROUTER_ISIS, processTag, ctx);
+      _c.referenceStructure(
+          ROUTER_ISIS, processTag, ROUTER_ISIS_SELF_REFERENCE, ctx.tag.getStart().getLine());
+    } else {
+      // Dummy process, with all inner config also dummy.
+      _currentIsisProcess = new IsisProcess("dummy");
+    }
+    _currentIsisVrf = _currentIsisProcess.getOrCreateVrf(DEFAULT_VRF_NAME);
+  }
+
+  @Override
+  public void exitRouter_isis(Router_isisContext ctx) {
+    _currentIsisProcess = null;
+    _currentIsisVrf = null;
+  }
+
+  @Override
+  public void enterRi_vrf(Ri_vrfContext ctx) {
+    Optional<String> nameOrErr = toString(ctx, ctx.name);
+    if (nameOrErr.isPresent()) {
+      _currentIsisVrf = _currentIsisProcess.getOrCreateVrf(nameOrErr.get());
+    } else {
+      // Dummy so parsing doesn't crash.
+      _currentIsisVrf = new IsisVrfConfiguration();
+    }
+  }
+
+  @Override
+  public void exitRi_vrf(Ri_vrfContext ctx) {
+    _currentIsisVrf = _currentIsisProcess.getOrCreateVrf(DEFAULT_VRF_NAME);
+  }
+
+  @Override
+  public void exitRi_net(Ri_netContext ctx) {
+    _currentIsisVrf.setNetAddress(new IsoAddress(ctx.net.getText()));
+  }
+
+  @Override
+  public void exitRi_is_type(Ri_is_typeContext ctx) {
+    _currentIsisVrf.setLevel(toIsisLevel(ctx.level));
   }
 
   @Override
@@ -7173,6 +7317,11 @@ public final class CiscoNxosControlPlaneExtractor extends CiscoNxosParserBaseLis
 
   private @Nonnull Optional<Integer> toInteger(ParserRuleContext messageCtx, Eigrp_asnContext ctx) {
     return toIntegerInSpace(messageCtx, ctx, EIGRP_ASN_RANGE, "EIGRP autonomous-system number");
+  }
+
+  private @Nonnull Optional<Integer> toInteger(
+      ParserRuleContext messageCtx, Ntp_authentication_key_numberContext ctx) {
+    return toIntegerInSpace(messageCtx, ctx, NTP_KEY_RANGE, "NTP key number");
   }
 
   private @Nonnull Optional<Integer> toInteger(

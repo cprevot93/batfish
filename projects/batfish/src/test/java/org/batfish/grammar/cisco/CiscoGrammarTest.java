@@ -449,6 +449,8 @@ import org.batfish.representation.cisco.HsrpVersion;
 import org.batfish.representation.cisco.IcmpEchoSla;
 import org.batfish.representation.cisco.IpSla;
 import org.batfish.representation.cisco.LdapServerGroup;
+import org.batfish.representation.cisco.NtpAuthenticationKey;
+import org.batfish.representation.cisco.NtpAuthenticationKey.HashAlgorithm;
 import org.batfish.representation.cisco.OspfNetworkType;
 import org.batfish.representation.cisco.PortObjectGroup;
 import org.batfish.representation.cisco.PrefixList;
@@ -745,6 +747,73 @@ public final class CiscoGrammarTest {
   @Test
   public void testIosLineParsing() {
     assertNotNull(parseCiscoConfig("ios-line", null));
+  }
+
+  @Test
+  public void testIosNtpExtraction() {
+    CiscoConfiguration vc = parseCiscoConfig("ios-ntp", ConfigurationFormat.CISCO_IOS);
+
+    assertTrue(vc.getNtpAuthenticate());
+
+    assertThat(vc.getNtpAuthenticationKeys(), hasKeys(1, 2, 3, 42));
+
+    NtpAuthenticationKey key1 = vc.getNtpAuthenticationKeys().get(1);
+    assertThat(key1.getHashAlgorithm(), equalTo(HashAlgorithm.MD5));
+    assertThat(key1.getValue(), equalTo("aNiceKey"));
+
+    NtpAuthenticationKey key2 = vc.getNtpAuthenticationKeys().get(2);
+    assertThat(key2.getHashAlgorithm(), equalTo(HashAlgorithm.CMAC_AES_128));
+    assertThat(key2.getValue(), equalTo("aCmacKey"));
+
+    NtpAuthenticationKey key3 = vc.getNtpAuthenticationKeys().get(3);
+    assertThat(key3.getHashAlgorithm(), equalTo(HashAlgorithm.HMAC_SHA1));
+    assertThat(key3.getValue(), equalTo("aSha1Key"));
+
+    NtpAuthenticationKey key42 = vc.getNtpAuthenticationKeys().get(42);
+    assertThat(key42.getHashAlgorithm(), equalTo(HashAlgorithm.HMAC_SHA2_256));
+    assertThat(key42.getValue(), equalTo("aSha2Key"));
+
+    // `ntp trusted-key 0` parses as a uint16 but is out of the valid NTP key range (1-65535), so it
+    // is dropped with a warning and never added to the trusted-key set.
+    assertThat(
+        vc.getNtpTrustedKeys(),
+        equalTo(IntegerSpace.builder().including(1).including(Range.closed(10, 12)).build()));
+
+    assertThat(vc.getNtpServers(), hasKeys("10.1.1.10", "10.1.1.11", "10.1.1.12"));
+
+    assertThat(vc.getNtpServers().get("10.1.1.10").getKey(), equalTo(1));
+    assertThat(vc.getNtpServers().get("10.1.1.11").getKey(), nullValue());
+    assertThat(vc.getNtpServers().get("10.1.1.12").getKey(), equalTo(42));
+
+    assertTrue(vc.isNtpServerAuthenticated("10.1.1.10"));
+    assertFalse(vc.isNtpServerAuthenticated("10.1.1.11"));
+    assertFalse(vc.isNtpServerAuthenticated("10.1.1.12"));
+  }
+
+  @Test
+  public void testIosNtpNoAuthenticateExtraction() {
+    CiscoConfiguration vc =
+        parseCiscoConfig("ios-ntp-no-authenticate", ConfigurationFormat.CISCO_IOS);
+
+    assertFalse(vc.getNtpAuthenticate());
+
+    // `ntp trusted-key 5 - 8` should expand to the inclusive range 5-8.
+    IntegerSpace trustedKeys = vc.getNtpTrustedKeys();
+    assertThat(trustedKeys, equalTo(IntegerSpace.of(Range.closed(5, 8))));
+    assertThat(trustedKeys.contains(4), equalTo(false));
+    assertThat(trustedKeys.contains(5), equalTo(true));
+    assertThat(trustedKeys.contains(8), equalTo(true));
+    assertThat(trustedKeys.contains(9), equalTo(false));
+
+    assertThat(vc.getNtpServers(), hasKeys("10.1.1.20", "10.1.1.21"));
+    assertThat(vc.getNtpServers().get("10.1.1.20").getKey(), equalTo(6));
+    assertThat(vc.getNtpServers().get("10.1.1.21").getKey(), equalTo(9));
+
+    // Key 6 is defined and falls within the trusted range 5-8, but `ntp authenticate` is off, so
+    // the server is not authenticated.
+    assertFalse(vc.isNtpServerAuthenticated("10.1.1.20"));
+    // Key 9 is outside the trusted range and undefined.
+    assertFalse(vc.isNtpServerAuthenticated("10.1.1.21"));
   }
 
   @Test
@@ -1882,6 +1951,10 @@ public final class CiscoGrammarTest {
 
     assertThat(c, hasInterface("Loopback0", hasIsis(hasLevel2(notNullValue()))));
     assertThat(c, hasInterface("Loopback100", hasIsis(nullValue())));
+    // interface-level "isis enable" makes the interface an active IS-IS interface
+    assertThat(c, hasInterface("Loopback101", hasIsis(hasLevel2(notNullValue()))));
+    // interface-level "isis passive" still models IS-IS on the interface (passive)
+    assertThat(c, hasInterface("Loopback102", hasIsis(hasLevel2(notNullValue()))));
   }
 
   @Test
@@ -3889,10 +3962,10 @@ public final class CiscoGrammarTest {
     String redistRmName = "redist_eigrp";
     CiscoConfiguration vc = parseCiscoConfig(hostname, ConfigurationFormat.CISCO_IOS);
     org.batfish.representation.cisco.BgpProcess bgpProc = vc.getDefaultVrf().getBgpProcess();
-    assert bgpProc != null;
+    assertThat(bgpProc, notNullValue());
     BgpRedistributionPolicy eigrpRedist =
         bgpProc.getRedistributionPolicies().get(RoutingProtocolInstance.eigrp(1L));
-    assert eigrpRedist != null;
+    assertThat(eigrpRedist, notNullValue());
     assertThat(eigrpRedist.getRouteMap(), equalTo(redistRmName));
 
     /* Confirm route-map was referenced from correct context */
@@ -5945,6 +6018,21 @@ public final class CiscoGrammarTest {
   public void testIosAdvertiseInactive() throws IOException {
     Configuration config = parseConfig("ios-advertise-inactive");
     assertTrue(
+        config
+            .getDefaultVrf()
+            .getBgpProcess()
+            .getActiveNeighbors()
+            .get(Ip.parse("1.1.1.1"))
+            .getIpv4UnicastAddressFamily()
+            .getAddressFamilyCapabilities()
+            .getAdvertiseInactive());
+  }
+
+  @Test
+  public void testIosSuppressInactive() throws IOException {
+    // "bgp suppress-inactive" disables the default advertise-inactive behavior.
+    Configuration config = parseConfig("ios-suppress-inactive");
+    assertFalse(
         config
             .getDefaultVrf()
             .getBgpProcess()

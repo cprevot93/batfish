@@ -37,6 +37,7 @@ import org.batfish.datamodel.Ip;
 import org.batfish.datamodel.LongSpace;
 import org.batfish.datamodel.NetworkFactory;
 import org.batfish.datamodel.Prefix;
+import org.batfish.datamodel.UseConstantIp;
 import org.batfish.datamodel.Vrf;
 import org.batfish.datamodel.bgp.BgpTopologyUtils.AsPair;
 import org.batfish.datamodel.bgp.BgpTopologyUtils.ConfedSessionType;
@@ -111,7 +112,7 @@ public class BgpTopologyUtilsTest {
             .setLocalAs(1L)
             .setPeerAddress(ip2)
             .setRemoteAs(2L)
-            .setSessionVrf(DEFAULT_VRF_NAME)
+            .setSessionVrfScope(new SessionVrfScope.SpecificVrf(DEFAULT_VRF_NAME))
             .setIpv4UnicastAddressFamily(
                 Ipv4UnicastAddressFamily.builder()
                     .setAddressFamilyCapabilities(AddressFamilyCapabilities.builder().build())
@@ -134,6 +135,151 @@ public class BgpTopologyUtilsTest {
     ValueGraph<BgpPeerConfigId, BgpSessionProperties> bgpTopology =
         initBgpTopology(_configs, ipOwners, false, null).getGraph();
     assertThat(bgpTopology.nodes(), hasSize(1));
+  }
+
+  /**
+   * Builds a two-node network where an initiator in the default VRF dials an address that the
+   * listener owns in its <i>default</i> VRF, while the listener's BGP process lives in VRF "blue".
+   * The listener's {@link SessionVrfScope} is the variable under test.
+   */
+  private static ValueGraph<BgpPeerConfigId, BgpSessionProperties> initAnyVrfScenario(
+      SessionVrfScope listenerScope) {
+    Ip ip1 = Ip.parse("1.1.1.1");
+    Ip ip2 = Ip.parse("2.2.2.2");
+
+    NetworkFactory nf = new NetworkFactory();
+    Configuration.Builder cb =
+        nf.configurationBuilder().setConfigurationFormat(ConfigurationFormat.CISCO_IOS);
+
+    // Initiator i1: default VRF, active peer dialing ip2.
+    Configuration ci = cb.setHostname("i1").build();
+    Vrf vi = new Vrf(DEFAULT_VRF_NAME);
+    BgpProcess bpi = BgpProcess.testBgpProcess(Ip.parse("0.0.0.1"));
+    vi.setBgpProcess(bpi);
+    ci.setVrfs(ImmutableMap.of(DEFAULT_VRF_NAME, vi));
+    BgpActivePeerConfig initiator =
+        BgpActivePeerConfig.builder()
+            .setLocalIp(ip1)
+            .setLocalAs(1L)
+            .setPeerAddress(ip2)
+            .setRemoteAs(2L)
+            .setIpv4UnicastAddressFamily(
+                Ipv4UnicastAddressFamily.builder()
+                    .setAddressFamilyCapabilities(AddressFamilyCapabilities.builder().build())
+                    .build())
+            .build();
+    bpi.setNeighbors(ImmutableSortedMap.of(ip2, initiator));
+
+    // Listener l2: BGP process in VRF "blue", passive peer with the scope under test.
+    Configuration cl = cb.setHostname("l2").build();
+    BgpProcess bpl = BgpProcess.testBgpProcess(Ip.parse("0.0.0.2"));
+    Vrf vlBlue = new Vrf("blue");
+    vlBlue.setBgpProcess(bpl);
+    cl.setVrfs(ImmutableMap.of(DEFAULT_VRF_NAME, new Vrf(DEFAULT_VRF_NAME), "blue", vlBlue));
+    Prefix listenRange = Prefix.create(ip1, 24);
+    BgpPassivePeerConfig listener =
+        BgpPassivePeerConfig.builder()
+            .setLocalAs(2L)
+            .setRemoteAs(1L)
+            .setPeerPrefix(listenRange)
+            .setSessionVrfScope(listenerScope)
+            .setIpv4UnicastAddressFamily(
+                Ipv4UnicastAddressFamily.builder()
+                    .setAddressFamilyCapabilities(AddressFamilyCapabilities.builder().build())
+                    .build())
+            .build();
+    bpl.setPassiveNeighbors(ImmutableSortedMap.of(listenRange, listener));
+
+    // ip2 is owned by l2 in the DEFAULT VRF, not "blue".
+    Map<Ip, Map<String, Set<String>>> ipOwners =
+        ImmutableMap.of(
+            ip1,
+            ImmutableMap.of("i1", ImmutableSet.of(DEFAULT_VRF_NAME)),
+            ip2,
+            ImmutableMap.of("l2", ImmutableSet.of(DEFAULT_VRF_NAME)));
+
+    return initBgpTopology(ImmutableMap.of("i1", ci, "l2", cl), ipOwners, true, null).getGraph();
+  }
+
+  /**
+   * An {@link SessionVrfScope.AnyVrf} listener registers under every VRF on its node, so an
+   * initiator whose dialed address is owned in a non-config VRF still finds it.
+   */
+  @Test
+  public void testInitTopologyAnyVrfRegistersUnderAllNodeVrfs() {
+    assertThat(initAnyVrfScenario(SessionVrfScope.AnyVrf.instance()).edges(), hasSize(2));
+  }
+
+  /**
+   * Contrast with {@link #testInitTopologyAnyVrfRegistersUnderAllNodeVrfs()}: a default-scoped
+   * listener registers only under its own (config) VRF, so the same dialed address owned in a
+   * different VRF does not match.
+   */
+  @Test
+  public void testInitTopologyOwnVrfDoesNotRegisterUnderOtherVrfs() {
+    assertThat(initAnyVrfScenario(SessionVrfScope.OwnVrf.instance()).edges(), empty());
+  }
+
+  /**
+   * A peer with no explicit local IP whose VRF uses {@link UseConstantIp} should resolve its local
+   * IP even when no FIBs are available. Regression test for allowing source IP inference without a
+   * FIB.
+   */
+  @Test
+  public void testInitTopologySourceIpInferenceWithoutFib() {
+    Ip ip1 = Ip.parse("1.1.1.1");
+    Ip ip2 = Ip.parse("2.2.2.2");
+
+    // Peer on node1 with no explicit local IP; peer address is ip2
+    BgpActivePeerConfig peer1 =
+        BgpActivePeerConfig.builder()
+            .setLocalAs(1L)
+            .setPeerAddress(ip2)
+            .setRemoteAs(2L)
+            .setIpv4UnicastAddressFamily(
+                Ipv4UnicastAddressFamily.builder()
+                    .setAddressFamilyCapabilities(AddressFamilyCapabilities.builder().build())
+                    .build())
+            .build();
+    _node1BgpProcess.setNeighbors(ImmutableSortedMap.of(ip2, peer1));
+
+    // Peer on node2 with explicit local IP ip2, peering back to ip1
+    BgpActivePeerConfig peer2 =
+        BgpActivePeerConfig.builder()
+            .setLocalIp(ip2)
+            .setLocalAs(2L)
+            .setPeerAddress(ip1)
+            .setRemoteAs(1L)
+            .setIpv4UnicastAddressFamily(
+                Ipv4UnicastAddressFamily.builder()
+                    .setAddressFamilyCapabilities(AddressFamilyCapabilities.builder().build())
+                    .build())
+            .build();
+    _node2BgpProcess.setNeighbors(ImmutableSortedMap.of(ip1, peer2));
+
+    // Set node1's VRF to use UseConstantIp (simulates Junos default-address-selection)
+    _configs
+        .get(NODE1)
+        .getVrfs()
+        .get(DEFAULT_VRF_NAME)
+        .setSourceIpInference(UseConstantIp.create(ip1));
+
+    Map<Ip, Map<String, Set<String>>> ipOwners =
+        ImmutableMap.of(
+            ip1,
+            ImmutableMap.of(NODE1, ImmutableSet.of(DEFAULT_VRF_NAME)),
+            ip2,
+            ImmutableMap.of(NODE2, ImmutableSet.of(DEFAULT_VRF_NAME)));
+
+    // No FIBs provided, but UseConstantIp should still resolve ip1 as the local IP,
+    // allowing the session to establish.
+    ValueGraph<BgpPeerConfigId, BgpSessionProperties> bgpTopology =
+        initBgpTopology(_configs, ipOwners, true, null).getGraph();
+    assertThat(bgpTopology.edges(), hasSize(2));
+    EndpointPair<BgpPeerConfigId> edge = bgpTopology.edges().iterator().next();
+    assertThat(
+        ImmutableSet.of(edge.source().getHostname(), edge.target().getHostname()),
+        equalTo(ImmutableSet.of(NODE1, NODE2)));
   }
 
   @Test

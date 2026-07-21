@@ -58,6 +58,29 @@ public final class AnnotateTest {
   }
 
   /**
+   * Nokia SR-OS is not flattened, so annotation inserts {@code #}-prefixed comments in-place above
+   * the offending source line. Here an out-of-range autonomous-system produces a line-stamped
+   * extraction {@link org.batfish.common.Warnings.ParseWarning}.
+   */
+  @Test
+  public void testSros() throws IOException {
+    assertValidPair("annotate-sros-before", "annotate-sros-after");
+  }
+
+  /**
+   * SR-OS has no {@code _null} grammar rules, so silently-ignored statements are found by tracking
+   * which {@link org.batfish.vendor.sros.grammar.SrosStatementTree} nodes the feature extractor
+   * reads and reporting the rest (see {@link org.batfish.vendor.sros.grammar.SrosSilentSyntax}).
+   * Here the {@code system security} block is parsed and accepted but not modeled, so it is flagged
+   * once at its header line; the modeled {@code system name} and {@code autonomous-system} leaves
+   * are not.
+   */
+  @Test
+  public void testSrosSilentlyIgnored() throws IOException {
+    assertValidPair("annotate-sros-ignored-before", "annotate-sros-ignored-after");
+  }
+
+  /**
    * Assert that running annotate on {@code before} as a direct file input (not a snapshot
    * directory) produces the content of {@code after}.
    */
