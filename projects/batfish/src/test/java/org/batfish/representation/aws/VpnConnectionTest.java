@@ -14,8 +14,10 @@ import static org.batfish.representation.aws.VpnConnection.EXPORT_CONNECTED_STAT
 import static org.batfish.representation.aws.VpnConnection.VPN_TO_BACKBONE_EXPORT_POLICY_NAME;
 import static org.batfish.representation.aws.VpnConnection.VPN_UNDERLAY_VRF_NAME;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasKey;
+import static org.hamcrest.Matchers.nullValue;
 import static org.junit.Assert.assertTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -34,7 +36,12 @@ import org.batfish.common.util.BatfishObjectMapper;
 import org.batfish.datamodel.BgpActivePeerConfig;
 import org.batfish.datamodel.BgpProcess;
 import org.batfish.datamodel.Configuration;
+import org.batfish.datamodel.DiffieHellmanGroup;
+import org.batfish.datamodel.EncryptionAlgorithm;
+import org.batfish.datamodel.IkeHashingAlgorithm;
+import org.batfish.datamodel.IkePhase1Proposal;
 import org.batfish.datamodel.Ip;
+import org.batfish.datamodel.IpsecPhase2Proposal;
 import org.batfish.datamodel.Prefix;
 import org.batfish.datamodel.Vrf;
 import org.batfish.datamodel.bgp.Ipv4UnicastAddressFamily;
@@ -268,6 +275,22 @@ public class VpnConnectionTest {
                     false))));
   }
 
+  /**
+   * A tunnel that stores its pre-shared key in Secrets Manager has no PreSharedKey in
+   * DescribeVpnConnections output -- AWS returns a PreSharedKeyArn instead. Rejecting the tunnel
+   * would discard every VPN connection in the file.
+   */
+  @Test
+  public void testDeserializationSecretsManagerPreSharedKey() throws IOException {
+    String text =
+        readResource("org/batfish/representation/aws/VpnConnectionSecretsManagerPsk.json", UTF_8);
+
+    Region region = new Region("r1");
+    region.addConfigElement(BatfishObjectMapper.mapper().readTree(text), null, null);
+
+    assertThat(region.getVpnConnections().keySet(), contains("vpn-secretsmanager"));
+  }
+
   @Test
   public void testDeserializationTransitGateway() throws IOException {
     String text =
@@ -440,6 +463,126 @@ public class VpnConnectionTest {
                 .setStatements(Collections.singletonList(EXPORT_CONNECTED_STATEMENT))
                 .build()));
     assertThat(vgwConfig.getAllInterfaces(), hasKey(BACKBONE_FACING_INTERFACE_NAME));
+  }
+
+  /**
+   * AWS lets phase 1 and phase 2 use different algorithms, and commonly does: CBC for the IKE SA,
+   * GCM for the IPsec SA. The IKE phase 1 proposals must come from the phase 1 lists.
+   */
+  @Test
+  public void testIkePhase1ProposalsUsePhase1Algorithms() {
+    VpnGateway vgw = new VpnGateway("vpn", ImmutableList.of(), ImmutableMap.of(), 64666L);
+    Configuration vgwConfig = Utils.newAwsConfiguration(vgw.getId(), "awstest");
+    VpnConnection.initVpnConnectionsInfrastructure(vgwConfig);
+    Vrf vpnVrf = Vrf.builder().setOwner(vgwConfig).setName("vpn").build();
+    makeBgpProcess(Ip.parse("1.1.1.1"), vpnVrf);
+
+    IpsecTunnel ipsecTunnel =
+        new IpsecTunnel(
+            65301L,
+            Ip.parse("169.254.15.194"),
+            30,
+            Ip.parse("147.75.69.27"),
+            // phase 1: SHA2-256 / AES256 (CBC) / group 19
+            List.of(new Value("SHA2-256")),
+            List.of(new Value("AES256")),
+            28800,
+            "main",
+            List.of(new Value("19")),
+            "7db2fd6e9dcffcf826743b57bc0518cfcbca8f4db0b80a7a2c3f0c3b09deb49a",
+            // phase 2: deliberately different -- SHA1 / AES256-GCM-16 / group 20
+            List.of(new Value("SHA1")),
+            List.of(new Value("AES256-GCM-16")),
+            3600,
+            "tunnel",
+            List.of(new Value("20")),
+            "esp",
+            64666L,
+            Ip.parse("169.254.15.193"),
+            30,
+            Ip.parse("52.27.166.152"));
+
+    VpnConnection vpnConnection =
+        new VpnConnection(
+            true,
+            "vpn-1",
+            "cgw-1",
+            GatewayType.VPN,
+            vgw.getId(),
+            ImmutableList.of(ipsecTunnel),
+            ImmutableList.of(),
+            ImmutableList.of(),
+            false);
+
+    vpnConnection.applyToGateway(
+        vgwConfig, vpnVrf, "ExportPolicy", "ImportPolicy", new Warnings(true, true, true));
+
+    IkePhase1Proposal proposal = getOnlyElement(vgwConfig.getIkePhase1Proposals().values());
+    assertThat(proposal.getEncryptionAlgorithm(), equalTo(EncryptionAlgorithm.AES_256_CBC));
+    assertThat(proposal.getHashingAlgorithm(), equalTo(IkeHashingAlgorithm.SHA_256));
+    assertThat(proposal.getDiffieHellmanGroup(), equalTo(DiffieHellmanGroup.GROUP19));
+  }
+
+  /**
+   * AWS omits the phase 2 integrity algorithms when the phase 2 cipher is AEAD, since the cipher
+   * authenticates internally. The absent list must not be defaulted into HMAC proposals that no
+   * peer configured for that cipher can match.
+   */
+  @Test
+  public void testIpsecPhase2ProposalsAeadHasNoAuthentication() {
+    VpnGateway vgw = new VpnGateway("vpn", ImmutableList.of(), ImmutableMap.of(), 64666L);
+    Configuration vgwConfig = Utils.newAwsConfiguration(vgw.getId(), "awstest");
+    VpnConnection.initVpnConnectionsInfrastructure(vgwConfig);
+    Vrf vpnVrf = Vrf.builder().setOwner(vgwConfig).setName("vpn").build();
+    makeBgpProcess(Ip.parse("1.1.1.1"), vpnVrf);
+
+    IpsecTunnel ipsecTunnel =
+        new IpsecTunnel(
+            65301L,
+            Ip.parse("169.254.15.194"),
+            30,
+            Ip.parse("147.75.69.27"),
+            List.of(new Value("SHA2-256")),
+            List.of(new Value("AES256")),
+            28800,
+            "main",
+            List.of(new Value("19")),
+            "7db2fd6e9dcffcf826743b57bc0518cfcbca8f4db0b80a7a2c3f0c3b09deb49a",
+            // AWS defaults the omitted phase 2 integrity list to every supported HMAC
+            List.of(
+                new Value("SHA1"),
+                new Value("SHA2-256"),
+                new Value("SHA2-384"),
+                new Value("SHA2-512")),
+            List.of(new Value("AES256-GCM-16")),
+            3600,
+            "tunnel",
+            List.of(new Value("19")),
+            "esp",
+            64666L,
+            Ip.parse("169.254.15.193"),
+            30,
+            Ip.parse("52.27.166.152"));
+
+    VpnConnection vpnConnection =
+        new VpnConnection(
+            true,
+            "vpn-1",
+            "cgw-1",
+            GatewayType.VPN,
+            vgw.getId(),
+            ImmutableList.of(ipsecTunnel),
+            ImmutableList.of(),
+            ImmutableList.of(),
+            false);
+
+    vpnConnection.applyToGateway(
+        vgwConfig, vpnVrf, "ExportPolicy", "ImportPolicy", new Warnings(true, true, true));
+
+    // one proposal, not one per HMAC, and it carries no authentication algorithm
+    IpsecPhase2Proposal proposal = getOnlyElement(vgwConfig.getIpsecPhase2Proposals().values());
+    assertThat(proposal.getEncryptionAlgorithm(), equalTo(EncryptionAlgorithm.AES_256_GCM));
+    assertThat(proposal.getAuthenticationAlgorithm(), nullValue());
   }
 
   @Test

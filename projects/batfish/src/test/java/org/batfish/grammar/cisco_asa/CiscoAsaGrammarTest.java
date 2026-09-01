@@ -80,6 +80,7 @@ import static org.batfish.representation.cisco_asa.AsaConfiguration.computeIcmpO
 import static org.batfish.representation.cisco_asa.AsaConfiguration.computeProtocolObjectGroupAclName;
 import static org.batfish.representation.cisco_asa.AsaConfiguration.computeServiceObjectAclName;
 import static org.batfish.representation.cisco_asa.AsaConfiguration.computeServiceObjectGroupAclName;
+import static org.batfish.representation.cisco_asa.AsaStructureType.DNS_SERVER_GROUP;
 import static org.batfish.representation.cisco_asa.AsaStructureType.ICMP_TYPE_OBJECT_GROUP;
 import static org.batfish.representation.cisco_asa.AsaStructureType.INTERFACE;
 import static org.batfish.representation.cisco_asa.AsaStructureType.IPV4_ACCESS_LIST_EXTENDED;
@@ -193,9 +194,13 @@ import org.batfish.representation.cisco_asa.AsaConfiguration;
 import org.batfish.representation.cisco_asa.AsaNat;
 import org.batfish.representation.cisco_asa.AsaNat.Section;
 import org.batfish.representation.cisco_asa.BgpAggregateIpv4Network;
+import org.batfish.representation.cisco_asa.DnsServerGroup;
 import org.batfish.representation.cisco_asa.EigrpProcess;
 import org.batfish.representation.cisco_asa.ExpandedCommunityList;
 import org.batfish.representation.cisco_asa.ExpandedCommunityListLine;
+import org.batfish.representation.cisco_asa.Logging;
+import org.batfish.representation.cisco_asa.LoggingHost;
+import org.batfish.representation.cisco_asa.NameServer;
 import org.batfish.representation.cisco_asa.NetworkObject;
 import org.batfish.representation.cisco_asa.NetworkObjectAddressSpecifier;
 import org.batfish.representation.cisco_asa.NetworkObjectGroupAddressSpecifier;
@@ -209,6 +214,7 @@ import org.batfish.representation.cisco_asa.RouteMapSetAdditiveCommunityLine;
 import org.batfish.representation.cisco_asa.RouteMapSetCommunityLine;
 import org.batfish.representation.cisco_asa.StandardCommunityList;
 import org.batfish.representation.cisco_asa.StandardCommunityListLine;
+import org.batfish.representation.cisco_asa.SyslogTransportProtocol;
 import org.batfish.representation.cisco_asa.WildcardAddressSpecifier;
 import org.junit.Rule;
 import org.junit.Test;
@@ -274,6 +280,161 @@ public final class CiscoAsaGrammarTest {
   public void testHumanName() throws IOException {
     Configuration c = parseConfig("asa-humanname");
     assertThat(c.getHumanName(), equalTo("ASA-humanname"));
+  }
+
+  @Test
+  public void testDnsDomainLookupExtraction() {
+    AsaConfiguration c = parseVendorConfig("asa_dns");
+    assertThat(c.getDnsDomainLookupInterfaces(), contains("inside", "management", "outside"));
+  }
+
+  @Test
+  public void testDnsServerGroupExtraction() {
+    AsaConfiguration c = parseVendorConfig("asa_dns");
+    Map<String, DnsServerGroup> groups = c.getDnsServerGroups();
+    assertThat(groups.keySet(), containsInAnyOrder("DefaultDNS", "InsideDNS"));
+
+    DnsServerGroup defaultGroup = groups.get("DefaultDNS");
+    assertThat(
+        defaultGroup.getNameServers(),
+        contains(
+            new NameServer("192.0.2.10", "management"),
+            new NameServer("192.0.2.11", "management"),
+            new NameServer("192.0.2.12", null),
+            new NameServer("203.0.113.8", null)));
+    assertThat(defaultGroup.getDomainName(), equalTo("example.com"));
+    assertThat(defaultGroup.getTimeoutSeconds(), equalTo(7));
+    assertThat(defaultGroup.getRetries(), equalTo(5));
+    assertThat(defaultGroup.getPollTimerMinutes(), equalTo(120));
+    assertThat(defaultGroup.getExpireEntryTimerMinutes(), equalTo(240));
+
+    DnsServerGroup insideGroup = groups.get("InsideDNS");
+    assertThat(insideGroup.getNameServers(), contains(new NameServer("198.51.100.53", null)));
+    assertThat(insideGroup.getDomainName(), nullValue());
+    assertThat(insideGroup.getTimeoutSeconds(), nullValue());
+    assertThat(insideGroup.getRetries(), nullValue());
+    assertThat(insideGroup.getPollTimerMinutes(), nullValue());
+    assertThat(insideGroup.getExpireEntryTimerMinutes(), nullValue());
+
+    DnsServerGroup expectedDefault = new DnsServerGroup("DefaultDNS");
+    expectedDefault.addNameServer(new NameServer("192.0.2.10", "management"));
+    expectedDefault.addNameServer(new NameServer("192.0.2.11", "management"));
+    expectedDefault.addNameServer(new NameServer("192.0.2.12", null));
+    expectedDefault.addNameServer(new NameServer("203.0.113.8", null));
+    expectedDefault.setDomainName("example.com");
+    expectedDefault.setTimeoutSeconds(7);
+    expectedDefault.setRetries(5);
+    expectedDefault.setPollTimerMinutes(120);
+    expectedDefault.setExpireEntryTimerMinutes(240);
+    DnsServerGroup expectedInside = new DnsServerGroup("InsideDNS");
+    expectedInside.addNameServer(new NameServer("198.51.100.53", null));
+    assertThat(
+        ImmutableSet.copyOf(groups.values()),
+        equalTo(ImmutableSet.of(expectedDefault, expectedInside)));
+  }
+
+  @Test
+  public void testDnsGroupMapAndDefaultExtraction() {
+    AsaConfiguration c = parseVendorConfig("asa_dns");
+    assertThat(c.getDefaultDnsServerGroup(), equalTo("DefaultDNS"));
+    assertThat(
+        c.getDnsGroupMap(),
+        equalTo(Map.of("eng.example.com", "InsideDNS", "hr.example.com", "InsideDNS")));
+  }
+
+  @Test
+  public void testDnsServerGroupBadRanges() {
+    AsaConfiguration c = parseVendorConfig("asa_dns_bad_ranges");
+    DnsServerGroup group = c.getDnsServerGroups().get("DefaultDNS");
+    assertThat(group.getTimeoutSeconds(), nullValue());
+    assertThat(group.getRetries(), nullValue());
+    assertThat(group.getPollTimerMinutes(), nullValue());
+    assertThat(group.getExpireEntryTimerMinutes(), nullValue());
+  }
+
+  @Test
+  public void testDnsServersConversion() throws IOException {
+    Configuration c = parseConfig("asa_dns");
+    assertThat(
+        c.getDnsServers(),
+        containsInAnyOrder(
+            "192.0.2.10", "192.0.2.11", "192.0.2.12", "203.0.113.8", "198.51.100.53"));
+    assertThat(c.getDomainName(), equalTo("corp.example.com"));
+  }
+
+  @Test
+  public void testDnsReferences() throws IOException {
+    String hostname = "asa_dns";
+    String filename = "configs/" + hostname;
+    Batfish batfish = getBatfishForConfigurationNames(hostname);
+    ConvertConfigurationAnswerElement ccae =
+        batfish.loadConvertConfigurationAnswerElementOrReparse(batfish.getSnapshot());
+
+    assertThat(ccae, hasNumReferrers(filename, INTERFACE, "inside", 2));
+    assertThat(ccae, hasNumReferrers(filename, INTERFACE, "outside", 2));
+    assertThat(ccae, hasNumReferrers(filename, INTERFACE, "management", 3));
+
+    // "dns server-group" defines a group; "dns-group" and "dns-to-domain" reference one.
+    assertThat(ccae, hasDefinedStructure(filename, DNS_SERVER_GROUP, "DefaultDNS"));
+    assertThat(ccae, hasDefinedStructure(filename, DNS_SERVER_GROUP, "InsideDNS"));
+    assertThat(ccae, hasNumReferrers(filename, DNS_SERVER_GROUP, "DefaultDNS", 1));
+    assertThat(ccae, hasNumReferrers(filename, DNS_SERVER_GROUP, "InsideDNS", 2));
+  }
+
+  @Test
+  public void testLoggingExtraction() {
+    AsaConfiguration c = parseVendorConfig("asa-logging");
+    Logging logging = c.getAsaLogging();
+
+    assertThat(logging.getFacility(), equalTo(21));
+    assertThat(logging.getTrapSeverity(), equalTo("errors"));
+    assertThat(logging.getTrapSeverityNum(), equalTo(3));
+    assertThat(logging.getBufferedSeverity(), equalTo("warnings"));
+    assertThat(logging.getBufferedSeverityNum(), equalTo(4));
+    assertThat(logging.getBufferSize(), equalTo(16384));
+
+    Map<String, LoggingHost> hosts = logging.getHosts();
+    assertThat(
+        hosts.keySet(),
+        containsInAnyOrder(
+            "10.0.0.1", "192.168.1.5", "172.16.0.9", "10.0.0.4", "192.168.1.7", "2001::1:1"));
+
+    LoggingHost tcpHost = hosts.get("10.0.0.1");
+    assertThat(tcpHost.getInterfaceName(), equalTo("inside"));
+    assertThat(tcpHost.getTransport(), equalTo(SyslogTransportProtocol.TCP));
+    assertThat(tcpHost.getPort(), equalTo(1500));
+
+    LoggingHost udpHost = hosts.get("192.168.1.5");
+    assertThat(udpHost.getInterfaceName(), equalTo("dmz"));
+    assertThat(udpHost.getTransport(), equalTo(SyslogTransportProtocol.UDP));
+    assertThat(udpHost.getPort(), equalTo(1026));
+
+    LoggingHost defaultHost = hosts.get("172.16.0.9");
+    assertThat(defaultHost.getInterfaceName(), equalTo("mgmt"));
+    assertThat(defaultHost.getTransport(), equalTo(SyslogTransportProtocol.UDP));
+    assertThat(defaultHost.getPort(), equalTo(514));
+
+    LoggingHost bareTcpHost = hosts.get("10.0.0.4");
+    assertThat(bareTcpHost.getInterfaceName(), equalTo("outside"));
+    assertThat(bareTcpHost.getTransport(), equalTo(SyslogTransportProtocol.TCP));
+    assertThat(bareTcpHost.getPort(), equalTo(1470));
+
+    LoggingHost bareUdpHost = hosts.get("192.168.1.7");
+    assertThat(bareUdpHost.getInterfaceName(), equalTo("dmz"));
+    assertThat(bareUdpHost.getTransport(), equalTo(SyslogTransportProtocol.UDP));
+    assertThat(bareUdpHost.getPort(), equalTo(514));
+
+    LoggingHost ipv6Host = hosts.get("2001::1:1");
+    assertThat(ipv6Host.getInterfaceName(), equalTo("inside"));
+    assertThat(ipv6Host.getTransport(), equalTo(SyslogTransportProtocol.UDP));
+    assertThat(ipv6Host.getPort(), equalTo(2020));
+  }
+
+  @Test
+  public void testLoggingBadPort() {
+    AsaConfiguration c = parseVendorConfig("asa-logging-bad-port");
+    // An out-of-range port is warned about, and the host is not stored in the vendor model.
+    assertTrue(c.getAsaLogging().getHosts().isEmpty());
   }
 
   @Test

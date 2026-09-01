@@ -449,6 +449,8 @@ import org.batfish.representation.cisco.HsrpVersion;
 import org.batfish.representation.cisco.IcmpEchoSla;
 import org.batfish.representation.cisco.IpSla;
 import org.batfish.representation.cisco.LdapServerGroup;
+import org.batfish.representation.cisco.Logging;
+import org.batfish.representation.cisco.LoggingHost;
 import org.batfish.representation.cisco.NtpAuthenticationKey;
 import org.batfish.representation.cisco.NtpAuthenticationKey.HashAlgorithm;
 import org.batfish.representation.cisco.OspfNetworkType;
@@ -463,6 +465,7 @@ import org.batfish.representation.cisco.RouteMapSetExtcommunityRtLine;
 import org.batfish.representation.cisco.RoutingProtocolInstance;
 import org.batfish.representation.cisco.StandardCommunityList;
 import org.batfish.representation.cisco.StandardCommunityListLine;
+import org.batfish.representation.cisco.SyslogTransportProtocol;
 import org.batfish.representation.cisco.TacacsPlusServerGroup;
 import org.batfish.representation.cisco.TrackIpSla;
 import org.batfish.representation.cisco.Tunnel.TunnelMode;
@@ -521,6 +524,60 @@ public final class CiscoGrammarTest {
     Configuration noNewModelConfiguration = parseConfig("aaaNoNewmodel");
     aaaNewmodel = noNewModelConfiguration.getVendorFamily().getCisco().getAaa().getNewModel();
     assertFalse(aaaNewmodel);
+  }
+
+  @Test
+  public void testAaaVendorSpecificModel() throws IOException {
+    CiscoConfiguration vc = parseCiscoConfig("iosAaaVsModel", ConfigurationFormat.CISCO_IOS);
+
+    assertThat(vc.getAaa(), notNullValue());
+    assertTrue(vc.getAaa().getNewModel());
+
+    assertThat(vc.getAaa().getAuthentication(), notNullValue());
+    assertThat(vc.getAaa().getAuthentication().getLogin(), notNullValue());
+    assertThat(
+        vc.getAaa().getAuthentication().getLogin().getLists(),
+        allOf(hasKey("default"), hasKey("MYLIST")));
+    assertTrue(vc.getAaa().getAuthentication().getLogin().getPrivilegeMode());
+    assertThat(
+        vc.getAaa().getAuthentication().getLogin().getLists().get("default").getMethods(),
+        contains(GROUP_USER_DEFINED, LOCAL));
+
+    assertThat(vc.getAaa().getAccounting(), notNullValue());
+    assertThat(vc.getAaa().getAccounting().getDefault(), notNullValue());
+    assertThat(
+        vc.getAaa().getAccounting().getDefault().getGroups(), contains("myGroup1", "myGroup2"));
+    assertThat(vc.getAaa().getAccounting().getDefault().getLocal(), equalTo(true));
+    assertThat(vc.getAaa().getAccounting().getCommands(), hasKey("15"));
+
+    assertThat(vc.getEnableSecret(), notNullValue());
+
+    assertThat(vc.getUsers(), allOf(hasKey("admin"), hasKey("operator")));
+    assertThat(vc.getUsers().get("admin").getPassword(), notNullValue());
+    assertThat(vc.getUsers().get("admin").getRole(), nullValue());
+    assertThat(vc.getUsers().get("operator").getRole(), equalTo("network-operator"));
+
+    // After conversion, the vendor_family model is reconstructed from the vendor-specific model.
+    org.batfish.datamodel.vendor_family.cisco.CiscoFamily viCisco =
+        parseConfig("iosAaaVsModel").getVendorFamily().getCisco();
+    assertTrue(viCisco.getAaa().getNewModel());
+    assertThat(viCisco.getAaa().getAuthentication(), notNullValue());
+    assertThat(viCisco.getAaa().getAuthentication().getLogin(), notNullValue());
+    assertThat(
+        viCisco.getAaa().getAuthentication().getLogin().getLists(),
+        allOf(hasKey("default"), hasKey("MYLIST")));
+    assertTrue(viCisco.getAaa().getAuthentication().getLogin().getPrivilegeMode());
+    assertThat(
+        viCisco.getAaa().getAuthentication().getLogin().getLists().get("default").getMethods(),
+        contains(GROUP_USER_DEFINED, LOCAL));
+    assertThat(
+        viCisco.getAaa().getAccounting().getDefault().getGroups(),
+        contains("myGroup1", "myGroup2"));
+    assertThat(viCisco.getAaa().getAccounting().getDefault().getLocal(), equalTo(true));
+    assertThat(viCisco.getAaa().getAccounting().getCommands(), hasKey("15"));
+    assertThat(viCisco.getUsers(), allOf(hasKey("admin"), hasKey("operator")));
+    assertThat(viCisco.getUsers().get("operator").getRole(), equalTo("network-operator"));
+    assertThat(viCisco.getEnableSecret(), notNullValue());
   }
 
   @Test
@@ -747,6 +804,52 @@ public final class CiscoGrammarTest {
   @Test
   public void testIosLineParsing() {
     assertNotNull(parseCiscoConfig("ios-line", null));
+  }
+
+  @Test
+  public void testIosLoggingExtraction() {
+    CiscoConfiguration vc = parseCiscoConfig("ios-logging", ConfigurationFormat.CISCO_IOS);
+    Logging logging = vc.getIosLogging();
+
+    assertThat(logging.getFacility(), equalTo("local7"));
+    assertThat(logging.getTrapSeverity(), equalTo("notifications"));
+    assertThat(logging.getTrapSeverityNum(), equalTo(5));
+
+    assertThat(logging.getBufferedDiscriminator(), equalTo("MYDISC"));
+    assertThat(logging.getBufferedSize(), equalTo(32768));
+    assertThat(logging.getBufferedSeverity(), equalTo("warnings"));
+    assertThat(logging.getBufferedSeverityNum(), equalTo(4));
+
+    Map<String, LoggingHost> hosts = logging.getHosts();
+    assertThat(
+        hosts.keySet(),
+        containsInAnyOrder(
+            "10.1.1.100", "10.1.1.101", "10.1.1.102", "10.1.1.103", "10.1.1.104", "2001::1:1"));
+
+    LoggingHost tcpHost = hosts.get("10.1.1.100");
+    assertThat(tcpHost.getTransport(), equalTo(SyslogTransportProtocol.TCP));
+    assertThat(tcpHost.getPort(), equalTo(6514));
+
+    LoggingHost udpHost = hosts.get("10.1.1.101");
+    assertThat(udpHost.getTransport(), equalTo(SyslogTransportProtocol.UDP));
+    assertThat(udpHost.getPort(), equalTo(514)); // default UDP port
+
+    LoggingHost bareHost = hosts.get("10.1.1.102");
+    assertThat(bareHost.getTransport(), equalTo(SyslogTransportProtocol.UDP)); // default protocol
+    assertThat(bareHost.getPort(), equalTo(514)); // default UDP port
+
+    // vrf is parsed but not extracted; the host still appears with default transport/port.
+    LoggingHost vrfHost = hosts.get("10.1.1.103");
+    assertThat(vrfHost.getTransport(), equalTo(SyslogTransportProtocol.UDP)); // default protocol
+    assertThat(vrfHost.getPort(), equalTo(514)); // default UDP port
+
+    LoggingHost fullHost = hosts.get("10.1.1.104");
+    assertThat(fullHost.getTransport(), equalTo(SyslogTransportProtocol.TCP));
+    assertThat(fullHost.getPort(), equalTo(10));
+
+    LoggingHost ipv6Host = hosts.get("2001::1:1");
+    assertThat(ipv6Host.getTransport(), equalTo(SyslogTransportProtocol.TCP));
+    assertThat(ipv6Host.getPort(), equalTo(601));
   }
 
   @Test

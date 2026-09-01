@@ -162,8 +162,8 @@ public final class CommunityMatchExprEvaluator
     return extendedCommunityLocalAdministratorMatch
         .getExpr()
         .accept(
-            IntMatchExprEvaluator.instance(),
-            new LiteralInt((int) ((ExtendedCommunity) arg).getLocalAdministrator()));
+            LongMatchExprEvaluator.instance(),
+            new LiteralLong(((ExtendedCommunity) arg).getLocalAdministrator()));
   }
 
   @Override
@@ -227,6 +227,7 @@ public final class CommunityMatchExprEvaluator
   }
 
   private final @Nonnull CommunityContext _ctx;
+
   ////////////////////////////////
   private static final LoadingCache<RegexCacheKey, Boolean> REGEX_MATCH_CACHE =
       Caffeine.newBuilder()

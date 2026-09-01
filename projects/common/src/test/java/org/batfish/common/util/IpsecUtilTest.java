@@ -14,7 +14,9 @@ import static org.hamcrest.Matchers.nullValue;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSortedMap;
+import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.graph.MutableValueGraph;
 import com.google.common.graph.ValueGraphBuilder;
 import java.util.HashMap;
@@ -22,12 +24,17 @@ import java.util.Map;
 import java.util.Set;
 import org.batfish.datamodel.Configuration;
 import org.batfish.datamodel.ConfigurationFormat;
+import org.batfish.datamodel.DiffieHellmanGroup;
 import org.batfish.datamodel.Edge;
+import org.batfish.datamodel.IkeAuthenticationMethod;
 import org.batfish.datamodel.IkeKeyType;
 import org.batfish.datamodel.IkePhase1Key;
+import org.batfish.datamodel.IkePhase1Policy;
+import org.batfish.datamodel.IkePhase1Proposal;
 import org.batfish.datamodel.Interface;
 import org.batfish.datamodel.Ip;
 import org.batfish.datamodel.IpsecPeerConfigId;
+import org.batfish.datamodel.IpsecPhase2Policy;
 import org.batfish.datamodel.IpsecPhase2Proposal;
 import org.batfish.datamodel.IpsecSession;
 import org.batfish.datamodel.IpsecStaticPeerConfig;
@@ -264,6 +271,118 @@ public class IpsecUtilTest {
   }
 
   @Test
+  public void testNegotiateIkePhase1KeyMixedPsk() {
+    // A device whose config exposes the plaintext key (e.g. AWS) peering with one whose config
+    // only ever contains an encrypted key (e.g. Cisco 'key 6', or any Palo Alto gateway). The
+    // values cannot be compared, so negotiation continues with an empty key rather than failing.
+    for (boolean encryptedIsInitiator : ImmutableList.of(true, false)) {
+      IkePhase1Key encryptedKey = new IkePhase1Key();
+      encryptedKey.setKeyType(IkeKeyType.PRE_SHARED_KEY_ENCRYPTED);
+      encryptedKey.setKeyHash("encrypted-blob");
+      IkePhase1Key plaintextKey = new IkePhase1Key();
+      plaintextKey.setKeyType(IkeKeyType.PRE_SHARED_KEY_UNENCRYPTED);
+      plaintextKey.setKeyHash("plaintext");
+      IpsecSession.Builder ipsecSessionBuilder = IpsecSession.builder();
+
+      negotiateIkePhase1Key(
+          encryptedIsInitiator ? encryptedKey : plaintextKey,
+          encryptedIsInitiator ? plaintextKey : encryptedKey,
+          ipsecSessionBuilder);
+
+      assertThat(ipsecSessionBuilder.getNegotiatedIkeP1Key(), notNullValue());
+      assertThat(
+          ipsecSessionBuilder.getNegotiatedIkeP1Key().getKeyType(),
+          equalTo(IkeKeyType.PRE_SHARED_KEY_ENCRYPTED));
+      assertThat(ipsecSessionBuilder.getNegotiatedIkeP1Key().getKeyHash(), nullValue());
+    }
+  }
+
+  @Test
+  public void testNegotiateIkePhase1KeyMissingKey() {
+    // A peer with no key configured at all, e.g. an IOS keyring with no pre-shared-key statement,
+    // is not a peer whose key Batfish could not read: it cannot authenticate, whatever the other
+    // side has. Also covers the other side's key hash being dereferenced for comparison.
+    for (IkeKeyType peerKeyType :
+        ImmutableList.of(
+            IkeKeyType.PRE_SHARED_KEY_UNENCRYPTED,
+            IkeKeyType.PRE_SHARED_KEY_ENCRYPTED,
+            IkeKeyType.RSA_PUB_KEY)) {
+      for (boolean keylessIsInitiator : ImmutableList.of(true, false)) {
+        IkePhase1Key keylessKey = new IkePhase1Key();
+        keylessKey.setKeyType(IkeKeyType.PRE_SHARED_KEY_UNENCRYPTED);
+        IkePhase1Key peerKey = new IkePhase1Key();
+        peerKey.setKeyType(peerKeyType);
+        peerKey.setKeyHash("key1");
+        IpsecSession.Builder builder = IpsecSession.builder();
+
+        negotiateIkePhase1Key(
+            keylessIsInitiator ? keylessKey : peerKey,
+            keylessIsInitiator ? peerKey : keylessKey,
+            builder);
+
+        assertThat(builder.getNegotiatedIkeP1Key(), nullValue());
+      }
+    }
+  }
+
+  @Test
+  public void testNegotiateIkePhase1KeyRsaVersusPskFail() {
+    // Different authentication methods entirely - not merely an unreadable key - must still fail.
+    // The guard is a conjunction over both operands, so check every RSA/PSK combination.
+    for (IkeKeyType psk :
+        ImmutableList.of(
+            IkeKeyType.PRE_SHARED_KEY_UNENCRYPTED, IkeKeyType.PRE_SHARED_KEY_ENCRYPTED)) {
+      for (boolean rsaIsInitiator : ImmutableList.of(true, false)) {
+        IkePhase1Key rsaKey = new IkePhase1Key();
+        rsaKey.setKeyType(IkeKeyType.RSA_PUB_KEY);
+        rsaKey.setKeyHash("key1");
+        IkePhase1Key pskKey = new IkePhase1Key();
+        pskKey.setKeyType(psk);
+        pskKey.setKeyHash("key1");
+        IpsecSession.Builder builder = IpsecSession.builder();
+
+        negotiateIkePhase1Key(
+            rsaIsInitiator ? rsaKey : pskKey, rsaIsInitiator ? pskKey : rsaKey, builder);
+
+        assertThat(builder.getNegotiatedIkeP1Key(), nullValue());
+      }
+    }
+  }
+
+  @Test
+  public void testGetIpsecSessionMixedPskNegotiatesPhase2() {
+    // End to end: a peer whose key is encrypted and one whose key is plaintext must still reach
+    // phase 2, since retainCompatibleTunnelEdges drops any session with no negotiated P2 proposal.
+    Configuration initiatorOwner = configWithIpsec(IkeKeyType.PRE_SHARED_KEY_ENCRYPTED);
+    Configuration responderOwner = configWithIpsec(IkeKeyType.PRE_SHARED_KEY_UNENCRYPTED);
+
+    IpsecStaticPeerConfig initiator =
+        IpsecStaticPeerConfig.builder()
+            .setSourceInterface("interface1")
+            .setTunnelInterface("Tunnel1")
+            .setLocalAddress(Ip.parse("1.1.1.1"))
+            .setDestinationAddress(Ip.parse("2.2.2.2"))
+            .setIkePhase1Policy("ike-policy")
+            .setIpsecPolicy("ipsec-policy")
+            .build();
+    IpsecStaticPeerConfig responder =
+        IpsecStaticPeerConfig.builder()
+            .setSourceInterface("interface2")
+            .setTunnelInterface("Tunnel2")
+            .setLocalAddress(Ip.parse("2.2.2.2"))
+            .setDestinationAddress(Ip.parse("1.1.1.1"))
+            .setIkePhase1Policy("ike-policy")
+            .setIpsecPolicy("ipsec-policy")
+            .build();
+
+    IpsecSession session = getIpsecSession(initiatorOwner, responderOwner, initiator, responder);
+
+    assertThat(session.getNegotiatedIkeP1Key(), notNullValue());
+    assertThat(session.getNegotiatedIkeP1Proposal(), notNullValue());
+    assertThat(session.getNegotiatedIpsecP2Proposal(), notNullValue());
+  }
+
+  @Test
   public void testNegotiateIkePhase1KeyPsk() {
     IpsecSession.Builder ipsecSessionBuilder = IpsecSession.builder();
     IkePhase1Key initiatorKey = new IkePhase1Key();
@@ -295,5 +414,38 @@ public class IpsecUtilTest {
     negotiateIkePhase1Key(initiatorKey, responderKey, ipsecSessionBuilder);
 
     assertThat(ipsecSessionBuilder.getNegotiatedIkeP1Key(), nullValue());
+  }
+
+  /**
+   * Returns a {@link Configuration} with an IKE phase 1 policy named {@code ike-policy} and an
+   * IPsec phase 2 policy named {@code ipsec-policy}, whose pre-shared key has the given type.
+   * Policies built by separate calls are distinct but compatible objects, so negotiating between
+   * two such configurations exercises the real comparisons.
+   */
+  private static Configuration configWithIpsec(IkeKeyType keyType) {
+    Configuration c =
+        Configuration.builder()
+            .setHostname("host-" + keyType)
+            .setConfigurationFormat(ConfigurationFormat.CISCO_IOS)
+            .build();
+    IkePhase1Key key = new IkePhase1Key();
+    key.setKeyType(keyType);
+    // an encrypted key still has a value, it is just a ciphertext rather than a salted hash
+    key.setKeyHash(
+        keyType == IkeKeyType.PRE_SHARED_KEY_UNENCRYPTED ? "plaintext" : "encrypted-blob");
+    IkePhase1Proposal ikeProposal = new IkePhase1Proposal("ike-proposal");
+    ikeProposal.setAuthenticationMethod(IkeAuthenticationMethod.PRE_SHARED_KEYS);
+    IkePhase1Policy ikePolicy = new IkePhase1Policy("ike-policy");
+    ikePolicy.setIkePhase1Key(key);
+    ikePolicy.setIkePhase1Proposals(ImmutableList.of("ike-proposal"));
+    IpsecPhase2Policy ipsecPolicy = new IpsecPhase2Policy();
+    ipsecPolicy.setProposals(ImmutableList.of("ipsec-proposal"));
+    // negotiateIpsecP2 requires a non-empty intersection of PFS groups
+    ipsecPolicy.setPfsKeyGroups(ImmutableSortedSet.of(DiffieHellmanGroup.GROUP14));
+    c.setIkePhase1Proposals(ImmutableSortedMap.of("ike-proposal", ikeProposal));
+    c.setIkePhase1Policies(ImmutableSortedMap.of("ike-policy", ikePolicy));
+    c.setIpsecPhase2Proposals(ImmutableSortedMap.of("ipsec-proposal", new IpsecPhase2Proposal()));
+    c.setIpsecPhase2Policies(ImmutableSortedMap.of("ipsec-policy", ipsecPolicy));
+    return c;
   }
 }

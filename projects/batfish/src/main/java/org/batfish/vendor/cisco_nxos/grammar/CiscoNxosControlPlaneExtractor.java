@@ -135,6 +135,8 @@ import static org.batfish.vendor.cisco_nxos.representation.CiscoNxosStructureUsa
 import static org.batfish.vendor.cisco_nxos.representation.CiscoNxosStructureUsage.IP_ACCESS_LIST_LINE_SELF_REFERENCE;
 import static org.batfish.vendor.cisco_nxos.representation.CiscoNxosStructureUsage.IP_ACCESS_LIST_SOURCE_ADDRGROUP;
 import static org.batfish.vendor.cisco_nxos.representation.CiscoNxosStructureUsage.IP_ACCESS_LIST_SOURCE_PORTGROUP;
+import static org.batfish.vendor.cisco_nxos.representation.CiscoNxosStructureUsage.IP_DNS_SOURCE_INTERFACE;
+import static org.batfish.vendor.cisco_nxos.representation.CiscoNxosStructureUsage.IP_NAME_SERVER_SOURCE_INTERFACE;
 import static org.batfish.vendor.cisco_nxos.representation.CiscoNxosStructureUsage.IP_PIM_RP_ADDRESS_PREFIX_LIST;
 import static org.batfish.vendor.cisco_nxos.representation.CiscoNxosStructureUsage.IP_PIM_RP_ADDRESS_ROUTE_MAP;
 import static org.batfish.vendor.cisco_nxos.representation.CiscoNxosStructureUsage.IP_PIM_RP_CANDIDATE_INTERFACE;
@@ -144,6 +146,7 @@ import static org.batfish.vendor.cisco_nxos.representation.CiscoNxosStructureUsa
 import static org.batfish.vendor.cisco_nxos.representation.CiscoNxosStructureUsage.IP_ROUTE_NEXT_HOP_VRF;
 import static org.batfish.vendor.cisco_nxos.representation.CiscoNxosStructureUsage.LINE_VTY_ACCESS_CLASS_IN;
 import static org.batfish.vendor.cisco_nxos.representation.CiscoNxosStructureUsage.LINE_VTY_ACCESS_CLASS_OUT;
+import static org.batfish.vendor.cisco_nxos.representation.CiscoNxosStructureUsage.LOGGING_SERVER_USE_VRF;
 import static org.batfish.vendor.cisco_nxos.representation.CiscoNxosStructureUsage.LOGGING_SOURCE_INTERFACE;
 import static org.batfish.vendor.cisco_nxos.representation.CiscoNxosStructureUsage.MONITOR_SESSION_DESTINATION_INTERFACE;
 import static org.batfish.vendor.cisco_nxos.representation.CiscoNxosStructureUsage.MONITOR_SESSION_SOURCE_INTERFACE;
@@ -447,6 +450,8 @@ import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Ip_as_path_access_l
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Ip_as_path_access_list_seqContext;
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Ip_community_list_nameContext;
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Ip_community_list_seqContext;
+import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Ip_dns_source_interfaceContext;
+import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Ip_domain_lookupContext;
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Ip_domain_nameContext;
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Ip_name_serverContext;
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Ip_prefixContext;
@@ -472,6 +477,7 @@ import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Ispt_queuingContext
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Last_as_num_prependsContext;
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Line_actionContext;
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Literal_standard_communityContext;
+import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Logging_logfileContext;
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Logging_serverContext;
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Logging_source_interfaceContext;
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Lv6_access_classContext;
@@ -485,6 +491,7 @@ import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Monitor_session_des
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Monitor_session_source_interfaceContext;
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Monitor_session_source_vlanContext;
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.Name_serverContext;
+import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.No_ip_domain_lookupContext;
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.No_ip_route_networkContext;
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.No_sysds_shutdownContext;
 import org.batfish.vendor.cisco_nxos.grammar.CiscoNxosParser.No_sysds_switchportContext;
@@ -792,6 +799,7 @@ import org.batfish.vendor.cisco_nxos.representation.CiscoNxosStructureUsage;
 import org.batfish.vendor.cisco_nxos.representation.DefaultVrfOspfProcess;
 import org.batfish.vendor.cisco_nxos.representation.DistributeList;
 import org.batfish.vendor.cisco_nxos.representation.DistributeList.DistributeListFilterType;
+import org.batfish.vendor.cisco_nxos.representation.DnsSourceInterface;
 import org.batfish.vendor.cisco_nxos.representation.EigrpMetric;
 import org.batfish.vendor.cisco_nxos.representation.EigrpProcessConfiguration;
 import org.batfish.vendor.cisco_nxos.representation.EigrpVrfConfiguration;
@@ -828,6 +836,7 @@ import org.batfish.vendor.cisco_nxos.representation.IsisVrfConfiguration;
 import org.batfish.vendor.cisco_nxos.representation.Layer3Options;
 import org.batfish.vendor.cisco_nxos.representation.LiteralIpAddressSpec;
 import org.batfish.vendor.cisco_nxos.representation.LiteralPortSpec;
+import org.batfish.vendor.cisco_nxos.representation.LoggingLogfile;
 import org.batfish.vendor.cisco_nxos.representation.LoggingServer;
 import org.batfish.vendor.cisco_nxos.representation.NameServer;
 import org.batfish.vendor.cisco_nxos.representation.NtpAuthenticationKey;
@@ -1013,6 +1022,13 @@ public final class CiscoNxosControlPlaneExtractor extends CiscoNxosParserBaseLis
   private static final IntegerSpace ISIS_PROCESS_TAG_LENGTH_RANGE =
       IntegerSpace.of(Range.closed(1, 20));
   private static final IntegerSpace LACP_MIN_LINKS_RANGE = IntegerSpace.of(Range.closed(1, 32));
+  private static final LongSpace LOGGING_LOGFILE_SIZE_RANGE =
+      LongSpace.of(Range.closed(4096L, 4194304L));
+  private static final IntegerSpace LOGGING_LOGFILE_THRESHOLD_RANGE =
+      IntegerSpace.of(Range.closed(0, 99));
+  private static final IntegerSpace LOGGING_SERVER_PORT_RANGE =
+      IntegerSpace.of(Range.closed(1, 65535));
+  private static final IntegerSpace LOGGING_SEVERITY_RANGE = IntegerSpace.of(Range.closed(0, 7));
   private static final IntegerSpace NUM_AS_PATH_PREPENDS_RANGE =
       IntegerSpace.of(Range.closed(1, 10));
   private static final IntegerSpace OBJECT_GROUP_NAME_LENGTH_RANGE =
@@ -1386,7 +1402,6 @@ public final class CiscoNxosControlPlaneExtractor extends CiscoNxosParserBaseLis
   private Ipv6PrefixList _currentIpv6PrefixList;
   private Layer3Options.Builder _currentLayer3OptionsBuilder;
 
-  @SuppressWarnings("unused")
   private LoggingServer _currentLoggingServer;
 
   private NtpServer _currentNtpServer;
@@ -2197,6 +2212,36 @@ public final class CiscoNxosControlPlaneExtractor extends CiscoNxosParserBaseLis
   }
 
   @Override
+  public void exitIp_domain_lookup(Ip_domain_lookupContext ctx) {
+    _c.setDnsLookupEnabled(true);
+  }
+
+  @Override
+  public void exitNo_ip_domain_lookup(No_ip_domain_lookupContext ctx) {
+    _c.setDnsLookupEnabled(false);
+  }
+
+  @Override
+  public void exitIp_dns_source_interface(Ip_dns_source_interfaceContext ctx) {
+    Optional<String> inameOrError = toString(ctx, ctx.source_interface);
+    if (!inameOrError.isPresent()) {
+      return;
+    }
+    String name = inameOrError.get();
+    String vrf = null;
+    if (ctx.vrf != null) {
+      Optional<String> vrfOrErr = toString(ctx, ctx.vrf);
+      if (!vrfOrErr.isPresent()) {
+        return;
+      }
+      vrf = vrfOrErr.get();
+    }
+    _c.addDnsSourceInterface(new DnsSourceInterface(name, vrf));
+    _c.referenceStructure(
+        INTERFACE, name, IP_DNS_SOURCE_INTERFACE, ctx.source_interface.getStart().getLine());
+  }
+
+  @Override
   public void exitIp_name_server(Ip_name_serverContext ctx) {
     String useVrf = null;
     if (ctx.vrf != null) {
@@ -2206,8 +2251,21 @@ public final class CiscoNxosControlPlaneExtractor extends CiscoNxosParserBaseLis
       }
       useVrf = vrfOrErr.get();
     }
+    String sourceInterface = null;
+    if (ctx.source_interface != null) {
+      Optional<String> inameOrError = toString(ctx, ctx.source_interface);
+      if (!inameOrError.isPresent()) {
+        return;
+      }
+      sourceInterface = inameOrError.get();
+      _c.referenceStructure(
+          INTERFACE,
+          sourceInterface,
+          IP_NAME_SERVER_SOURCE_INTERFACE,
+          ctx.source_interface.getStart().getLine());
+    }
     for (Name_serverContext server : ctx.servers) {
-      _currentVrf.addNameServer(new NameServer(getFullText(server), useVrf));
+      _currentVrf.addNameServer(new NameServer(getFullText(server), useVrf, sourceInterface));
     }
   }
 
@@ -2702,6 +2760,30 @@ public final class CiscoNxosControlPlaneExtractor extends CiscoNxosParserBaseLis
   }
 
   @Override
+  public void exitLogging_logfile(Logging_logfileContext ctx) {
+    Optional<Integer> severity =
+        toIntegerInSpace(
+            ctx, ctx.severity.uint8(), LOGGING_SEVERITY_RANGE, "logging logfile severity");
+    if (!severity.isPresent()) {
+      return;
+    }
+    LoggingLogfile logfile = new LoggingLogfile(ctx.name.getText(), severity.get());
+    if (ctx.ll_size() != null) {
+      toLongInSpace(ctx, ctx.ll_size().size, LOGGING_LOGFILE_SIZE_RANGE, "logging logfile size")
+          .ifPresent(size -> logfile.setSizeBytes(size.intValue()));
+    }
+    if (ctx.ll_persistent() != null) {
+      toIntegerInSpace(
+              ctx,
+              ctx.ll_persistent().threshold,
+              LOGGING_LOGFILE_THRESHOLD_RANGE,
+              "logging logfile persistent threshold")
+          .ifPresent(logfile::setPersistentThreshold);
+    }
+    _c.setLoggingLogfile(logfile);
+  }
+
+  @Override
   public void enterLogging_server(Logging_serverContext ctx) {
     _currentLoggingServer =
         _c.getLoggingServers().computeIfAbsent(ctx.host.getText(), LoggingServer::new);
@@ -2709,6 +2791,29 @@ public final class CiscoNxosControlPlaneExtractor extends CiscoNxosParserBaseLis
 
   @Override
   public void exitLogging_server(Logging_serverContext ctx) {
+    if (ctx.level != null) {
+      toIntegerInSpace(ctx, ctx.level.uint8(), LOGGING_SEVERITY_RANGE, "logging server severity")
+          .ifPresent(_currentLoggingServer::setSeverityLevel);
+    }
+    if (ctx.ls_port() != null) {
+      toIntegerInSpace(ctx, ctx.ls_port().port, LOGGING_SERVER_PORT_RANGE, "logging server port")
+          .ifPresent(_currentLoggingServer::setPort);
+    }
+    if (ctx.ls_facility() != null) {
+      _currentLoggingServer.setFacility(ctx.ls_facility().facility.getText());
+    }
+    if (ctx.ls_use_vrf() != null) {
+      Optional<String> vrfOrError = toString(ctx, ctx.ls_use_vrf().name);
+      if (vrfOrError.isPresent()) {
+        String vrf = vrfOrError.get();
+        _currentLoggingServer.setUseVrf(vrf);
+        _c.referenceStructure(
+            VRF, vrf, LOGGING_SERVER_USE_VRF, ctx.ls_use_vrf().name.getStart().getLine());
+      }
+    }
+    if (ctx.ls_secure() != null) {
+      _currentLoggingServer.setSecure(true);
+    }
     _currentLoggingServer = null;
   }
 

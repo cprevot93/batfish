@@ -20,6 +20,7 @@ import com.google.common.collect.ImmutableList.Builder;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedMap;
+import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.Iterables;
 import java.util.Collection;
 import java.util.Collections;
@@ -32,6 +33,7 @@ import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Set;
 import java.util.SortedMap;
+import java.util.SortedSet;
 import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -61,6 +63,7 @@ import org.batfish.datamodel.bgp.Ipv4UnicastAddressFamily;
 import org.batfish.datamodel.bgp.Layer2VniConfig;
 import org.batfish.datamodel.bgp.Layer3VniConfig;
 import org.batfish.datamodel.bgp.community.Community;
+import org.batfish.datamodel.bgp.community.ExtendedCommunity;
 import org.batfish.datamodel.routing_policy.Common;
 import org.batfish.datamodel.routing_policy.RoutingPolicy;
 import org.batfish.datamodel.routing_policy.communities.ColonSeparatedRendering;
@@ -124,6 +127,13 @@ import org.batfish.vendor.arista.representation.eos.AristaEosVxlan;
  */
 @ParametersAreNonnullByDefault
 final class AristaConversions {
+  /** Convert a set of import route targets to the community-match patterns used by VniConfig. */
+  private static @Nonnull SortedSet<String> toImportRtPatterns(Set<ExtendedCommunity> rts) {
+    return rts.stream()
+        .map(ExtendedCommunity::matchString)
+        .collect(ImmutableSortedSet.toImmutableSortedSet(Comparator.naturalOrder()));
+  }
+
   /** Computes the router ID. */
   static @Nonnull Ip getBgpRouterId(
       AristaBgpVrf vrfConfig, String vrfName, Map<String, Interface> vrfInterfaces, Warnings w) {
@@ -686,7 +696,7 @@ final class AristaConversions {
                   .setAllowRemoteAsOut(ALWAYS) // no outgoing remote-as check on Arista
                   .setSendCommunity(firstNonNull(neighbor.getSendCommunity(), Boolean.FALSE))
                   .setSendExtendedCommunity(
-                      firstNonNull(neighbor.getSendCommunity(), Boolean.FALSE))
+                      firstNonNull(neighbor.getSendExtendedCommunity(), Boolean.FALSE))
                   .build());
 
       ImmutableSet.Builder<Layer2VniConfig> l2vnis = ImmutableSet.builder();
@@ -694,8 +704,8 @@ final class AristaConversions {
           vxlan == null ? ImmutableSortedMap.of() : vxlan.getVlanVnis();
       for (AristaBgpVlan vlanConfig : bgpConfig.getVlans().values()) {
         if (vlanConfig.getRd() == null
-            || vlanConfig.getRtImport() == null
-            || vlanConfig.getRtExport() == null) {
+            || vlanConfig.getRtImports().isEmpty()
+            || vlanConfig.getRtExports().isEmpty()) {
           continue;
         }
         Vrf vrfForVlan = getVrfForVlan(c, vlanConfig.getVlan()).orElse(null);
@@ -709,8 +719,8 @@ final class AristaConversions {
         l2vnis.add(
             Layer2VniConfig.builder()
                 .setVni(vni)
-                .setImportRouteTarget(vlanConfig.getRtImport().matchString())
-                .setRouteTarget(vlanConfig.getRtExport())
+                .setImportRouteTargets(toImportRtPatterns(vlanConfig.getRtImports()))
+                .setRouteTargets(ImmutableSortedSet.copyOf(vlanConfig.getRtExports()))
                 .setRouteDistinguisher(vlanConfig.getRd())
                 .setVrf(vrfForVlan.getName())
                 .build());
@@ -718,8 +728,8 @@ final class AristaConversions {
       for (AristaBgpVlanAwareBundle bundle : bgpConfig.getVlanAwareBundles().values()) {
         if (bundle.getVlans() == null
             || bundle.getRd() == null
-            || bundle.getRtExport() == null
-            || bundle.getRtImport() == null) {
+            || bundle.getRtExports().isEmpty()
+            || bundle.getRtImports().isEmpty()) {
           continue;
         }
         for (Integer vlan : bundle.getVlans().enumerate()) {
@@ -730,8 +740,8 @@ final class AristaConversions {
           l2vnis.add(
               Layer2VniConfig.builder()
                   .setVni(vni)
-                  .setImportRouteTarget(bundle.getRtImport().matchString())
-                  .setRouteTarget(bundle.getRtExport())
+                  .setImportRouteTargets(toImportRtPatterns(bundle.getRtImports()))
+                  .setRouteTargets(ImmutableSortedSet.copyOf(bundle.getRtExports()))
                   .setRouteDistinguisher(bundle.getRd())
                   // TODO: remove vrf from Layer2Vni
                   .setVrf(DEFAULT_VRF_NAME)
@@ -749,16 +759,16 @@ final class AristaConversions {
         }
         AristaBgpVrf bgpVrf = bgpConfig.getVrfs().get(vrfName);
         if (bgpVrf.getRouteDistinguisher() == null
-            || bgpVrf.getImportRouteTarget() == null
-            || bgpVrf.getExportRouteTarget() == null) {
+            || bgpVrf.getImportRouteTargets().isEmpty()
+            || bgpVrf.getExportRouteTargets().isEmpty()) {
           continue;
         }
         l3vnis.add(
             Layer3VniConfig.builder()
                 .setAdvertiseV4Unicast(true)
                 .setVni(entry.getValue())
-                .setImportRouteTarget(bgpVrf.getImportRouteTarget().matchString())
-                .setRouteTarget(bgpVrf.getExportRouteTarget())
+                .setImportRouteTargets(toImportRtPatterns(bgpVrf.getImportRouteTargets()))
+                .setRouteTargets(ImmutableSortedSet.copyOf(bgpVrf.getExportRouteTargets()))
                 .setRouteDistinguisher(bgpVrf.getRouteDistinguisher())
                 .setVrf(vrfName)
                 .build());

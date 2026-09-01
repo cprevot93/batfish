@@ -240,6 +240,13 @@ public final class JuniperConfiguration extends VendorConfiguration {
   /** Juniper's default routing instance is called "master". */
   public static final @Nonnull String DEFAULT_ROUTING_INSTANCE_NAME = "master";
 
+  /**
+   * Junos reserves the word "default" to mean the default routing instance where a routing instance
+   * is referenced, e.g. {@code firewall filter ... then routing-instance default}. It cannot be the
+   * name of a configured routing instance.
+   */
+  public static final @Nonnull String DEFAULT_ROUTING_INSTANCE_ALIAS = "default";
+
   /** Normalize to VI VRF name. */
   public static @Nonnull String toVrfName(String routingInstanceName) {
     if (routingInstanceName.equals(DEFAULT_ROUTING_INSTANCE_NAME)) {
@@ -3602,7 +3609,7 @@ public final class JuniperConfiguration extends VendorConfiguration {
     _masterLogicalSystem.getRoutingInstances().clear();
     _masterLogicalSystem.getRoutingInstances().putAll(ls.getRoutingInstances());
     // TODO: something with syslog hosts?
-    // TODO: something with tacplus servers?
+    _masterLogicalSystem.getTacplusServers().putAll(ls.getTacplusServers());
     _masterLogicalSystem.getNamedVlans().clear();
     _masterLogicalSystem.getNamedVlans().putAll(ls.getNamedVlans());
     if (ls.getEvpn() != null) {
@@ -3640,7 +3647,16 @@ public final class JuniperConfiguration extends VendorConfiguration {
     _c.setDomainName(_masterLogicalSystem.getDefaultRoutingInstance().getDomainName());
     _c.setLoggingServers(ImmutableSortedSet.copyOf(_masterLogicalSystem.getSyslogHosts().keySet()));
     _c.setNtpServers(ImmutableSortedSet.copyOf(_masterLogicalSystem.getNtpServers().keySet()));
-    _c.setTacacsServers(_masterLogicalSystem.getTacplusServers());
+    ImmutableSortedSet.Builder<String> tacacsServers =
+        ImmutableSortedSet.<String>naturalOrder()
+            .addAll(_masterLogicalSystem.getTacplusServers().keySet());
+    Accounting accounting = _masterLogicalSystem.getAccounting();
+    if (accounting != null) {
+      // Servers configured under `accounting destination tacplus` are also TACACS+ servers this
+      // device communicates with, so include them in the flat set of TACACS+ server addresses.
+      tacacsServers.addAll(accounting.getTacplusServers().keySet());
+    }
+    _c.setTacacsServers(tacacsServers.build());
     _c.getVendorFamily().setJuniper(_masterLogicalSystem.getJf());
     _c.setDeviceModel(DeviceModel.JUNIPER_UNSPECIFIED);
     for (String riName : _masterLogicalSystem.getRoutingInstances().keySet()) {
@@ -4436,8 +4452,8 @@ public final class JuniperConfiguration extends VendorConfiguration {
 
   /**
    * Emit warnings for policy actions that have no effect in the forwarding-table export context. On
-   * Junos, only accept/reject and load-balance/source-class are meaningful; all other attribute
-   * mutations (metric, next-hop, community, etc.) are no-ops.
+   * Junos, only accept/reject, load-balance, and source-class/destination-class are meaningful; all
+   * other attribute mutations (metric, next-hop, community, etc.) are no-ops.
    */
   private void warnForwardingTableExportActions(String policyName) {
     PolicyStatement ps = _masterLogicalSystem.getPolicyStatements().get(policyName);
@@ -4458,13 +4474,16 @@ public final class JuniperConfiguration extends VendorConfiguration {
           || then instanceof PsThenDefaultActionReject
           || then instanceof PsThenNextPolicy
           || then instanceof PsThenNextTerm
-          || then instanceof PsThenLoadBalance) {
-        // Control flow or forwarding-table-specific actions — no warning.
+          || then instanceof PsThenLoadBalance
+          || then instanceof PsThenSourceClass
+          || then instanceof PsThenDestinationClass) {
+        // Control flow or forwarding-table-specific actions — no warning. Source-class and
+        // destination-class (SCU/DCU) are only settable from a forwarding-table export policy.
         continue;
       }
       _w.riskyRedFlag(
-          "forwarding-table export %s term %s: %s has no effect"
-              + " (only accept/reject affects forwarding-table export)",
+          "forwarding-table export %s term %s: %s has no effect (only accept/reject, load-balance,"
+              + " and source-class/destination-class affect forwarding-table export)",
           policyName, term.getName(), then.getClass().getSimpleName());
     }
   }

@@ -174,14 +174,17 @@ import static org.batfish.representation.juniper.JuniperStructureType.BRIDGE_DOM
 import static org.batfish.representation.juniper.JuniperStructureType.CLASS_OF_SERVICE_DSCP_CODE_POINT_ALIAS;
 import static org.batfish.representation.juniper.JuniperStructureType.CLASS_OF_SERVICE_FORWARDING_CLASS;
 import static org.batfish.representation.juniper.JuniperStructureType.COMMUNITY;
+import static org.batfish.representation.juniper.JuniperStructureType.DESTINATION_CLASS;
 import static org.batfish.representation.juniper.JuniperStructureType.FIREWALL_FILTER;
 import static org.batfish.representation.juniper.JuniperStructureType.FIREWALL_FILTER_TERM;
 import static org.batfish.representation.juniper.JuniperStructureType.FIREWALL_INTERFACE_SET;
 import static org.batfish.representation.juniper.JuniperStructureType.FIREWALL_POLICER;
 import static org.batfish.representation.juniper.JuniperStructureType.INTERFACE;
+import static org.batfish.representation.juniper.JuniperStructureType.LOGIN_CLASS;
 import static org.batfish.representation.juniper.JuniperStructureType.POLICY_STATEMENT;
 import static org.batfish.representation.juniper.JuniperStructureType.POLICY_STATEMENT_TERM;
 import static org.batfish.representation.juniper.JuniperStructureType.PREFIX_LIST;
+import static org.batfish.representation.juniper.JuniperStructureType.ROUTING_INSTANCE;
 import static org.batfish.representation.juniper.JuniperStructureType.RTF_PREFIX_LIST;
 import static org.batfish.representation.juniper.JuniperStructureType.SECURITY_POLICY_TERM;
 import static org.batfish.representation.juniper.JuniperStructureType.SOURCE_CLASS;
@@ -260,6 +263,7 @@ import org.batfish.common.topology.L3Adjacencies;
 import org.batfish.common.topology.Layer1Edge;
 import org.batfish.common.topology.Layer1Topology;
 import org.batfish.common.util.CommonUtil;
+import org.batfish.common.util.JuniperUtils;
 import org.batfish.config.Settings;
 import org.batfish.datamodel.AbstractRoute;
 import org.batfish.datamodel.AclAclLine;
@@ -379,6 +383,10 @@ import org.batfish.datamodel.ospf.OspfMetricType;
 import org.batfish.datamodel.ospf.OspfNetworkType;
 import org.batfish.datamodel.ospf.OspfProcess;
 import org.batfish.datamodel.ospf.StubType;
+import org.batfish.datamodel.packet_policy.FibLookup;
+import org.batfish.datamodel.packet_policy.LiteralVrfName;
+import org.batfish.datamodel.packet_policy.PacketPolicy;
+import org.batfish.datamodel.packet_policy.Return;
 import org.batfish.datamodel.route.nh.NextHopDiscard;
 import org.batfish.datamodel.route.nh.NextHopIp;
 import org.batfish.datamodel.route.nh.NextHopVrf;
@@ -413,6 +421,7 @@ import org.batfish.grammar.flatjuniper.FlatJuniperParser.Flat_juniper_configurat
 import org.batfish.main.Batfish;
 import org.batfish.main.BatfishTestUtils;
 import org.batfish.main.TestrigText;
+import org.batfish.representation.juniper.Accounting;
 import org.batfish.representation.juniper.AllVlans;
 import org.batfish.representation.juniper.ApplicationSetMember;
 import org.batfish.representation.juniper.BaseApplication;
@@ -431,6 +440,7 @@ import org.batfish.representation.juniper.EvpnIpPrefixRoutesAdvertise;
 import org.batfish.representation.juniper.ExtendedCommunityOrAuto;
 import org.batfish.representation.juniper.FirewallFilter;
 import org.batfish.representation.juniper.FwFrom;
+import org.batfish.representation.juniper.FwFromDestinationClass;
 import org.batfish.representation.juniper.FwFromDestinationPort;
 import org.batfish.representation.juniper.FwFromFragmentOffset;
 import org.batfish.representation.juniper.FwFromHopLimit;
@@ -464,6 +474,11 @@ import org.batfish.representation.juniper.JunosSyslogFile;
 import org.batfish.representation.juniper.JunosSyslogHost;
 import org.batfish.representation.juniper.JunosSyslogSeverity;
 import org.batfish.representation.juniper.JunosSyslogTransportProtocol;
+import org.batfish.representation.juniper.Login;
+import org.batfish.representation.juniper.LoginClass;
+import org.batfish.representation.juniper.LoginPassword;
+import org.batfish.representation.juniper.LoginRetryOptions;
+import org.batfish.representation.juniper.LoginUser;
 import org.batfish.representation.juniper.MulticastModeOptions;
 import org.batfish.representation.juniper.NamedBgpGroup;
 import org.batfish.representation.juniper.Nat;
@@ -509,6 +524,7 @@ import org.batfish.representation.juniper.PsThenAsPathPrepend;
 import org.batfish.representation.juniper.PsThenCommunityAdd;
 import org.batfish.representation.juniper.PsThenCommunityDelete;
 import org.batfish.representation.juniper.PsThenCommunitySet;
+import org.batfish.representation.juniper.PsThenDestinationClass;
 import org.batfish.representation.juniper.PsThenLoadBalance;
 import org.batfish.representation.juniper.PsThenLoadBalance.LoadBalanceMethod;
 import org.batfish.representation.juniper.PsThenLocalPreference;
@@ -533,6 +549,7 @@ import org.batfish.representation.juniper.Srlg;
 import org.batfish.representation.juniper.StaticRouteV4;
 import org.batfish.representation.juniper.StaticRouteV6;
 import org.batfish.representation.juniper.SwitchOptions;
+import org.batfish.representation.juniper.TacplusServer;
 import org.batfish.representation.juniper.TcpFinNoAck;
 import org.batfish.representation.juniper.TcpNoFlag;
 import org.batfish.representation.juniper.TcpSynFin;
@@ -1314,8 +1331,9 @@ public final class FlatJuniperGrammarTest {
   @Test
   public void testSyslogFileArchiveExtraction() {
     JuniperConfiguration c = parseJuniperConfig("juniper-syslog-file-archive");
+    assertThat(c.getWarnings().getParseWarnings(), empty());
     Map<String, JunosSyslogFile> files = c.getMasterLogicalSystem().getSyslogFiles();
-    assertThat(files, hasKeys("messages", "bytes-only", "count-only"));
+    assertThat(files, hasKeys("messages", "bytes-only", "count-only", "combined", "bare-archive"));
 
     // Archive size with unit (10m -> 10 * 1024 * 1024 bytes) and archive file count both set
     JunosSyslogFile messages = files.get("messages");
@@ -1331,6 +1349,16 @@ public final class FlatJuniperGrammarTest {
     JunosSyslogFile countOnly = files.get("count-only");
     assertThat(countOnly.getArchiveSizeBytes(), nullValue());
     assertThat(countOnly.getArchiveFileCount(), equalTo(3));
+
+    // Several archive options on one statement
+    JunosSyslogFile combined = files.get("combined");
+    assertThat(combined.getArchiveSizeBytes(), equalTo(1024L * 1024));
+    assertThat(combined.getArchiveFileCount(), equalTo(5));
+
+    // Archive with no options
+    JunosSyslogFile bareArchive = files.get("bare-archive");
+    assertThat(bareArchive.getArchiveSizeBytes(), nullValue());
+    assertThat(bareArchive.getArchiveFileCount(), nullValue());
   }
 
   @Test
@@ -2751,6 +2779,46 @@ public final class FlatJuniperGrammarTest {
     assertThat(
         ccae.getWarnings().get(hostname).getRedFlagWarnings(),
         everyItem(WarningMatchers.hasText(containsString("missing action in firewall filter"))));
+  }
+
+  @Test
+  public void testFirewallFilterThenRoutingInstanceReferences() throws IOException {
+    String hostname = "firewall-filter-then-routing-instance";
+    String filename = "configs/" + hostname;
+
+    Batfish batfish = getBatfishForConfigurationNames(hostname);
+    ConvertConfigurationAnswerElement ccae =
+        batfish.loadConvertConfigurationAnswerElementOrReparse(batfish.getSnapshot());
+
+    // 'default' is a reserved word for the master routing instance, so it is not a reference to any
+    // configured structure.
+    assertThat(ccae, not(hasUndefinedReference(filename, ROUTING_INSTANCE, "default")));
+
+    // Other names are still tracked: 2 self-referencing definition lines plus the filter term.
+    assertThat(ccae, hasNumReferrers(filename, ROUTING_INSTANCE, "RI_DEFINED", 3));
+    assertThat(ccae, hasUndefinedReference(filename, ROUTING_INSTANCE, "RI_UNDEFINED"));
+  }
+
+  @Test
+  public void testFirewallFilterThenRoutingInstanceConversion() {
+    Configuration c = parseConfig("firewall-filter-then-routing-instance");
+
+    PacketPolicy policy = c.getPacketPolicies().get("FBF");
+    assertThat(policy, notNullValue());
+
+    // One statement per term, in term order. 'default' forwards into the master instance, i.e. the
+    // VI default VRF.
+    assertThat(fibLookupVrfs(policy), contains(DEFAULT_VRF_NAME, "RI_DEFINED", "RI_UNDEFINED"));
+  }
+
+  /** Extract the VRF each term of {@code policy} does its FIB lookup in, in term order. */
+  private static List<String> fibLookupVrfs(PacketPolicy policy) {
+    return policy.getStatements().stream()
+        .flatMap(s -> ((org.batfish.datamodel.packet_policy.If) s).getTrueStatements().stream())
+        .filter(s -> s instanceof Return && ((Return) s).getAction() instanceof FibLookup)
+        .map(s -> (FibLookup) ((Return) s).getAction())
+        .map(fibLookup -> ((LiteralVrfName) fibLookup.getVrfExpr()).getVrfName())
+        .collect(ImmutableList.toImmutableList());
   }
 
   @Test
@@ -4424,6 +4492,203 @@ public final class FlatJuniperGrammarTest {
   public void testTacplusPsk() {
     /* allow both encrypted and unencrypted key */
     parseConfig("tacplus-psk");
+  }
+
+  @Test
+  public void testTacplusServerModel() {
+    JuniperConfiguration vc = parseJuniperConfig("tacplus-psk");
+    Map<String, TacplusServer> servers = vc.getMasterLogicalSystem().getTacplusServers();
+    assertThat(servers.keySet(), containsInAnyOrder("1.2.3.4", "2.3.4.5", "3.4.5.6", "4.5.6.7"));
+
+    TacplusServer s1 = servers.get("1.2.3.4");
+    assertThat(s1.getSecret(), equalTo(CommonUtil.sha256Digest("psk" + CommonUtil.salt())));
+    assertThat(s1.getPort(), nullValue());
+    assertThat(s1.getTimeout(), nullValue());
+    assertFalse(s1.getSingleConnection());
+    assertThat(s1.getSourceAddress(), nullValue());
+    assertThat(s1.getRoutingInstance(), nullValue());
+
+    TacplusServer s2 = servers.get("2.3.4.5");
+    assertThat(s2.getSecret(), equalTo(CommonUtil.sha256Digest("%CENSORED%" + CommonUtil.salt())));
+    assertThat(s2.getSourceAddress(), equalTo(Ip.parse("6.7.8.9")));
+    assertThat(s2.getRoutingInstance(), equalTo("RI"));
+    assertThat(s2.getPort(), equalTo(4949));
+    assertThat(s2.getTimeout(), equalTo(5));
+    assertTrue(s2.getSingleConnection());
+
+    // timeout 200 is outside the valid 1-90 range, so it should be null.
+    TacplusServer s3 = servers.get("3.4.5.6");
+    assertThat(s3.getSecret(), nullValue());
+    assertThat(s3.getSourceAddress(), nullValue());
+    assertThat(s3.getRoutingInstance(), nullValue());
+    assertFalse(s3.getSingleConnection());
+    assertThat(s3.getPort(), nullValue());
+    assertThat(s3.getTimeout(), nullValue());
+
+    TacplusServer s4 = servers.get("4.5.6.7");
+    assertThat(
+        s4.getSecret(), equalTo(JuniperUtils.decryptAndHashJuniper9CipherText("$9$czBSK87-wgoG")));
+    assertThat(s4.getPort(), nullValue());
+    assertThat(s4.getTimeout(), nullValue());
+    assertFalse(s4.getSingleConnection());
+    assertThat(s4.getSourceAddress(), nullValue());
+    assertThat(s4.getRoutingInstance(), nullValue());
+  }
+
+  @Test
+  public void testAccounting() {
+    JuniperConfiguration vc = parseJuniperConfig("juniper-accounting");
+    Accounting accounting = vc.getMasterLogicalSystem().getAccounting();
+    assertThat(accounting, notNullValue());
+    assertThat(
+        accounting.getEvents(),
+        containsInAnyOrder(
+            Accounting.Event.LOGIN,
+            Accounting.Event.CHANGE_LOG,
+            Accounting.Event.INTERACTIVE_COMMANDS));
+    assertTrue(accounting.getTacplusDestination());
+
+    // destination tacplus server sub-block reuses the tacplus server model.
+    assertThat(accounting.getTacplusServers().keySet(), containsInAnyOrder("1.2.3.4"));
+    TacplusServer s = accounting.getTacplusServers().get("1.2.3.4");
+    assertThat(s.getSecret(), equalTo(CommonUtil.sha256Digest("%CENSORED%" + CommonUtil.salt())));
+    assertThat(s.getPort(), equalTo(49));
+    assertThat(s.getTimeout(), equalTo(5));
+    assertTrue(s.getSingleConnection());
+    assertThat(s.getSourceAddress(), equalTo(Ip.parse("6.7.8.9")));
+
+    // The accounting destination server is also surfaced in the VI TACACS+ server set, even though
+    // it is not configured under top-level `system tacplus-server`.
+    Configuration c = parseConfig("juniper-accounting");
+    assertThat(c.getTacacsServers(), hasItem("1.2.3.4"));
+  }
+
+  @Test
+  public void testLoginClass() {
+    JuniperConfiguration vc = parseJuniperConfig("juniper-login-class");
+    Map<String, LoginClass> classes = vc.getMasterLogicalSystem().getLogin().getClasses();
+    assertThat(classes.keySet(), containsInAnyOrder("ADMIN", "READONLY"));
+    assertThat(classes.get("ADMIN").getPermissions(), containsInAnyOrder("all"));
+    assertThat(
+        classes.get("READONLY").getPermissions(), containsInAnyOrder("view", "view-configuration"));
+  }
+
+  @Test
+  public void testLoginUser() {
+    JuniperConfiguration vc = parseJuniperConfig("juniper-login-class");
+    Map<String, LoginUser> users = vc.getMasterLogicalSystem().getLogin().getUsers();
+    assertThat(users.keySet(), containsInAnyOrder("neteng", "remote", "bootstrap", "sshuser"));
+
+    LoginUser neteng = users.get("neteng");
+    assertThat(neteng.getUid(), equalTo(2000));
+    assertThat(neteng.getClassName(), equalTo("ADMIN"));
+    assertThat(neteng.getFullName(), equalTo("network engineer"));
+    assertThat(
+        neteng.getAuthenticationType(), equalTo(LoginUser.AuthenticationType.ENCRYPTED_PASSWORD));
+
+    LoginUser remote = users.get("remote");
+    assertThat(remote.getClassName(), equalTo("READONLY"));
+    assertThat(remote.getUid(), nullValue());
+    assertThat(remote.getFullName(), nullValue());
+    assertThat(remote.getAuthenticationType(), nullValue());
+
+    LoginUser bootstrap = users.get("bootstrap");
+    assertThat(
+        bootstrap.getAuthenticationType(),
+        equalTo(LoginUser.AuthenticationType.PLAIN_TEXT_PASSWORD));
+    assertThat(bootstrap.getUid(), nullValue());
+    assertThat(bootstrap.getClassName(), nullValue());
+    assertThat(bootstrap.getFullName(), nullValue());
+
+    LoginUser sshuser = users.get("sshuser");
+    assertThat(sshuser.getUid(), nullValue());
+    assertThat(sshuser.getClassName(), nullValue());
+    assertThat(sshuser.getFullName(), nullValue());
+    assertThat(sshuser.getAuthenticationType(), nullValue());
+  }
+
+  @Test
+  public void testLoginRetryOptions() {
+    JuniperConfiguration vc = parseJuniperConfig("juniper-login-class");
+    LoginRetryOptions ro = vc.getMasterLogicalSystem().getLogin().getRetryOptions();
+    assertThat(ro, notNullValue());
+    assertThat(ro.getTriesBeforeDisconnect(), equalTo(4));
+    assertThat(ro.getBackoffThreshold(), equalTo(2));
+    assertThat(ro.getBackoffFactor(), equalTo(10));
+    assertThat(ro.getMinimumTime(), equalTo(20));
+    assertThat(ro.getMaximumTime(), equalTo(120));
+    assertThat(ro.getLockoutPeriod(), equalTo(30));
+  }
+
+  @Test
+  public void testLoginPassword() {
+    JuniperConfiguration vc = parseJuniperConfig("juniper-login-class");
+    LoginPassword pw = vc.getMasterLogicalSystem().getLogin().getPassword();
+    assertThat(pw, notNullValue());
+    assertThat(pw.getMinimumLength(), equalTo(8));
+    assertThat(pw.getMaximumLength(), equalTo(20));
+    assertThat(pw.getMaximumLifetime(), equalTo(90));
+    assertThat(pw.getMinimumLifetime(), equalTo(7));
+    assertThat(pw.getMinimumCharacterChanges(), equalTo(5));
+    assertThat(pw.getFormat(), equalTo(LoginPassword.Format.SHA512));
+    assertThat(pw.getChangeType(), equalTo(LoginPassword.ChangeType.CHARACTER_SETS));
+    assertThat(pw.getMinimumChanges(), equalTo((long) Integer.MAX_VALUE));
+    assertThat(pw.getMinimumLowerCases(), equalTo(1));
+    assertThat(pw.getMinimumUpperCases(), equalTo(1));
+    assertThat(pw.getMinimumNumerics(), equalTo(1));
+    assertThat(pw.getMinimumPunctuations(), equalTo(1));
+    assertThat(pw.getMinimumReuse(), equalTo(5));
+  }
+
+  @Test
+  public void testLoginClassReferences() throws IOException {
+    String hostname = "juniper-login-class";
+    String filename = "configs/" + hostname;
+    Batfish batfish = getBatfishForConfigurationNames(hostname);
+    ConvertConfigurationAnswerElement ccae =
+        batfish.loadConvertConfigurationAnswerElementOrReparse(batfish.getSnapshot());
+
+    assertThat(ccae, hasDefinedStructure(filename, LOGIN_CLASS, "ADMIN"));
+    assertThat(ccae, hasDefinedStructure(filename, LOGIN_CLASS, "READONLY"));
+    assertThat(ccae, hasNumReferrers(filename, LOGIN_CLASS, "ADMIN", 1));
+    assertThat(ccae, hasNumReferrers(filename, LOGIN_CLASS, "READONLY", 1));
+  }
+
+  @Test
+  public void testLoginRangeChecks() {
+    // All values parse (within the grammar's uint bounds) but violate the documented ranges,
+    // so each should warn and be dropped.
+    JuniperConfiguration vc = parseJuniperConfig("juniper-login-range");
+
+    List<String> comments =
+        vc.getWarnings().getParseWarnings().stream()
+            .map(ParseWarning::getComment)
+            .collect(Collectors.toList());
+    assertThat(comments, everyItem(containsString("in range")));
+    assertThat(comments, hasSize(17));
+
+    Login login = vc.getMasterLogicalSystem().getLogin();
+
+    LoginRetryOptions retry = login.getRetryOptions();
+    assertThat(retry.getBackoffFactor(), nullValue());
+    assertThat(retry.getBackoffThreshold(), nullValue());
+    assertThat(retry.getLockoutPeriod(), nullValue());
+    assertThat(retry.getMaximumTime(), nullValue());
+    assertThat(retry.getMinimumTime(), nullValue());
+    assertThat(retry.getTriesBeforeDisconnect(), nullValue());
+    assertThat(login.getUsers().get("baduser").getUid(), nullValue());
+
+    LoginPassword pw = login.getPassword();
+    assertThat(pw.getMaximumLength(), nullValue());
+    assertThat(pw.getMaximumLifetime(), nullValue());
+    assertThat(pw.getMinimumCharacterChanges(), nullValue());
+    assertThat(pw.getMinimumLength(), nullValue());
+    assertThat(pw.getMinimumLifetime(), nullValue());
+    assertThat(pw.getMinimumLowerCases(), nullValue());
+    assertThat(pw.getMinimumNumerics(), nullValue());
+    assertThat(pw.getMinimumPunctuations(), nullValue());
+    assertThat(pw.getMinimumReuse(), nullValue());
+    assertThat(pw.getMinimumUpperCases(), nullValue());
   }
 
   @Test
@@ -8347,6 +8612,51 @@ public final class FlatJuniperGrammarTest {
   }
 
   @Test
+  public void testCrpdEthInterfaces() throws IOException {
+    String hostname = "juniper-crpd-eth-interfaces";
+    String filename = "configs/" + hostname;
+    Batfish batfish = getBatfishForConfigurationNames(hostname);
+    Configuration config =
+        batfish.loadConfigurations(batfish.getSnapshot()).get(hostname.toLowerCase());
+
+    assertThat(config.getAllInterfaces(), hasKeys("eth0", "eth0.0", "eth1", "eth1.0"));
+
+    // "from interface eth0.0" matches a connected route on that unit's prefix.
+    RoutingPolicy unit = config.getRoutingPolicies().get("UNIT");
+    assertTrue(
+        unit.call(
+                Environment.builder(config)
+                    .setOriginalRoute(new ConnectedRoute(Prefix.parse("1.1.1.1/24"), "eth0.0"))
+                    .build())
+            .getBooleanValue());
+    assertFalse(
+        unit.call(
+                Environment.builder(config)
+                    .setOriginalRoute(new ConnectedRoute(Prefix.parse("3.3.3.3/24"), "eth0.0"))
+                    .build())
+            .getBooleanValue());
+
+    // "from interface eth1" names the parent, which carries no addresses, so it
+    // matches nothing -- not even a connected route on one of its units.
+    RoutingPolicy parent = config.getRoutingPolicies().get("PARENT");
+    assertFalse(
+        parent
+            .call(
+                Environment.builder(config)
+                    .setOriginalRoute(new ConnectedRoute(Prefix.parse("2.2.2.2/24"), "eth1.0"))
+                    .build())
+            .getBooleanValue());
+
+    ConvertConfigurationAnswerElement ccae =
+        batfish.loadConvertConfigurationAnswerElementOrReparse(batfish.getSnapshot());
+    // Each is referred to by its own "set interfaces" line and by "from interface".
+    assertThat(ccae, hasNumReferrers(filename, INTERFACE, "eth0.0", 2));
+    assertThat(ccae, hasNumReferrers(filename, INTERFACE, "eth1", 2));
+    // An interface that is only a device netdev is an undefined reference.
+    assertThat(ccae, hasUndefinedReference(filename, INTERFACE, "eth9"));
+  }
+
+  @Test
   public void testSourceNatPool() {
     JuniperConfiguration juniperConfiguration = parseJuniperConfig("juniper-sourcenat-pool");
     Map<String, NatPool> pools =
@@ -9737,6 +10047,7 @@ public final class FlatJuniperGrammarTest {
   @Test
   public void testXstpInterfaceExtraction() {
     JuniperConfiguration jc = parseJuniperConfig("xstp-interface-validation");
+    assertThat(jc.getWarnings().getParseWarnings(), empty());
     Set<String> xstpInterfaces = jc.getMasterLogicalSystem().getXstpInterfaceNames();
     // Should contain the specific interfaces but not "all"
     assertThat(xstpInterfaces, containsInAnyOrder("xe-0/0/1.0", "xe-0/0/2.0", "ge-0/0/0.0"));
@@ -11177,6 +11488,86 @@ public final class FlatJuniperGrammarTest {
   }
 
   @Test
+  public void testDestinationClassExtraction() {
+    JuniperConfiguration c = parseJuniperConfig("destination-class");
+    Map<String, PolicyStatement> policies = c.getMasterLogicalSystem().getPolicyStatements();
+    Map<String, FirewallFilter> filters = c.getMasterLogicalSystem().getFirewallFilters();
+
+    // Test policy-statement then destination-class extraction (definition)
+    PolicyStatement exportDcu = policies.get("EXPORT-DCU");
+    assertThat(exportDcu, notNullValue());
+
+    PsTerm termA = exportDcu.getTerms().get("REGION-A");
+    assertThat(termA.getThens().getAllThens(), hasSize(1));
+    assertThat(
+        getOnlyElement(termA.getThens().getAllThens()),
+        equalTo(new PsThenDestinationClass("DEST-CLASS-A")));
+
+    PsTerm termB = exportDcu.getTerms().get("REGION-B");
+    assertThat(termB.getThens().getAllThens(), hasSize(1));
+    assertThat(
+        getOnlyElement(termB.getThens().getAllThens()),
+        equalTo(new PsThenDestinationClass("DEST-CLASS-B")));
+
+    // Test firewall filter from destination-class extraction (reference)
+    assertThat(filters, hasEntry(equalTo("METERING"), instanceOf(ConcreteFirewallFilter.class)));
+    ConcreteFirewallFilter meteringFilter = (ConcreteFirewallFilter) filters.get("METERING");
+    assertThat(meteringFilter.getTerms(), hasKeys("METER-A", "METER-B", "METER-UNDEF", "ACCEPT"));
+
+    FwTerm fwTermA = meteringFilter.getTerms().get("METER-A");
+    assertThat(fwTermA.getFroms(), hasSize(1));
+    FwFrom fromA = getOnlyElement(fwTermA.getFroms());
+    assertThat(fromA, instanceOf(FwFromDestinationClass.class));
+    assertThat(((FwFromDestinationClass) fromA).getName(), equalTo("DEST-CLASS-A"));
+
+    FwTerm fwTermB = meteringFilter.getTerms().get("METER-B");
+    assertThat(fwTermB.getFroms(), hasSize(1));
+    FwFrom fromB = getOnlyElement(fwTermB.getFroms());
+    assertThat(fromB, instanceOf(FwFromDestinationClass.class));
+    assertThat(((FwFromDestinationClass) fromB).getName(), equalTo("DEST-CLASS-B"));
+
+    // Test undefined destination-class reference
+    FwTerm fwTermUndef = meteringFilter.getTerms().get("METER-UNDEF");
+    assertThat(fwTermUndef.getFroms(), hasSize(1));
+    FwFrom fromUndef = getOnlyElement(fwTermUndef.getFroms());
+    assertThat(fromUndef, instanceOf(FwFromDestinationClass.class));
+    assertThat(((FwFromDestinationClass) fromUndef).getName(), equalTo("DEST-CLASS-UNDEFINED"));
+
+    // Test IPv6 filter with destination-class
+    assertThat(filters, hasEntry(equalTo("METERING-V6"), instanceOf(ConcreteFirewallFilter.class)));
+    ConcreteFirewallFilter meteringV6Filter = (ConcreteFirewallFilter) filters.get("METERING-V6");
+    assertThat(meteringV6Filter.getTerms(), hasKeys("METER-A", "ACCEPT"));
+
+    FwTerm fwTermV6 = meteringV6Filter.getTerms().get("METER-A");
+    assertThat(fwTermV6.getFroms(), hasSize(1));
+    FwFrom fromV6 = getOnlyElement(fwTermV6.getFroms());
+    assertThat(fromV6, instanceOf(FwFromDestinationClass.class));
+    assertThat(((FwFromDestinationClass) fromV6).getName(), equalTo("DEST-CLASS-A"));
+  }
+
+  @Test
+  public void testDestinationClassDefinitionAndReferences() throws IOException {
+    String hostname = "destination-class";
+    String filename = "configs/" + hostname;
+    Batfish batfish = getBatfishForConfigurationNames(hostname);
+    ConvertConfigurationAnswerElement ccae =
+        batfish.loadConvertConfigurationAnswerElementOrReparse(batfish.getSnapshot());
+
+    // Verify destination-class definitions are tracked
+    assertThat(ccae, hasDefinedStructure(filename, DESTINATION_CLASS, "DEST-CLASS-A"));
+    assertThat(ccae, hasDefinedStructure(filename, DESTINATION_CLASS, "DEST-CLASS-B"));
+
+    // Verify destination-class references are tracked
+    // DEST-CLASS-A is referenced 2 times (once in inet filter, once in inet6 filter)
+    assertThat(ccae, hasNumReferrers(filename, DESTINATION_CLASS, "DEST-CLASS-A", 2));
+    // DEST-CLASS-B is referenced 1 time (in inet filter)
+    assertThat(ccae, hasNumReferrers(filename, DESTINATION_CLASS, "DEST-CLASS-B", 1));
+
+    // Verify undefined destination-class reference is identified
+    assertThat(ccae, hasUndefinedReference(filename, DESTINATION_CLASS, "DEST-CLASS-UNDEFINED"));
+  }
+
+  @Test
   public void testPolicyStatementFromProtocol() {
     JuniperConfiguration vc = parseJuniperConfig("policy-statement-from-protocol");
     PolicyStatement ps = vc.getMasterLogicalSystem().getPolicyStatements().get("PS");
@@ -11378,6 +11769,27 @@ public final class FlatJuniperGrammarTest {
     Fib fib = dp.getFibs().get(hostname).get(Configuration.DEFAULT_VRF_NAME);
     assertThat(fib.get(Ip.parse("192.168.0.1")), not(empty()));
     assertThat(fib.get(Ip.parse("192.168.1.1")), not(empty()));
+  }
+
+  /**
+   * {@code then source-class}/{@code then destination-class} (SCU/DCU) are only settable from a
+   * forwarding-table export policy, so they must not be reported as having no effect there. Other
+   * attribute mutations, like {@code then metric}, still are.
+   */
+  @Test
+  public void testForwardingTableExport_classActionsNotFlagged() throws IOException {
+    String hostname = "forwarding-table-export-classes";
+    Batfish batfish = getBatfishForConfigurationNames(hostname);
+    ConvertConfigurationAnswerElement ccae =
+        batfish.loadConvertConfigurationAnswerElementOrReparse(batfish.getSnapshot());
+
+    assertThat(
+        ccae.getWarnings().get(hostname).getRedFlagWarnings(),
+        contains(
+            WarningMatchers.hasText(
+                "RISK: forwarding-table export FIB_CLASSES term class-a: PsThenMetric has no effect"
+                    + " (only accept/reject, load-balance, and source-class/destination-class"
+                    + " affect forwarding-table export)")));
   }
 
   private final BddTestbed _b = new BddTestbed(ImmutableMap.of(), ImmutableMap.of());

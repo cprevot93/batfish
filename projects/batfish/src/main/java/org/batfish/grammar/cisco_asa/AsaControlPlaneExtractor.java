@@ -26,6 +26,7 @@ import static org.batfish.representation.cisco_asa.AsaStructureType.CRYPTO_DYNAM
 import static org.batfish.representation.cisco_asa.AsaStructureType.CRYPTO_MAP_SET;
 import static org.batfish.representation.cisco_asa.AsaStructureType.DEPI_CLASS;
 import static org.batfish.representation.cisco_asa.AsaStructureType.DEPI_TUNNEL;
+import static org.batfish.representation.cisco_asa.AsaStructureType.DNS_SERVER_GROUP;
 import static org.batfish.representation.cisco_asa.AsaStructureType.DOCSIS_POLICY;
 import static org.batfish.representation.cisco_asa.AsaStructureType.DOCSIS_POLICY_RULE;
 import static org.batfish.representation.cisco_asa.AsaStructureType.ICMP_TYPE_OBJECT_GROUP;
@@ -122,9 +123,12 @@ import static org.batfish.representation.cisco_asa.AsaStructureUsage.CRYPTO_MAP_
 import static org.batfish.representation.cisco_asa.AsaStructureUsage.DEPI_TUNNEL_DEPI_CLASS;
 import static org.batfish.representation.cisco_asa.AsaStructureUsage.DEPI_TUNNEL_L2TP_CLASS;
 import static org.batfish.representation.cisco_asa.AsaStructureUsage.DEPI_TUNNEL_PROTECT_TUNNEL;
+import static org.batfish.representation.cisco_asa.AsaStructureUsage.DNS_DOMAIN_LOOKUP_INTERFACE;
+import static org.batfish.representation.cisco_asa.AsaStructureUsage.DNS_GROUP;
+import static org.batfish.representation.cisco_asa.AsaStructureUsage.DNS_GROUP_MAP_DNS_TO_DOMAIN;
+import static org.batfish.representation.cisco_asa.AsaStructureUsage.DNS_SERVER_GROUP_NAME_SERVER_INTERFACE;
 import static org.batfish.representation.cisco_asa.AsaStructureUsage.DOCSIS_GROUP_DOCSIS_POLICY;
 import static org.batfish.representation.cisco_asa.AsaStructureUsage.DOCSIS_POLICY_DOCSIS_POLICY_RULE;
-import static org.batfish.representation.cisco_asa.AsaStructureUsage.DOMAIN_LOOKUP_SOURCE_INTERFACE;
 import static org.batfish.representation.cisco_asa.AsaStructureUsage.EIGRP_AF_INTERFACE;
 import static org.batfish.representation.cisco_asa.AsaStructureUsage.EIGRP_DISTRIBUTE_LIST_ACCESS_LIST_IN;
 import static org.batfish.representation.cisco_asa.AsaStructureUsage.EIGRP_DISTRIBUTE_LIST_ACCESS_LIST_OUT;
@@ -177,7 +181,6 @@ import static org.batfish.representation.cisco_asa.AsaStructureUsage.INTERFACE_Z
 import static org.batfish.representation.cisco_asa.AsaStructureUsage.IPSEC_PROFILE_ISAKMP_PROFILE;
 import static org.batfish.representation.cisco_asa.AsaStructureUsage.IPSEC_PROFILE_TRANSFORM_SET;
 import static org.batfish.representation.cisco_asa.AsaStructureUsage.IPV6_LOCAL_POLICY_ROUTE_MAP;
-import static org.batfish.representation.cisco_asa.AsaStructureUsage.IP_DOMAIN_LOOKUP_INTERFACE;
 import static org.batfish.representation.cisco_asa.AsaStructureUsage.IP_LOCAL_POLICY_ROUTE_MAP;
 import static org.batfish.representation.cisco_asa.AsaStructureUsage.IP_TACACS_SOURCE_INTERFACE;
 import static org.batfish.representation.cisco_asa.AsaStructureUsage.ISAKMP_POLICY_SELF_REF;
@@ -283,6 +286,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.Range;
+import com.google.common.primitives.Ints;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
@@ -538,9 +542,16 @@ import org.batfish.grammar.cisco_asa.AsaParser.Description_lineContext;
 import org.batfish.grammar.cisco_asa.AsaParser.Dh_groupContext;
 import org.batfish.grammar.cisco_asa.AsaParser.Distribute_list_bgp_tailContext;
 import org.batfish.grammar.cisco_asa.AsaParser.Distribute_list_is_stanzaContext;
-import org.batfish.grammar.cisco_asa.AsaParser.Domain_lookupContext;
-import org.batfish.grammar.cisco_asa.AsaParser.Domain_nameContext;
-import org.batfish.grammar.cisco_asa.AsaParser.Domain_name_serverContext;
+import org.batfish.grammar.cisco_asa.AsaParser.Dns_domain_lookupContext;
+import org.batfish.grammar.cisco_asa.AsaParser.Dns_name_serverContext;
+import org.batfish.grammar.cisco_asa.AsaParser.Dns_server_groupContext;
+import org.batfish.grammar.cisco_asa.AsaParser.Dnsgm_dns_to_domainContext;
+import org.batfish.grammar.cisco_asa.AsaParser.Dnssg_domain_nameContext;
+import org.batfish.grammar.cisco_asa.AsaParser.Dnssg_expire_entry_timerContext;
+import org.batfish.grammar.cisco_asa.AsaParser.Dnssg_name_serverContext;
+import org.batfish.grammar.cisco_asa.AsaParser.Dnssg_poll_timerContext;
+import org.batfish.grammar.cisco_asa.AsaParser.Dnssg_retriesContext;
+import org.batfish.grammar.cisco_asa.AsaParser.Dnssg_timeoutContext;
 import org.batfish.grammar.cisco_asa.AsaParser.Dscp_typeContext;
 import org.batfish.grammar.cisco_asa.AsaParser.Dt_depi_classContext;
 import org.batfish.grammar.cisco_asa.AsaParser.Dt_l2tp_classContext;
@@ -643,8 +654,6 @@ import org.batfish.grammar.cisco_asa.AsaParser.Interface_nameContext;
 import org.batfish.grammar.cisco_asa.AsaParser.Ip_as_path_access_list_stanzaContext;
 import org.batfish.grammar.cisco_asa.AsaParser.Ip_as_path_access_list_tailContext;
 import org.batfish.grammar.cisco_asa.AsaParser.Ip_dhcp_relay_serverContext;
-import org.batfish.grammar.cisco_asa.AsaParser.Ip_domain_lookupContext;
-import org.batfish.grammar.cisco_asa.AsaParser.Ip_domain_nameContext;
 import org.batfish.grammar.cisco_asa.AsaParser.Ip_hostnameContext;
 import org.batfish.grammar.cisco_asa.AsaParser.Ip_prefix_list_stanzaContext;
 import org.batfish.grammar.cisco_asa.AsaParser.Ip_prefix_list_tailContext;
@@ -663,8 +672,10 @@ import org.batfish.grammar.cisco_asa.AsaParser.L_login_authenticationContext;
 import org.batfish.grammar.cisco_asa.AsaParser.L_transportContext;
 import org.batfish.grammar.cisco_asa.AsaParser.Local_as_bgp_tailContext;
 import org.batfish.grammar.cisco_asa.AsaParser.Logging_addressContext;
+import org.batfish.grammar.cisco_asa.AsaParser.Logging_buffer_sizeContext;
 import org.batfish.grammar.cisco_asa.AsaParser.Logging_bufferedContext;
 import org.batfish.grammar.cisco_asa.AsaParser.Logging_consoleContext;
+import org.batfish.grammar.cisco_asa.AsaParser.Logging_facilityContext;
 import org.batfish.grammar.cisco_asa.AsaParser.Logging_hostContext;
 import org.batfish.grammar.cisco_asa.AsaParser.Logging_onContext;
 import org.batfish.grammar.cisco_asa.AsaParser.Logging_serverContext;
@@ -865,14 +876,12 @@ import org.batfish.grammar.cisco_asa.AsaParser.S_cableContext;
 import org.batfish.grammar.cisco_asa.AsaParser.S_class_mapContext;
 import org.batfish.grammar.cisco_asa.AsaParser.S_depi_classContext;
 import org.batfish.grammar.cisco_asa.AsaParser.S_depi_tunnelContext;
+import org.batfish.grammar.cisco_asa.AsaParser.S_dns_groupContext;
 import org.batfish.grammar.cisco_asa.AsaParser.S_domain_nameContext;
 import org.batfish.grammar.cisco_asa.AsaParser.S_hostnameContext;
 import org.batfish.grammar.cisco_asa.AsaParser.S_interfaceContext;
 import org.batfish.grammar.cisco_asa.AsaParser.S_ip_default_gatewayContext;
 import org.batfish.grammar.cisco_asa.AsaParser.S_ip_dhcpContext;
-import org.batfish.grammar.cisco_asa.AsaParser.S_ip_domainContext;
-import org.batfish.grammar.cisco_asa.AsaParser.S_ip_domain_nameContext;
-import org.batfish.grammar.cisco_asa.AsaParser.S_ip_name_serverContext;
 import org.batfish.grammar.cisco_asa.AsaParser.S_ip_pimContext;
 import org.batfish.grammar.cisco_asa.AsaParser.S_ip_source_routeContext;
 import org.batfish.grammar.cisco_asa.AsaParser.S_ip_sshContext;
@@ -1011,6 +1020,7 @@ import org.batfish.representation.cisco_asa.CryptoMapEntry;
 import org.batfish.representation.cisco_asa.CryptoMapSet;
 import org.batfish.representation.cisco_asa.DistributeList;
 import org.batfish.representation.cisco_asa.DistributeList.DistributeListFilterType;
+import org.batfish.representation.cisco_asa.DnsServerGroup;
 import org.batfish.representation.cisco_asa.DynamicIpBgpPeerGroup;
 import org.batfish.representation.cisco_asa.DynamicIpv6BgpPeerGroup;
 import org.batfish.representation.cisco_asa.EigrpProcess;
@@ -1051,6 +1061,7 @@ import org.batfish.representation.cisco_asa.Keyring;
 import org.batfish.representation.cisco_asa.MacAccessList;
 import org.batfish.representation.cisco_asa.MasterBgpPeerGroup;
 import org.batfish.representation.cisco_asa.MatchSemantics;
+import org.batfish.representation.cisco_asa.NameServer;
 import org.batfish.representation.cisco_asa.NamedBgpPeerGroup;
 import org.batfish.representation.cisco_asa.NamedRsaPubKey;
 import org.batfish.representation.cisco_asa.NetworkObjectAddressSpecifier;
@@ -1120,6 +1131,7 @@ import org.batfish.representation.cisco_asa.StandardIpv6AccessListLine;
 import org.batfish.representation.cisco_asa.StaticRoute;
 import org.batfish.representation.cisco_asa.StubSettings;
 import org.batfish.representation.cisco_asa.SubnetNetworkObject;
+import org.batfish.representation.cisco_asa.SyslogTransportProtocol;
 import org.batfish.representation.cisco_asa.TcpServiceObjectGroupLine;
 import org.batfish.representation.cisco_asa.TcpUdpServiceObjectGroupLine;
 import org.batfish.representation.cisco_asa.Tunnel;
@@ -1136,9 +1148,22 @@ import org.batfish.vendor.VendorConfiguration;
 public class AsaControlPlaneExtractor extends AsaParserBaseListener
     implements SilentSyntaxListener, ControlPlaneExtractor {
   private static final String INLINE_SERVICE_OBJECT_NAME = "~INLINE_SERVICE_OBJECT~";
+
+  /** Name of the ASA's default DNS server group, used by the global {@code dns name-server}. */
+  private static final String DEFAULT_DNS_SERVER_GROUP_NAME = "DefaultDNS";
+
+  // Valid value ranges for "dns server-group" tuning parameters.
+  private static final IntegerSpace DNS_TIMEOUT_RANGE = IntegerSpace.of(Range.closed(1, 30));
+  private static final IntegerSpace DNS_RETRIES_RANGE = IntegerSpace.of(Range.closed(0, 10));
+  private static final IntegerSpace DNS_POLL_TIMER_RANGE = IntegerSpace.of(Range.closed(1, 65535));
+  private static final IntegerSpace DNS_EXPIRE_ENTRY_TIMER_RANGE =
+      IntegerSpace.of(Range.closed(1, 65535));
   private static final IntegerSpace PROTOCOL_DISTANCE_RANGE = IntegerSpace.of(Range.closed(1, 255));
 
   private static final LongSpace NTP_KEY_RANGE = LongSpace.of(Range.closed(1L, 4294967295L));
+
+  private static final IntegerSpace LOGGING_HOST_PORT_RANGE =
+      IntegerSpace.of(Range.closed(1025, 65535));
 
   @VisibleForTesting static final String SERIAL_LINE = "serial";
 
@@ -1400,6 +1425,8 @@ public class AsaControlPlaneExtractor extends AsaParserBaseListener
   private StandardIpv6AccessList _currentStandardIpv6Acl;
 
   private User _currentUser;
+
+  private DnsServerGroup _currentDnsServerGroup;
 
   private String _currentVrf;
 
@@ -3215,11 +3242,6 @@ public class AsaControlPlaneExtractor extends AsaParserBaseListener
   }
 
   @Override
-  public void enterS_ip_domain(S_ip_domainContext ctx) {
-    _no = ctx.NO() != null;
-  }
-
-  @Override
   public void enterS_ip_pim(S_ip_pimContext ctx) {
     _no = ctx.NO() != null;
   }
@@ -4351,26 +4373,94 @@ public class AsaControlPlaneExtractor extends AsaParserBaseListener
   }
 
   @Override
-  public void exitDomain_lookup(Domain_lookupContext ctx) {
-    if (ctx.iname != null) {
-      String ifaceName = getCanonicalInterfaceName(ctx.iname.getText());
-      _configuration.referenceStructure(
-          INTERFACE, ifaceName, DOMAIN_LOOKUP_SOURCE_INTERFACE, ctx.iname.getStart().getLine());
-      _configuration.setDnsSourceInterface(ifaceName);
+  public void exitDns_domain_lookup(Dns_domain_lookupContext ctx) {
+    String iface = ctx.iname.getText();
+    _configuration.getDnsDomainLookupInterfaces().add(iface);
+    _configuration.referenceStructure(
+        INTERFACE, iface, DNS_DOMAIN_LOOKUP_INTERFACE, ctx.iname.getStart().getLine());
+  }
+
+  @Override
+  public void exitDns_name_server(Dns_name_serverContext ctx) {
+    DnsServerGroup group = _configuration.getOrCreateDnsServerGroup(DEFAULT_DNS_SERVER_GROUP_NAME);
+    for (Ip_hostnameContext server : ctx.servers) {
+      group.addNameServer(new NameServer(server.getText(), null));
     }
   }
 
   @Override
-  public void exitDomain_name(Domain_nameContext ctx) {
-    String domainName = ctx.hostname.getText();
-    _configuration.setDomainName(domainName);
+  public void enterDns_server_group(Dns_server_groupContext ctx) {
+    String name = ctx.name.getText();
+    _currentDnsServerGroup = _configuration.getOrCreateDnsServerGroup(name);
+    _configuration.defineStructure(DNS_SERVER_GROUP, name, ctx);
   }
 
   @Override
-  public void exitDomain_name_server(Domain_name_serverContext ctx) {
-    Set<String> dnsServers = _configuration.getDnsServers();
-    String hostname = ctx.hostname.getText();
-    dnsServers.add(hostname);
+  public void exitDns_server_group(Dns_server_groupContext ctx) {
+    _currentDnsServerGroup = null;
+  }
+
+  @Override
+  public void exitDnssg_name_server(Dnssg_name_serverContext ctx) {
+    String sourceInterface = ctx.iface != null ? ctx.iface.getText() : null;
+    for (Ip_hostnameContext server : ctx.servers) {
+      _currentDnsServerGroup.addNameServer(new NameServer(server.getText(), sourceInterface));
+    }
+    if (sourceInterface != null) {
+      _configuration.referenceStructure(
+          INTERFACE,
+          sourceInterface,
+          DNS_SERVER_GROUP_NAME_SERVER_INTERFACE,
+          ctx.iface.getStart().getLine());
+    }
+  }
+
+  @Override
+  public void exitDnssg_domain_name(Dnssg_domain_nameContext ctx) {
+    _currentDnsServerGroup.setDomainName(ctx.name.getText());
+  }
+
+  @Override
+  public void exitDnssg_timeout(Dnssg_timeoutContext ctx) {
+    toIntegerInSpace(ctx, ctx.secs, DNS_TIMEOUT_RANGE, "dns server-group timeout")
+        .ifPresent(_currentDnsServerGroup::setTimeoutSeconds);
+  }
+
+  @Override
+  public void exitDnssg_retries(Dnssg_retriesContext ctx) {
+    toIntegerInSpace(ctx, ctx.count, DNS_RETRIES_RANGE, "dns server-group retries")
+        .ifPresent(_currentDnsServerGroup::setRetries);
+  }
+
+  @Override
+  public void exitDnssg_poll_timer(Dnssg_poll_timerContext ctx) {
+    toIntegerInSpace(ctx, ctx.mins, DNS_POLL_TIMER_RANGE, "dns server-group poll-timer")
+        .ifPresent(_currentDnsServerGroup::setPollTimerMinutes);
+  }
+
+  @Override
+  public void exitDnssg_expire_entry_timer(Dnssg_expire_entry_timerContext ctx) {
+    toIntegerInSpace(
+            ctx, ctx.mins, DNS_EXPIRE_ENTRY_TIMER_RANGE, "dns server-group expire-entry-timer")
+        .ifPresent(_currentDnsServerGroup::setExpireEntryTimerMinutes);
+  }
+
+  @Override
+  public void exitS_dns_group(S_dns_groupContext ctx) {
+    String name = ctx.name.getText();
+    _configuration.setDefaultDnsServerGroup(name);
+    _configuration.referenceStructure(
+        DNS_SERVER_GROUP, name, DNS_GROUP, ctx.name.getStart().getLine());
+  }
+
+  @Override
+  public void exitDnsgm_dns_to_domain(Dnsgm_dns_to_domainContext ctx) {
+    // "dns-to-domain <group> <domain>" maps a domain to a DNS server group. Each domain maps to
+    // exactly one group.
+    String group = ctx.group.getText();
+    _configuration.getDnsGroupMap().put(ctx.domain.getText(), group);
+    _configuration.referenceStructure(
+        DNS_SERVER_GROUP, group, DNS_GROUP_MAP_DNS_TO_DOMAIN, ctx.group.getStart().getLine());
   }
 
   @Override
@@ -5870,29 +5960,6 @@ public class AsaControlPlaneExtractor extends AsaParserBaseListener
   }
 
   @Override
-  public void exitIp_domain_lookup(Ip_domain_lookupContext ctx) {
-    if (ctx.iname != null) {
-      String ifaceName = getCanonicalInterfaceName(ctx.iname.getText());
-      _configuration.referenceStructure(
-          INTERFACE,
-          ifaceName,
-          IP_DOMAIN_LOOKUP_INTERFACE,
-          ctx.interface_name().getStart().getLine());
-      _configuration.setDnsSourceInterface(ifaceName);
-    }
-  }
-
-  @Override
-  public void exitIp_domain_name(Ip_domain_nameContext ctx) {
-    if (!_no) {
-      String domainName = ctx.hostname.getText();
-      _configuration.setDomainName(domainName);
-    } else {
-      _configuration.setDomainName(null);
-    }
-  }
-
-  @Override
   public void exitIpl_policy(Ipl_policyContext ctx) {
     todo(ctx);
     String name = ctx.name.getText();
@@ -6117,6 +6184,9 @@ public class AsaControlPlaneExtractor extends AsaParserBaseListener
     buffered.setSeverity(severity);
     buffered.setSeverityNum(severityNum);
     buffered.setSize(size);
+    // Vendor-specific ASA model: record the internal buffer severity by name and level.
+    _configuration.getAsaLogging().setBufferedSeverity(severity);
+    _configuration.getAsaLogging().setBufferedSeverityNum(severityNum);
   }
 
   @Override
@@ -6145,10 +6215,82 @@ public class AsaControlPlaneExtractor extends AsaParserBaseListener
     if (_no) {
       return;
     }
-    Logging logging = _configuration.getCf().getLogging();
     String hostname = ctx.hostname.getText();
-    LoggingHost host = new LoggingHost(hostname);
-    logging.getHosts().put(hostname, host);
+    // Preserve shared-model behavior (used for the VI loggingServers set).
+    Logging logging = _configuration.getCf().getLogging();
+    logging.getHosts().put(hostname, new LoggingHost(hostname));
+
+    // Vendor-specific ASA model: capture interface, transport, and port
+    org.batfish.representation.cisco_asa.LoggingHost syslogHost =
+        new org.batfish.representation.cisco_asa.LoggingHost(ctx.iface.getText(), hostname);
+
+    // Transport defaults to UDP on ASA. The transport clause is either a bare
+    // keyword (tcp | udp) or a combined 'protocol/port' token (e.g. 'tcp/1500').
+    SyslogTransportProtocol transport = SyslogTransportProtocol.UDP;
+    Integer explicitPort = null;
+    if (ctx.transport != null) {
+      if (ctx.transport.TCP() != null) {
+        transport = SyslogTransportProtocol.TCP;
+      } else if (ctx.transport.UDP() != null) {
+        transport = SyslogTransportProtocol.UDP;
+      } else {
+        String text = ctx.transport.getText();
+        int slash = text.indexOf('/');
+        String protocol = (slash < 0 ? text : text.substring(0, slash)).toLowerCase();
+        if (protocol.equals("tcp")) {
+          transport = SyslogTransportProtocol.TCP;
+        } else if (protocol.equals("udp")) {
+          transport = SyslogTransportProtocol.UDP;
+        } else {
+          warn(ctx, String.format("Unrecognized logging host transport protocol: '%s'", text));
+          return;
+        }
+        if (slash >= 0) {
+          Optional<Integer> maybePort = toLoggingHostPort(ctx, text.substring(slash + 1));
+          if (!maybePort.isPresent()) {
+            return;
+          }
+          explicitPort = maybePort.get();
+        }
+      }
+    }
+    syslogHost.setTransport(transport);
+    syslogHost.setPort(explicitPort != null ? explicitPort : transport.getDefaultPort());
+    _configuration.getAsaLogging().getHosts().put(hostname, syslogHost);
+  }
+
+  private @Nonnull Optional<Integer> toLoggingHostPort(
+      ParserRuleContext messageCtx, String portText) {
+    Integer port = Ints.tryParse(portText.trim());
+    if (port == null) {
+      warn(messageCtx, String.format("Invalid logging host port: '%s'", portText));
+      return Optional.empty();
+    }
+    if (!LOGGING_HOST_PORT_RANGE.contains(port)) {
+      warn(
+          messageCtx,
+          String.format(
+              "Expected logging host port in range %s, but got '%s'",
+              LOGGING_HOST_PORT_RANGE, portText));
+      return Optional.empty();
+    }
+    return Optional.of(port);
+  }
+
+  @Override
+  public void exitLogging_facility(Logging_facilityContext ctx) {
+    if (_no) {
+      return;
+    }
+    _configuration.getAsaLogging().setFacility(toInteger(ctx.num));
+  }
+
+  @Override
+  public void exitLogging_buffer_size(Logging_buffer_sizeContext ctx) {
+    if (_no) {
+      return;
+    }
+    _configuration.getAsaLogging().setBufferSize(toInteger(ctx.bytes));
   }
 
   @Override
@@ -6197,6 +6339,9 @@ public class AsaControlPlaneExtractor extends AsaParserBaseListener
     }
     trap.setSeverity(severity);
     trap.setSeverityNum(severityNum);
+    // Vendor-specific ASA model: record the global trap severity by name and level.
+    _configuration.getAsaLogging().setTrapSeverity(severity);
+    _configuration.getAsaLogging().setTrapSeverityNum(severityNum);
   }
 
   @Override
@@ -8156,26 +8301,6 @@ public class AsaControlPlaneExtractor extends AsaParserBaseListener
   @Override
   public void exitS_ip_dhcp(S_ip_dhcpContext ctx) {
     _no = false;
-  }
-
-  @Override
-  public void exitS_ip_domain(S_ip_domainContext ctx) {
-    _no = false;
-  }
-
-  @Override
-  public void exitS_ip_domain_name(S_ip_domain_nameContext ctx) {
-    String domainName = ctx.hostname.getText();
-    _configuration.setDomainName(domainName);
-  }
-
-  @Override
-  public void exitS_ip_name_server(S_ip_name_serverContext ctx) {
-    Set<String> dnsServers = _configuration.getDnsServers();
-    for (Ip_hostnameContext ipCtx : ctx.hostnames) {
-      String domainName = ipCtx.getText();
-      dnsServers.add(domainName);
-    }
   }
 
   @Override

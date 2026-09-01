@@ -252,28 +252,51 @@ public class IpsecUtil {
 
   /**
    * Negotiates key for IKE phase 1 and sets it in the provided ipsecSessionBuilder. Negotiated IKE
-   * P1 key in the ipsecSessionBuilder will be null if no valid key was detected or negotiated
+   * P1 key in the ipsecSessionBuilder will be null if no valid key was detected or negotiated.
+   *
+   * <p>Only a pair of unencrypted pre-shared keys can be compared. Any other pair of same-family
+   * keys is unverifiable, since at least one value is a ciphertext or an opaque public key, so an
+   * empty negotiated key is set. The type of that empty key is a marker for the family that was
+   * negotiated, not a fact about either peer's configuration.
    */
   @VisibleForTesting
   static void negotiateIkePhase1Key(
       IkePhase1Key initiatorKey,
       IkePhase1Key responderKey,
       IpsecSession.Builder ipsecSessionBuilder) {
-    if (responderKey.getKeyType() != initiatorKey.getKeyType()) {
+    // A key with no value is not a key that Batfish could not read: it is a peer with nothing
+    // configured to authenticate with, which cannot negotiate at all.
+    if (initiatorKey.getKeyHash() == null || responderKey.getKeyHash() == null) {
       return;
     }
+    IkeKeyType initiatorKeyType = initiatorKey.getKeyType();
+    IkeKeyType responderKeyType = responderKey.getKeyType();
     IkePhase1Key negotiatedIkePhase1Key = new IkePhase1Key();
-    negotiatedIkePhase1Key.setKeyType(initiatorKey.getKeyType());
-    if (responderKey.getKeyType() == IkeKeyType.RSA_PUB_KEY
-        || responderKey.getKeyType() == IkeKeyType.PRE_SHARED_KEY_ENCRYPTED) {
-      // RSA pub keys and encrypted PSKs will not be equal and there is no common negotiated key
-      // so creating an empty negotiated key
-      ipsecSessionBuilder.setNegotiatedIkeP1Key(negotiatedIkePhase1Key);
-    } else if (responderKey.getKeyType() == IkeKeyType.PRE_SHARED_KEY_UNENCRYPTED
-        && responderKey.getKeyHash().equals(initiatorKey.getKeyHash())) {
+    if (initiatorKeyType == IkeKeyType.PRE_SHARED_KEY_UNENCRYPTED
+        && responderKeyType == IkeKeyType.PRE_SHARED_KEY_UNENCRYPTED) {
+      // Both values are readable, so the configs prove whether the keys match
+      if (!initiatorKey.getKeyHash().equals(responderKey.getKeyHash())) {
+        return;
+      }
+      negotiatedIkePhase1Key.setKeyType(IkeKeyType.PRE_SHARED_KEY_UNENCRYPTED);
       negotiatedIkePhase1Key.setKeyHash(initiatorKey.getKeyHash());
-      ipsecSessionBuilder.setNegotiatedIkeP1Key(negotiatedIkePhase1Key);
+    } else if (isPreSharedKey(initiatorKeyType) && isPreSharedKey(responderKeyType)) {
+      // At least one value is encrypted, so the keys cannot be compared and there is no common
+      // negotiated key
+      negotiatedIkePhase1Key.setKeyType(IkeKeyType.PRE_SHARED_KEY_ENCRYPTED);
+    } else if (initiatorKeyType == IkeKeyType.RSA_PUB_KEY
+        && responderKeyType == IkeKeyType.RSA_PUB_KEY) {
+      // RSA pub keys will not be equal, so there is no common negotiated key
+      negotiatedIkePhase1Key.setKeyType(IkeKeyType.RSA_PUB_KEY);
+    } else {
+      return;
     }
+    ipsecSessionBuilder.setNegotiatedIkeP1Key(negotiatedIkePhase1Key);
+  }
+
+  private static boolean isPreSharedKey(IkeKeyType keyType) {
+    return keyType == IkeKeyType.PRE_SHARED_KEY_ENCRYPTED
+        || keyType == IkeKeyType.PRE_SHARED_KEY_UNENCRYPTED;
   }
 
   /**

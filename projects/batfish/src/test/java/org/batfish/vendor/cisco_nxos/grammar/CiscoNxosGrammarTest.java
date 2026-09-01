@@ -347,6 +347,7 @@ import org.batfish.vendor.cisco_nxos.representation.CiscoNxosStructureUsage;
 import org.batfish.vendor.cisco_nxos.representation.DefaultVrfOspfProcess;
 import org.batfish.vendor.cisco_nxos.representation.DistributeList;
 import org.batfish.vendor.cisco_nxos.representation.DistributeList.DistributeListFilterType;
+import org.batfish.vendor.cisco_nxos.representation.DnsSourceInterface;
 import org.batfish.vendor.cisco_nxos.representation.EigrpProcessConfiguration;
 import org.batfish.vendor.cisco_nxos.representation.EigrpVrfConfiguration;
 import org.batfish.vendor.cisco_nxos.representation.EigrpVrfIpv4AddressFamilyConfiguration;
@@ -380,6 +381,8 @@ import org.batfish.vendor.cisco_nxos.representation.Lacp;
 import org.batfish.vendor.cisco_nxos.representation.Layer3Options;
 import org.batfish.vendor.cisco_nxos.representation.LiteralIpAddressSpec;
 import org.batfish.vendor.cisco_nxos.representation.LiteralPortSpec;
+import org.batfish.vendor.cisco_nxos.representation.LoggingLogfile;
+import org.batfish.vendor.cisco_nxos.representation.LoggingServer;
 import org.batfish.vendor.cisco_nxos.representation.NameServer;
 import org.batfish.vendor.cisco_nxos.representation.NtpAuthenticationKey;
 import org.batfish.vendor.cisco_nxos.representation.NtpServer;
@@ -5035,16 +5038,112 @@ public final class CiscoNxosGrammarTest {
     assertThat(
         vc.getDefaultVrf().getNameServers(),
         contains(
-            new NameServer("192.0.2.2", null),
-            new NameServer("192.0.2.1", null),
-            new NameServer("dead:beef::1", null),
-            new NameServer("192.0.2.3", MANAGEMENT_VRF_NAME)));
+            new NameServer("192.0.2.2", null, null),
+            new NameServer("192.0.2.1", null, null),
+            new NameServer("dead:beef::1", null, null),
+            new NameServer("192.0.2.3", MANAGEMENT_VRF_NAME, null)));
     assertThat(
         vc.getVrfs().get("other_vrf").getNameServers(),
         contains(
-            new NameServer("192.0.2.99", MANAGEMENT_VRF_NAME),
-            new NameServer("192.0.2.100", null)));
+            new NameServer("192.0.2.99", MANAGEMENT_VRF_NAME, null),
+            new NameServer("192.0.2.100", null, null)));
     assertThat(vc.getVrfs().get(MANAGEMENT_VRF_NAME).getNameServers(), empty());
+
+    assertThat(vc.getDnsLookupEnabled(), nullValue());
+    assertThat(vc.getDnsSourceInterfaces(), empty());
+  }
+
+  @Test
+  public void testIpDnsExtraction() {
+    String hostname = "nxos_ip_dns";
+    CiscoNxosConfiguration vc = parseVendorConfig(hostname);
+
+    assertThat(vc.getDnsLookupEnabled(), equalTo(Boolean.TRUE));
+
+    assertThat(
+        vc.getDnsSourceInterfaces(),
+        contains(
+            new DnsSourceInterface("loopback0", "Corp"),
+            new DnsSourceInterface("loopback3", "Mgmt"),
+            new DnsSourceInterface("loopback4", "Client")));
+
+    assertThat(
+        vc.getDefaultVrf().getNameServers(),
+        contains(
+            new NameServer("192.0.2.11", "Client", null),
+            new NameServer("192.0.2.12", "Client", null),
+            new NameServer("198.51.100.11", null, "loopback5")));
+  }
+
+  @Test
+  public void testIpDnsReferences() throws IOException {
+    String hostname = "nxos_ip_dns";
+    String filename = String.format("configs/%s", hostname);
+    Batfish bf = getBatfishForConfigurationNames(hostname);
+    ConvertConfigurationAnswerElement ans =
+        bf.loadConvertConfigurationAnswerElementOrReparse(bf.getSnapshot());
+
+    assertThat(ans, hasNumReferrers(filename, CiscoNxosStructureType.INTERFACE, "loopback0", 2));
+    assertThat(ans, hasNumReferrers(filename, CiscoNxosStructureType.INTERFACE, "loopback3", 2));
+    assertThat(ans, hasNumReferrers(filename, CiscoNxosStructureType.INTERFACE, "loopback4", 2));
+    assertThat(ans, hasNumReferrers(filename, CiscoNxosStructureType.INTERFACE, "loopback5", 2));
+  }
+
+  @Test
+  public void testIpDomainLookupDisabledExtraction() {
+    String hostname = "nxos_ip_domain_lookup_disabled";
+    CiscoNxosConfiguration vc = parseVendorConfig(hostname);
+
+    assertThat(vc.getDnsLookupEnabled(), equalTo(Boolean.FALSE));
+  }
+
+  @Test
+  public void testIpDnsMultiVrfExtraction() {
+    String hostname = "nxos_ip_dns_multi_vrf";
+    CiscoNxosConfiguration vc = parseVendorConfig(hostname);
+
+    assertThat(vc.getDnsLookupEnabled(), equalTo(Boolean.TRUE));
+
+    assertThat(
+        vc.getDnsSourceInterfaces(),
+        contains(
+            new DnsSourceInterface("loopback0", "Corp"),
+            new DnsSourceInterface("loopback3", "Mgmt"),
+            new DnsSourceInterface("loopback4", "Client"),
+            new DnsSourceInterface("loopback5", "Infra")));
+
+    List<NameServer> defaultNs = vc.getDefaultVrf().getNameServers();
+    assertThat(defaultNs, hasSize(15));
+    assertThat(
+        defaultNs,
+        containsInAnyOrder(
+            new NameServer("192.0.2.11", "Client", "loopback6"),
+            new NameServer("192.0.2.12", "Client", "loopback6"),
+            new NameServer("192.0.2.13", "Client", "loopback6"),
+            new NameServer("192.0.2.14", "Client", "loopback6"),
+            new NameServer("192.0.2.15", "Client", "loopback6"),
+            new NameServer("192.0.2.16", "Client", "loopback6"),
+            new NameServer("198.51.100.11", "Infra", "loopback7"),
+            new NameServer("198.51.100.12", "Infra", "loopback7"),
+            new NameServer("198.51.100.13", "Infra", "loopback7"),
+            new NameServer("198.51.100.14", "Infra", "loopback7"),
+            new NameServer("198.51.100.15", "Infra", "loopback7"),
+            new NameServer("198.51.100.16", "Infra", "loopback7"),
+            new NameServer("203.0.113.11", "Mgmt", null),
+            new NameServer("203.0.113.12", "Mgmt", null),
+            new NameServer("203.0.113.13", "Mgmt", null)));
+
+    assertThat(
+        vc.getVrfs().get("Corp").getNameServers(),
+        contains(new NameServer("192.0.2.4", null, null)));
+    assertThat(vc.getVrfs().get("Client").getNameServers(), hasSize(6));
+    assertThat(vc.getVrfs().get("Infra").getNameServers(), hasSize(6));
+    assertThat(vc.getVrfs().get("Mgmt").getNameServers(), hasSize(3));
+
+    assertThat(
+        vc.getAllDnsSourceInterfaces(),
+        containsInAnyOrder(
+            "loopback0", "loopback3", "loopback4", "loopback5", "loopback6", "loopback7"));
   }
 
   @Test
@@ -5355,8 +5454,34 @@ public final class CiscoNxosGrammarTest {
     String hostname = "nxos_logging";
     Configuration c = parseConfig(hostname);
 
-    assertThat(c.getLoggingServers(), containsInAnyOrder("192.0.2.1", "192.0.2.2", "192.0.2.3"));
+    assertThat(
+        c.getLoggingServers(),
+        containsInAnyOrder("192.0.2.1", "192.0.2.2", "192.0.2.3", "192.0.2.4"));
     assertThat(c.getLoggingSourceInterface(), equalTo("loopback0"));
+  }
+
+  @Test
+  public void testLoggingReferences() throws IOException {
+    String hostname = "nxos_logging";
+    String filename = "configs/" + hostname;
+    Batfish batfish = getBatfishForConfigurationNames(hostname);
+    ConvertConfigurationAnswerElement ccae =
+        batfish.loadConvertConfigurationAnswerElementOrReparse(batfish.getSnapshot());
+
+    assertThat(
+        ccae,
+        hasReferencedStructure(
+            filename,
+            CiscoNxosStructureType.VRF,
+            "default",
+            CiscoNxosStructureUsage.LOGGING_SERVER_USE_VRF));
+    assertThat(
+        ccae,
+        hasReferencedStructure(
+            filename,
+            CiscoNxosStructureType.VRF,
+            "management",
+            CiscoNxosStructureUsage.LOGGING_SERVER_USE_VRF));
   }
 
   @Test
@@ -5364,8 +5489,43 @@ public final class CiscoNxosGrammarTest {
     String hostname = "nxos_logging";
     CiscoNxosConfiguration vc = parseVendorConfig(hostname);
 
-    assertThat(vc.getLoggingServers(), hasKeys("192.0.2.1", "192.0.2.2", "192.0.2.3"));
+    assertThat(vc.getLoggingServers(), hasKeys("192.0.2.1", "192.0.2.2", "192.0.2.3", "192.0.2.4"));
     assertThat(vc.getLoggingSourceInterface(), equalTo("loopback0"));
+
+    LoggingServer server1 = vc.getLoggingServers().get("192.0.2.1");
+    assertThat(server1.getSeverityLevel(), equalTo(5));
+    assertThat(server1.getPort(), nullValue());
+    assertFalse(server1.getSecure());
+    assertThat(server1.getUseVrf(), equalTo("default"));
+    assertThat(server1.getFacility(), equalTo("local7"));
+
+    LoggingServer server2 = vc.getLoggingServers().get("192.0.2.2");
+    assertThat(server2.getSeverityLevel(), equalTo(3));
+    assertThat(server2.getPort(), equalTo(2025));
+    assertFalse(server2.getSecure());
+    assertThat(server2.getUseVrf(), equalTo("management"));
+    assertThat(server2.getFacility(), equalTo("kern"));
+
+    LoggingServer server3 = vc.getLoggingServers().get("192.0.2.3");
+    assertThat(server3.getSeverityLevel(), nullValue());
+    assertThat(server3.getPort(), nullValue());
+    assertFalse(server3.getSecure());
+    assertThat(server3.getUseVrf(), nullValue());
+    assertThat(server3.getFacility(), nullValue());
+
+    LoggingServer server4 = vc.getLoggingServers().get("192.0.2.4");
+    assertThat(server4.getSeverityLevel(), equalTo(2));
+    assertThat(server4.getPort(), equalTo(500));
+    assertTrue(server4.getSecure());
+    assertThat(server4.getUseVrf(), nullValue());
+    assertThat(server4.getFacility(), equalTo("local3"));
+
+    LoggingLogfile logfile = vc.getLoggingLogfile();
+    assertThat(logfile, notNullValue());
+    assertThat(logfile.getName(), equalTo("my_log"));
+    assertThat(logfile.getSeverityLevel(), equalTo(6));
+    assertThat(logfile.getSizeBytes(), equalTo(4194304));
+    assertThat(logfile.getPersistentThreshold(), equalTo(80));
   }
 
   @Test
