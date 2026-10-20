@@ -30,6 +30,7 @@ o_common
    apply
    | o_area
    | o_disable
+   | o_domain_vpn_tag
    | o_enable
    | o_export
    | o_external_preference
@@ -39,9 +40,12 @@ o_common
    | o_no_rfc_1583_null
    | o_overload_null
    | o_prefix_export_limit
+   | o_preference
    | o_reference_bandwidth
    | o_rib_group
+   | o_rib_groups
    | o_spf_options_null
+   | o_topology
    | o_traceoptions_null
    | o_traffic_engineering
 ;
@@ -49,6 +53,12 @@ o_common
 o_disable
 :
    DISABLE
+;
+
+// https://www.juniper.net/documentation/en_US/junos/topics/reference/configuration-statement/domain-vpn-tag-edit-protocols-ospf.html
+o_domain_vpn_tag
+:
+   DOMAIN_VPN_TAG tag = uint32
 ;
 
 o_enable
@@ -63,7 +73,7 @@ o_export
 
 o_external_preference
 :
-   EXTERNAL_PREFERENCE dec
+   EXTERNAL_PREFERENCE preference = uint32
 ;
 
 o_import
@@ -92,6 +102,16 @@ o_spf_options_null
 :
    SPF_OPTIONS null_filler
 ;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/overload-edit-protocols-ospf.html
+o_topology
+:
+   TOPOLOGY name = junos_name
+   (
+      ot_overload
+   )?
+;
+
 o_traceoptions_null
 :
    TRACEOPTIONS null_filler
@@ -102,14 +122,26 @@ o_prefix_export_limit
     PREFIX_EXPORT_LIMIT limit = uint32
 ;
 
+// https://www.juniper.net/documentation/us/en/software/junos/ospf/topics/concept/multi-instance-ospf-overview.html
+o_preference
+:
+   PREFERENCE preference = uint32
+;
+
 o_reference_bandwidth
 :
    REFERENCE_BANDWIDTH bandwidth
 ;
 
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/rib-group-edit-protocols-ospf.html
 o_rib_group
 :
    RIB_GROUP name = junos_name
+;
+
+o_rib_groups
+:
+   RIB_GROUPS family = junos_name name = junos_name
 ;
 
 o_traffic_engineering
@@ -118,6 +150,7 @@ o_traffic_engineering
    (
       apply
       | ot_credibility_protocol_preference
+      | ot_ignore_lsp_metrics
       | ot_shortcuts
    )
 ;
@@ -160,6 +193,7 @@ oa_interface
       | oai_ldp_synchronization
       | oai_link_protection
       | oai_metric
+      | oai_mtu
       | oai_neighbor
       | oai_no_neighbor_down_notification_null
       | oai_passive
@@ -167,6 +201,7 @@ oa_interface
       | oai_priority
       | oai_retransmit_interval_null
       | oai_te_metric
+      | oai_topology
    )
 ;
 
@@ -277,6 +312,12 @@ oai_metric
    METRIC dec
 ;
 
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/interface-type-edit-protocols-ospf.html
+oai_mtu
+:
+   MTU mtu = uint16
+;
+
 oai_neighbor
 :
    NEIGHBOR ip_address ELIGIBLE?
@@ -320,6 +361,12 @@ oai_retransmit_interval_null
 oai_te_metric
 :
    TE_METRIC dec
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/topology-edit-protocols-ospf-interface.html
+oai_topology
+:
+   TOPOLOGY name = junos_name METRIC metric = uint16
 ;
 
 oal_metric
@@ -392,9 +439,20 @@ ot_credibility_protocol_preference
    CREDIBILITY_PROTOCOL_PREFERENCE
 ;
 
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/ignore-lsp-metrics-edit-protocols-ospf-mp.html
+ot_ignore_lsp_metrics
+:
+   IGNORE_LSP_METRICS
+;
+
+ot_overload
+:
+   OVERLOAD
+;
+
 ot_shortcuts
 :
-   SHORTCUTS
+   SHORTCUTS ot_ignore_lsp_metrics?
 ;
 
 p_ospf

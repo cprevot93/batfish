@@ -27,6 +27,7 @@ public final class PsFroms implements Serializable {
   private PsFromMetric _fromMetric;
   private final Set<PsFromNeighbor> _fromNeighbor;
   private final List<PsFromNextHop> _fromNextHops;
+  private final Set<PsFromNlriRouteType> _fromNlriRouteTypes;
   private final Set<PsFromPolicyStatement> _fromPolicyStatements;
   private final Set<PsFromPolicyStatementConjunction> _fromPolicyStatementConjunctions;
   private final Set<PsFromPrefixList> _fromPrefixLists;
@@ -36,6 +37,7 @@ public final class PsFroms implements Serializable {
   private final Set<PsFromRouteFilter> _fromRouteFilters;
   private PsFromExternal _fromExternal;
   private PsFromRouteType _fromRouteType;
+  private PsFromState _fromState;
   private final Set<PsFromTag> _fromTags;
   private PsFromUnsupported _fromUnsupported;
   private PsFromValidationDatabase _fromValidationDatabase;
@@ -48,6 +50,7 @@ public final class PsFroms implements Serializable {
     _fromInterfaces = new LinkedHashSet<>();
     _fromNeighbor = new LinkedHashSet<>();
     _fromNextHops = new LinkedList<>();
+    _fromNlriRouteTypes = new LinkedHashSet<>();
     _fromPolicyStatements = new LinkedHashSet<>();
     _fromPolicyStatementConjunctions = new LinkedHashSet<>();
     _fromPrefixLists = new LinkedHashSet<>();
@@ -91,6 +94,11 @@ public final class PsFroms implements Serializable {
   public void addFromNextHop(@Nonnull PsFromNextHop fromNextHop) {
     _atLeastOneFrom = true;
     _fromNextHops.add(fromNextHop);
+  }
+
+  public void addFromNlriRouteType(@Nonnull PsFromNlriRouteType fromNlriRouteType) {
+    _atLeastOneFrom = true;
+    _fromNlriRouteTypes.add(fromNlriRouteType);
   }
 
   public void addFromPolicyStatement(@Nonnull PsFromPolicyStatement fromPolicyStatement) {
@@ -139,6 +147,11 @@ public final class PsFroms implements Serializable {
   public void setFromRouteType(@Nonnull PsFromRouteType fromRouteType) {
     _atLeastOneFrom = true;
     _fromRouteType = fromRouteType;
+  }
+
+  public void setFromState(@Nonnull PsFromState fromState) {
+    _atLeastOneFrom = true;
+    _fromState = fromState;
   }
 
   public void addFromTag(@Nonnull PsFromTag fromTag) {
@@ -209,6 +222,11 @@ public final class PsFroms implements Serializable {
     return _fromNextHops;
   }
 
+  @VisibleForTesting
+  public @Nonnull Set<PsFromNlriRouteType> getFromNlriRouteTypes() {
+    return _fromNlriRouteTypes;
+  }
+
   @Nonnull
   Set<PsFromPolicyStatement> getFromPolicyStatements() {
     return _fromPolicyStatements;
@@ -249,6 +267,11 @@ public final class PsFroms implements Serializable {
 
   public @Nullable PsFromRouteType getFromRouteType() {
     return _fromRouteType;
+  }
+
+  @VisibleForTesting
+  public @Nullable PsFromState getFromState() {
+    return _fromState;
   }
 
   @VisibleForTesting

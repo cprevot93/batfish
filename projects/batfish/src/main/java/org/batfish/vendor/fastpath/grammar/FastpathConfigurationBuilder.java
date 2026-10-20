@@ -2,8 +2,10 @@ package org.batfish.vendor.fastpath.grammar;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Range;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.antlr.v4.runtime.ParserRuleContext;
@@ -53,14 +55,33 @@ import org.batfish.vendor.fastpath.grammar.FastpathParser.Ls_enableContext;
 import org.batfish.vendor.fastpath.grammar.FastpathParser.Ls_source_interfaceContext;
 import org.batfish.vendor.fastpath.grammar.FastpathParser.Noipd_lookupContext;
 import org.batfish.vendor.fastpath.grammar.FastpathParser.Nol_consoleContext;
+import org.batfish.vendor.fastpath.grammar.FastpathParser.Passwords_agingContext;
+import org.batfish.vendor.fastpath.grammar.FastpathParser.Passwords_historyContext;
+import org.batfish.vendor.fastpath.grammar.FastpathParser.Passwords_lock_outContext;
+import org.batfish.vendor.fastpath.grammar.FastpathParser.Passwords_min_lengthContext;
+import org.batfish.vendor.fastpath.grammar.FastpathParser.Passwords_strength_checkContext;
+import org.batfish.vendor.fastpath.grammar.FastpathParser.Ps_exclude_keywordContext;
+import org.batfish.vendor.fastpath.grammar.FastpathParser.Psmax_consecutive_charactersContext;
+import org.batfish.vendor.fastpath.grammar.FastpathParser.Psmax_repeated_charactersContext;
+import org.batfish.vendor.fastpath.grammar.FastpathParser.Psmin_character_classesContext;
+import org.batfish.vendor.fastpath.grammar.FastpathParser.Psmin_lowercase_lettersContext;
+import org.batfish.vendor.fastpath.grammar.FastpathParser.Psmin_numeric_charactersContext;
+import org.batfish.vendor.fastpath.grammar.FastpathParser.Psmin_special_charactersContext;
+import org.batfish.vendor.fastpath.grammar.FastpathParser.Psmin_uppercase_lettersContext;
 import org.batfish.vendor.fastpath.grammar.FastpathParser.Quoted_textContext;
 import org.batfish.vendor.fastpath.grammar.FastpathParser.S_hostnameContext;
+import org.batfish.vendor.fastpath.grammar.FastpathParser.S_taskgroupContext;
+import org.batfish.vendor.fastpath.grammar.FastpathParser.S_usergroupContext;
+import org.batfish.vendor.fastpath.grammar.FastpathParser.S_usernameContext;
 import org.batfish.vendor.fastpath.grammar.FastpathParser.Set_promptContext;
 import org.batfish.vendor.fastpath.grammar.FastpathParser.Sntp_client_modeContext;
 import org.batfish.vendor.fastpath.grammar.FastpathParser.Sntp_source_interfaceContext;
 import org.batfish.vendor.fastpath.grammar.FastpathParser.Sntpc_modeContext;
 import org.batfish.vendor.fastpath.grammar.FastpathParser.Sntpc_portContext;
 import org.batfish.vendor.fastpath.grammar.FastpathParser.Ss_hostContext;
+import org.batfish.vendor.fastpath.grammar.FastpathParser.Task_componentContext;
+import org.batfish.vendor.fastpath.grammar.FastpathParser.Task_permissionContext;
+import org.batfish.vendor.fastpath.grammar.FastpathParser.Taskgroup_taskContext;
 import org.batfish.vendor.fastpath.grammar.FastpathParser.Ts_hostContext;
 import org.batfish.vendor.fastpath.grammar.FastpathParser.Ts_keyContext;
 import org.batfish.vendor.fastpath.grammar.FastpathParser.Ts_source_interfaceContext;
@@ -69,6 +90,9 @@ import org.batfish.vendor.fastpath.grammar.FastpathParser.Tsh_keyContext;
 import org.batfish.vendor.fastpath.grammar.FastpathParser.Tsh_portContext;
 import org.batfish.vendor.fastpath.grammar.FastpathParser.Tsh_priorityContext;
 import org.batfish.vendor.fastpath.grammar.FastpathParser.Tsh_timeoutContext;
+import org.batfish.vendor.fastpath.grammar.FastpathParser.U_passwordContext;
+import org.batfish.vendor.fastpath.grammar.FastpathParser.U_usergroupContext;
+import org.batfish.vendor.fastpath.grammar.FastpathParser.Usergroup_taskgroupContext;
 import org.batfish.vendor.fastpath.grammar.FastpathParser.WordContext;
 import org.batfish.vendor.fastpath.representation.AaaMethod;
 import org.batfish.vendor.fastpath.representation.Accounting;
@@ -80,6 +104,11 @@ import org.batfish.vendor.fastpath.representation.LoggingBuffered;
 import org.batfish.vendor.fastpath.representation.LoggingServer;
 import org.batfish.vendor.fastpath.representation.Sntp;
 import org.batfish.vendor.fastpath.representation.TacacsServer;
+import org.batfish.vendor.fastpath.representation.TaskComponent;
+import org.batfish.vendor.fastpath.representation.TaskPermission;
+import org.batfish.vendor.fastpath.representation.Taskgroup;
+import org.batfish.vendor.fastpath.representation.UserAccount;
+import org.batfish.vendor.fastpath.representation.Usergroup;
 
 /** Populates a {@link FastpathConfiguration} by walking a FastPath parse tree. */
 public final class FastpathConfigurationBuilder extends FastpathParserBaseListener
@@ -103,6 +132,20 @@ public final class FastpathConfigurationBuilder extends FastpathParserBaseListen
    */
   private static final String DEFAULT_LIST_NAME = "default";
 
+  private static final IntegerSpace USER_LEVEL_RANGE = IntegerSpace.of(Range.closed(0, 15));
+
+  private static final IntegerSpace PASSWORD_LOCKOUT_RANGE = IntegerSpace.of(Range.closed(1, 5));
+  private static final IntegerSpace PASSWORD_AGING_RANGE = IntegerSpace.of(Range.closed(1, 365));
+  private static final IntegerSpace PASSWORD_HISTORY_RANGE = IntegerSpace.of(Range.closed(0, 10));
+  private static final IntegerSpace PASSWORD_MIN_LENGTH_RANGE =
+      IntegerSpace.of(Range.closed(0, 64));
+  private static final IntegerSpace PASSWORD_STRENGTH_MAX_CHARACTERS_RANGE =
+      IntegerSpace.of(Range.closed(0, 15));
+  private static final IntegerSpace PASSWORD_STRENGTH_MIN_LETTERS_RANGE =
+      IntegerSpace.of(Range.closed(0, 16));
+  private static final IntegerSpace PASSWORD_STRENGTH_MIN_CHARACTER_CLASSES_RANGE =
+      IntegerSpace.of(Range.closed(0, 4));
+
   public FastpathConfigurationBuilder(
       FastpathCombinedParser parser,
       String text,
@@ -123,6 +166,9 @@ public final class FastpathConfigurationBuilder extends FastpathParserBaseListen
   private final @Nonnull Warnings _w;
 
   private @Nullable TacacsServer _currentTacacsServer;
+  private @Nullable Taskgroup _currentTaskgroup;
+  private @Nullable UserAccount _currentUser;
+  private @Nullable Usergroup _currentUsergroup;
 
   @Override
   public void exitS_hostname(S_hostnameContext ctx) {
@@ -408,6 +454,193 @@ public final class FastpathConfigurationBuilder extends FastpathParserBaseListen
     }
     assert ctx.NONE() != null;
     return Accounting.RecordType.NONE;
+  }
+
+  @Override
+  public void enterS_username(S_usernameContext ctx) {
+    String name = toString(ctx.name);
+    _currentUser = _c.getUsers().computeIfAbsent(name, UserAccount::new);
+  }
+
+  @Override
+  public void exitS_username(S_usernameContext ctx) {
+    _currentUser = null;
+  }
+
+  @Override
+  public void exitU_password(U_passwordContext ctx) {
+    _currentUser.setHasPassword(true);
+    _currentUser.setEncrypted(ctx.ENCRYPTED() != null);
+    if (ctx.level != null) {
+      toIntegerInSpace(ctx, ctx.level, USER_LEVEL_RANGE, "username level")
+          .ifPresent(_currentUser::setLevel);
+    }
+  }
+
+  @Override
+  public void exitU_usergroup(U_usergroupContext ctx) {
+    _currentUser.setUserGroup(toString(ctx.group));
+  }
+
+  @Override
+  public void enterS_taskgroup(S_taskgroupContext ctx) {
+    _currentTaskgroup = _c.getTaskgroups().computeIfAbsent(toString(ctx.name), Taskgroup::new);
+  }
+
+  @Override
+  public void exitS_taskgroup(S_taskgroupContext ctx) {
+    _currentTaskgroup = null;
+  }
+
+  @Override
+  public void exitTaskgroup_task(Taskgroup_taskContext ctx) {
+    TaskComponent component = toTaskComponent(ctx.task_component());
+    Set<TaskPermission> permissions =
+        _currentTaskgroup
+            .getTasks()
+            .computeIfAbsent(component, c -> EnumSet.noneOf(TaskPermission.class));
+    ctx.task_permission().forEach(p -> permissions.add(toTaskPermission(p)));
+  }
+
+  private static @Nonnull TaskPermission toTaskPermission(Task_permissionContext ctx) {
+    if (ctx.READ() != null) {
+      return TaskPermission.READ;
+    } else if (ctx.WRITE() != null) {
+      return TaskPermission.WRITE;
+    } else if (ctx.EXECUTE() != null) {
+      return TaskPermission.EXECUTE;
+    }
+    assert ctx.DEBUG() != null;
+    return TaskPermission.DEBUG;
+  }
+
+  private static @Nonnull TaskComponent toTaskComponent(Task_componentContext ctx) {
+    if (ctx.AAA() != null) {
+      return TaskComponent.AAA;
+    } else if (ctx.OSPF() != null) {
+      return TaskComponent.OSPF;
+    }
+    assert ctx.BGP() != null;
+    return TaskComponent.BGP;
+  }
+
+  @Override
+  public void enterS_usergroup(S_usergroupContext ctx) {
+    _currentUsergroup = _c.getUsergroups().computeIfAbsent(toString(ctx.name), Usergroup::new);
+  }
+
+  @Override
+  public void exitS_usergroup(S_usergroupContext ctx) {
+    _currentUsergroup = null;
+  }
+
+  @Override
+  public void exitUsergroup_taskgroup(Usergroup_taskgroupContext ctx) {
+    _currentUsergroup.getTaskgroups().add(toString(ctx.name));
+  }
+
+  @Override
+  public void exitPasswords_lock_out(Passwords_lock_outContext ctx) {
+    toIntegerInSpace(ctx, ctx.count, PASSWORD_LOCKOUT_RANGE, "passwords lock-out")
+        .ifPresent(_c.getPasswordPolicy()::setLockOut);
+  }
+
+  @Override
+  public void exitPasswords_aging(Passwords_agingContext ctx) {
+    toIntegerInSpace(ctx, ctx.count, PASSWORD_AGING_RANGE, "passwords aging")
+        .ifPresent(_c.getPasswordPolicy()::setAging);
+  }
+
+  @Override
+  public void exitPasswords_history(Passwords_historyContext ctx) {
+    toIntegerInSpace(ctx, ctx.count, PASSWORD_HISTORY_RANGE, "passwords history")
+        .ifPresent(_c.getPasswordPolicy()::setHistory);
+  }
+
+  @Override
+  public void exitPasswords_min_length(Passwords_min_lengthContext ctx) {
+    toIntegerInSpace(ctx, ctx.count, PASSWORD_MIN_LENGTH_RANGE, "passwords min-length")
+        .ifPresent(_c.getPasswordPolicy()::setMinLength);
+  }
+
+  @Override
+  public void exitPasswords_strength_check(Passwords_strength_checkContext ctx) {
+    _c.getPasswordPolicy().setStrengthCheck(true);
+  }
+
+  @Override
+  public void exitPsmax_consecutive_characters(Psmax_consecutive_charactersContext ctx) {
+    toIntegerInSpace(
+            ctx,
+            ctx.count,
+            PASSWORD_STRENGTH_MAX_CHARACTERS_RANGE,
+            "passwords strength maximum consecutive-characters")
+        .ifPresent(_c.getPasswordPolicy()::setMaxConsecutiveCharacters);
+  }
+
+  @Override
+  public void exitPsmax_repeated_characters(Psmax_repeated_charactersContext ctx) {
+    toIntegerInSpace(
+            ctx,
+            ctx.count,
+            PASSWORD_STRENGTH_MAX_CHARACTERS_RANGE,
+            "passwords strength maximum repeated-characters")
+        .ifPresent(_c.getPasswordPolicy()::setMaxRepeatedCharacters);
+  }
+
+  @Override
+  public void exitPsmin_uppercase_letters(Psmin_uppercase_lettersContext ctx) {
+    toIntegerInSpace(
+            ctx,
+            ctx.count,
+            PASSWORD_STRENGTH_MIN_LETTERS_RANGE,
+            "passwords strength minimum uppercase-letters")
+        .ifPresent(_c.getPasswordPolicy()::setMinUppercaseLetters);
+  }
+
+  @Override
+  public void exitPsmin_lowercase_letters(Psmin_lowercase_lettersContext ctx) {
+    toIntegerInSpace(
+            ctx,
+            ctx.count,
+            PASSWORD_STRENGTH_MIN_LETTERS_RANGE,
+            "passwords strength minimum lowercase-letters")
+        .ifPresent(_c.getPasswordPolicy()::setMinLowercaseLetters);
+  }
+
+  @Override
+  public void exitPsmin_numeric_characters(Psmin_numeric_charactersContext ctx) {
+    toIntegerInSpace(
+            ctx,
+            ctx.count,
+            PASSWORD_STRENGTH_MIN_LETTERS_RANGE,
+            "passwords strength minimum numeric-characters")
+        .ifPresent(_c.getPasswordPolicy()::setMinNumericCharacters);
+  }
+
+  @Override
+  public void exitPsmin_special_characters(Psmin_special_charactersContext ctx) {
+    toIntegerInSpace(
+            ctx,
+            ctx.count,
+            PASSWORD_STRENGTH_MIN_LETTERS_RANGE,
+            "passwords strength minimum special-characters")
+        .ifPresent(_c.getPasswordPolicy()::setMinSpecialCharacters);
+  }
+
+  @Override
+  public void exitPsmin_character_classes(Psmin_character_classesContext ctx) {
+    toIntegerInSpace(
+            ctx,
+            ctx.count,
+            PASSWORD_STRENGTH_MIN_CHARACTER_CLASSES_RANGE,
+            "passwords strength minimum character-classes")
+        .ifPresent(_c.getPasswordPolicy()::setMinCharacterClasses);
+  }
+
+  @Override
+  public void exitPs_exclude_keyword(Ps_exclude_keywordContext ctx) {
+    _c.getPasswordPolicy().getExcludeKeywords().add(toString(ctx.keyword));
   }
 
   @Override

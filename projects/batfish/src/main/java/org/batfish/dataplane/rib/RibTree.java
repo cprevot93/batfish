@@ -50,14 +50,14 @@ final class RibTree<R extends AbstractRouteDecorator> implements Serializable {
     assert reason != Reason.ADD : "cannot remove a route with reason ADD";
 
     Prefix network = route.getNetwork();
-    boolean removed = _root.remove(network, route);
-    if (!removed) {
+    PrefixTrieMultiMap<R>.Handle handle = _root.existingHandle(network);
+    if (handle == null || !handle.remove(route)) {
       return RibDelta.empty();
     }
 
     RouteAdvertisement<R> removeRoute = new RouteAdvertisement<>(route, reason);
 
-    if (!_root.get(network).isEmpty()) {
+    if (!handle.get().isEmpty()) {
       // we still have a route for the network, so don't need to re-merge backups
       return RibDelta.of(removeRoute);
     }
@@ -94,13 +94,21 @@ final class RibTree<R extends AbstractRouteDecorator> implements Serializable {
   }
 
   private boolean hasAllowedForwardingRoute(Set<R> routes, ResolutionRestriction<R> restriction) {
-    return routes.stream()
-        .anyMatch(r -> !r.getAbstractRoute().getNonForwarding() && restriction.test(r));
+    for (R r : routes) {
+      if (!r.getAbstractRoute().getNonForwarding() && restriction.test(r)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private boolean onlyAllowedForwardingRoutes(Set<R> routes, ResolutionRestriction<R> restriction) {
-    return routes.stream()
-        .noneMatch(r -> r.getAbstractRoute().getNonForwarding() || !restriction.test(r));
+    for (R r : routes) {
+      if (r.getAbstractRoute().getNonForwarding() || !restriction.test(r)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   /**
@@ -113,16 +121,28 @@ final class RibTree<R extends AbstractRouteDecorator> implements Serializable {
   @Nonnull
   Set<R> getLongestPrefixMatch(
       Ip address, int maxPrefixLength, ResolutionRestriction<R> restriction) {
-    for (int pl = maxPrefixLength; pl >= 0; pl--) {
+    int pl = maxPrefixLength;
+    while (pl >= 0) {
       Set<R> routes = _root.longestPrefixMatch(address, pl);
+      if (routes.isEmpty()) {
+        // No prefix of length at most pl contains the address, so no shorter one does either.
+        return routes;
+      }
       if (hasAllowedForwardingRoute(routes, restriction)) {
         if (onlyAllowedForwardingRoutes(routes, restriction)) {
           return routes;
         }
-        return routes.stream()
-            .filter(r -> !r.getAbstractRoute().getNonForwarding() && restriction.test(r))
-            .collect(ImmutableSet.toImmutableSet());
+        ImmutableSet.Builder<R> allowed = ImmutableSet.builderWithExpectedSize(routes.size());
+        for (R r : routes) {
+          if (!r.getAbstractRoute().getNonForwarding() && restriction.test(r)) {
+            allowed.add(r);
+          }
+        }
+        return allowed.build();
       }
+      // Nothing usable at this prefix; the next candidate is the longest match strictly shorter
+      // than it, so skip the lengths in between rather than searching once per length.
+      pl = routes.iterator().next().getNetwork().getPrefixLength() - 1;
     }
     return ImmutableSet.of();
   }
@@ -155,9 +175,10 @@ final class RibTree<R extends AbstractRouteDecorator> implements Serializable {
    */
   @Nonnull
   RibDelta<R> mergeRoute(R route) {
-    Set<R> routes = _root.get(route.getNetwork());
+    PrefixTrieMultiMap<R>.Handle handle = _root.handle(route.getNetwork());
+    Set<R> routes = handle.get();
     if (routes.isEmpty()) {
-      _root.put(route.getNetwork(), route);
+      handle.add(route);
       return RibDelta.adding(route);
     }
     /*
@@ -174,7 +195,7 @@ final class RibTree<R extends AbstractRouteDecorator> implements Serializable {
     }
     if (preferenceComparison == 0) { // equal preference, so add for multipath routing
       // Otherwise add the route
-      if (_root.put(route.getNetwork(), route)) {
+      if (handle.add(route)) {
         return RibDelta.adding(route);
       } else {
         return RibDelta.empty();
@@ -185,7 +206,7 @@ final class RibTree<R extends AbstractRouteDecorator> implements Serializable {
      * Better than all existing routes for this prefix, so
      * replace them with this one.
      */
-    if (_root.replaceAll(route.getNetwork(), route)) {
+    if (handle.replaceAll(route)) {
       // build the RibDelta directly, since we know the routes are distinct
       List<RouteAdvertisement<R>> actions =
           Streams.concat(

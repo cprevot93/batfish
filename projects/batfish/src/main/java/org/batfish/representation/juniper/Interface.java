@@ -15,7 +15,9 @@ import org.batfish.datamodel.ConcreteInterfaceAddress;
 import org.batfish.datamodel.ConcreteInterfaceAddress6;
 import org.batfish.datamodel.InterfaceAddress;
 import org.batfish.datamodel.Ip;
+import org.batfish.datamodel.Ip6;
 import org.batfish.datamodel.IsoAddress;
+import org.batfish.datamodel.MacAddress;
 import org.batfish.datamodel.SubRange;
 
 public class Interface implements Serializable {
@@ -44,6 +46,10 @@ public class Interface implements Serializable {
     PHYSICAL,
     /** A unit on a physical port, such as xe-0/0/0.7. */
     PHYSICAL_UNIT,
+    /** A PPP service interface, such as pp0. */
+    PPP,
+    /** A unit on a PPP service interface, such as pp0.7. */
+    PPP_UNIT,
     /** A redundant ethernet interface, such as reth0. */
     REDUNDANT,
     /** A unit on a redundant ethernet interface, such as reth0.7. */
@@ -57,6 +63,16 @@ public class Interface implements Serializable {
     UNKNOWN,
   }
 
+  public enum EthernetSegmentRedundancyMode {
+    ALL_ACTIVE,
+    SINGLE_ACTIVE
+  }
+
+  public enum SpeedMode {
+    AUTO,
+    AUTO_10M_100M
+  }
+
   /**
    * Returns true if this interface is configured like a physical interface. The main use of this
    * function is for features that can be configured on a group of bundled interfaces.
@@ -65,6 +81,7 @@ public class Interface implements Serializable {
     return _type == InterfaceType.PHYSICAL
         || _type == InterfaceType.MANAGEMENT
         || _type == InterfaceType.AGGREGATED
+        || _type == InterfaceType.PPP
         || _type == InterfaceType.REDUNDANT;
   }
 
@@ -74,6 +91,7 @@ public class Interface implements Serializable {
         || _type == InterfaceType.IRB_UNIT
         || _type == InterfaceType.LOOPBACK_UNIT
         || _type == InterfaceType.MANAGEMENT_UNIT
+        || _type == InterfaceType.PPP_UNIT
         || _type == InterfaceType.AGGREGATED_UNIT
         || _type == InterfaceType.REDUNDANT_UNIT;
   }
@@ -96,6 +114,10 @@ public class Interface implements Serializable {
   public static double getDefaultBandwidthByName(String name) {
     if (name.startsWith("xe")) {
       return 1E10;
+    } else if (name.startsWith("mge")) {
+      return 1E10;
+    } else if (name.startsWith("sxe")) {
+      return 1E10;
     } else if (name.startsWith("ge")) {
       return 1E9;
     } else if (name.startsWith("fe")) {
@@ -113,20 +135,31 @@ public class Interface implements Serializable {
   }
 
   public static InterfaceType getInterfaceTypeByName(String name) {
-    if (name.startsWith("et")
-        || name.startsWith("fe")
-        || name.startsWith("ge")
-        || name.startsWith("xe")) {
+    int colonIndex = name.indexOf(':');
+    String unqualifiedName =
+        colonIndex < 0 || Character.isDigit(name.charAt(colonIndex + 1))
+            ? name
+            : name.substring(colonIndex + 1);
+    if (unqualifiedName.startsWith("et")
+        || unqualifiedName.startsWith("fe")
+        || unqualifiedName.startsWith("ge")
+        || unqualifiedName.startsWith("mge")
+        || unqualifiedName.startsWith("sxe")
+        || unqualifiedName.startsWith("xe")) {
       return name.contains(".") ? InterfaceType.PHYSICAL_UNIT : InterfaceType.PHYSICAL;
-    } else if (name.startsWith("irb.")) {
+    } else if (unqualifiedName.startsWith("irb.")) {
       return InterfaceType.IRB_UNIT;
-    } else if (name.startsWith("lo")) {
+    } else if (unqualifiedName.startsWith("lo")) {
       return name.contains(".") ? InterfaceType.LOOPBACK_UNIT : InterfaceType.LOOPBACK;
-    } else if (name.startsWith("em") || name.startsWith("fxp")) {
+    } else if (unqualifiedName.startsWith("em")
+        || unqualifiedName.startsWith("fxp")
+        || unqualifiedName.startsWith("mgmt")) {
       return name.contains(".") ? InterfaceType.MANAGEMENT_UNIT : InterfaceType.MANAGEMENT;
-    } else if (name.startsWith("ae")) {
+    } else if (unqualifiedName.startsWith("pp")) {
+      return name.contains(".") ? InterfaceType.PPP_UNIT : InterfaceType.PPP;
+    } else if (unqualifiedName.startsWith("ae")) {
       return name.contains(".") ? InterfaceType.AGGREGATED_UNIT : InterfaceType.AGGREGATED;
-    } else if (name.startsWith("reth")) {
+    } else if (unqualifiedName.startsWith("reth")) {
       return name.contains(".") ? InterfaceType.REDUNDANT_UNIT : InterfaceType.REDUNDANT;
     } else if (name.equals(RoutingInstance.MASTER_INTERFACE_NAME)) {
       return InterfaceType.MASTER;
@@ -160,29 +193,46 @@ public class Interface implements Serializable {
   private final Set<ConcreteInterfaceAddress6> _allAddresses6;
   // Dumb name to appease checkstyle
   private String _agg8023adInterface;
+  private @Nullable String _arpPolicer;
   private final Set<Ip> _allAddressIps;
   private final List<SubRange> _allowedVlans;
   private final List<String> _allowedVlanNames;
   private double _bandwidth;
+  private @Nullable String _demuxUnderlyingInterface;
   private String _description;
   private boolean _defined;
   private @Nullable BridgeSwitching _bridgeSwitching;
+  private @Nullable Ip _destinationAddress;
+  private @Nullable Ip6 _destinationAddress6;
+  private @Nullable String _ethernetSegmentIdentifier;
+  private @Nullable EthernetSegmentRedundancyMode _ethernetSegmentRedundancyMode;
   private @Nullable EthernetSwitching _ethernetSwitching;
   private @Nullable String _incomingFilter;
   private @Nullable List<String> _incomingFilterList;
   private @Nullable String _incomingFilter6;
   private @Nullable List<String> _incomingFilterList6;
+  private @Nullable String _incomingPolicer;
+  private @Nullable String _incomingPolicer6;
+  private @Nullable InterfaceVlanTag _innerVlanTag;
+  private @Nullable Integer _interfaceGroup;
+  private @Nullable Integer _interfaceGroup6;
   private transient boolean _inherited;
   private @Nullable IsisInterfaceSettings _isisSettings;
   private IsoAddress _isoAddress;
+  private @Nullable String _macsecConnectivityAssociation;
+  private @Nullable Boolean _lacpForceUp;
   private Integer _mtu;
+  private @Nullable Boolean _multipoint;
   private final String _name;
   private @Nullable Integer _nativeVlan;
   private @Nullable OspfInterfaceSettings _ospfSettings;
+  private @Nullable InterfaceVlanTag _outerVlanTag;
   private @Nullable String _outgoingFilter;
   private @Nullable List<String> _outgoingFilterList;
   private @Nullable String _outgoingFilter6;
   private @Nullable List<String> _outgoingFilterList6;
+  private @Nullable String _outgoingPolicer;
+  private @Nullable String _outgoingPolicer6;
   private Interface _parent;
   private InterfaceAddress _preferredAddress;
   private @Nullable ConcreteInterfaceAddress6 _preferredAddress6;
@@ -191,12 +241,16 @@ public class Interface implements Serializable {
   private boolean _primary;
   private @Nullable String _redundantParentInterface;
   private RoutingInstance _routingInstance;
+  private @Nullable SpeedMode _speedMode;
   private final @Nonnull InterfaceType _type;
   private final SortedMap<String, Interface> _units;
   private final SortedMap<Integer, VrrpGroup> _vrrpGroups;
   private @Nullable Integer _vlanId;
   private @Nonnull VlanTaggingMode _vlanTagging;
+  private boolean _virtualGatewayAcceptData;
+  private @Nullable MacAddress _virtualGatewayV4Mac;
   private Integer _tcpMss;
+  private boolean _tunnelTermination;
 
   public Interface(String name) {
     _active = true;
@@ -217,6 +271,14 @@ public class Interface implements Serializable {
 
   public String get8023adInterface() {
     return _agg8023adInterface;
+  }
+
+  public @Nullable String getEthernetSegmentIdentifier() {
+    return _ethernetSegmentIdentifier;
+  }
+
+  public @Nullable EthernetSegmentRedundancyMode getEthernetSegmentRedundancyMode() {
+    return _ethernetSegmentRedundancyMode;
   }
 
   public boolean getActive() {
@@ -251,8 +313,28 @@ public class Interface implements Serializable {
     return _bandwidth;
   }
 
+  public @Nullable SpeedMode getSpeedMode() {
+    return _speedMode;
+  }
+
+  public @Nullable String getArpPolicer() {
+    return _arpPolicer;
+  }
+
   public String getDescription() {
     return _description;
+  }
+
+  public @Nullable String getDemuxUnderlyingInterface() {
+    return _demuxUnderlyingInterface;
+  }
+
+  public @Nullable Ip getDestinationAddress() {
+    return _destinationAddress;
+  }
+
+  public @Nullable Ip6 getDestinationAddress6() {
+    return _destinationAddress6;
   }
 
   public @Nullable String getIncomingFilter() {
@@ -271,8 +353,28 @@ public class Interface implements Serializable {
     return _incomingFilterList6;
   }
 
+  public @Nullable String getIncomingPolicer() {
+    return _incomingPolicer;
+  }
+
+  public @Nullable String getIncomingPolicer6() {
+    return _incomingPolicer6;
+  }
+
+  public @Nullable Integer getInterfaceGroup() {
+    return _interfaceGroup;
+  }
+
+  public @Nullable Integer getInterfaceGroup6() {
+    return _interfaceGroup6;
+  }
+
   public @Nullable IsisInterfaceSettings getIsisSettings() {
     return _isisSettings;
+  }
+
+  public @Nullable Boolean getLacpForceUp() {
+    return _lacpForceUp;
   }
 
   /** Initializes {@link IsisInterfaceSettings} for this interface if not already initialized */
@@ -291,8 +393,16 @@ public class Interface implements Serializable {
     return _mtu;
   }
 
+  public @Nullable Boolean getMultipoint() {
+    return _multipoint;
+  }
+
   public String getName() {
     return _name;
+  }
+
+  public @Nullable String getMacsecConnectivityAssociation() {
+    return _macsecConnectivityAssociation;
   }
 
   /**
@@ -321,6 +431,14 @@ public class Interface implements Serializable {
 
   public @Nullable List<String> getOutgoingFilterList6() {
     return _outgoingFilterList6;
+  }
+
+  public @Nullable String getOutgoingPolicer() {
+    return _outgoingPolicer;
+  }
+
+  public @Nullable String getOutgoingPolicer6() {
+    return _outgoingPolicer6;
   }
 
   public Interface getParent() {
@@ -369,6 +487,14 @@ public class Interface implements Serializable {
     return _units;
   }
 
+  public @Nullable InterfaceVlanTag getInnerVlanTag() {
+    return _innerVlanTag;
+  }
+
+  public @Nullable InterfaceVlanTag getOuterVlanTag() {
+    return _outerVlanTag;
+  }
+
   public @Nullable Integer getVlanId() {
     return _vlanId;
   }
@@ -379,6 +505,14 @@ public class Interface implements Serializable {
 
   public @Nonnull VlanTaggingMode getVlanTagging() {
     return _vlanTagging;
+  }
+
+  public boolean getVirtualGatewayAcceptData() {
+    return _virtualGatewayAcceptData;
+  }
+
+  public @Nullable MacAddress getVirtualGatewayV4Mac() {
+    return _virtualGatewayV4Mac;
   }
 
   public void setVlanTagging(@Nonnull VlanTaggingMode vlanTagging) {
@@ -435,11 +569,37 @@ public class Interface implements Serializable {
     if (_description == null) {
       _description = bestower._description;
     }
+    if (_lacpForceUp == null) {
+      _lacpForceUp = bestower._lacpForceUp;
+    }
     if (_mtu == null) {
       _mtu = bestower._mtu;
     }
     if (_redundantParentInterface == null) {
       _redundantParentInterface = bestower._redundantParentInterface;
+    }
+  }
+
+  /** Copies logical-unit settings from an interface range into a member interface's unit. */
+  public void inheritUnsetUnitFields(Interface bestower) {
+    if (_description == null) {
+      _description = bestower._description;
+    }
+    if (bestower._ethernetSwitching != null) {
+      if (_ethernetSwitching == null) {
+        _ethernetSwitching = new EthernetSwitching();
+      }
+      if (_ethernetSwitching.getNativeVlan() == null
+          && bestower._ethernetSwitching.getNativeVlan() != null) {
+        _ethernetSwitching.setNativeVlan(bestower._ethernetSwitching.getNativeVlan());
+      }
+      if (_ethernetSwitching.getSwitchportMode() == null
+          && bestower._ethernetSwitching.getSwitchportMode() != null) {
+        _ethernetSwitching.setSwitchportMode(bestower._ethernetSwitching.getSwitchportMode());
+      }
+      if (_ethernetSwitching.getVlanMembers().isEmpty()) {
+        _ethernetSwitching.getVlanMembers().addAll(bestower._ethernetSwitching.getVlanMembers());
+      }
     }
   }
 
@@ -465,8 +625,16 @@ public class Interface implements Serializable {
     _additionalArpIps = ImmutableSet.copyOf(additionalArpIps);
   }
 
+  public void setArpPolicer(@Nullable String arpPolicer) {
+    _arpPolicer = arpPolicer;
+  }
+
   public void setBandwidth(double bandwidth) {
     _bandwidth = bandwidth;
+  }
+
+  public void setSpeedMode(@Nullable SpeedMode speedMode) {
+    _speedMode = speedMode;
   }
 
   public void setDefined(boolean defined) {
@@ -477,9 +645,34 @@ public class Interface implements Serializable {
     _description = description;
   }
 
+  public void setDemuxUnderlyingInterface(@Nullable String demuxUnderlyingInterface) {
+    _demuxUnderlyingInterface = demuxUnderlyingInterface;
+  }
+
+  public void setDestinationAddress(@Nullable Ip destinationAddress) {
+    _destinationAddress = destinationAddress;
+  }
+
+  public void setDestinationAddress6(@Nullable Ip6 destinationAddress6) {
+    _destinationAddress6 = destinationAddress6;
+  }
+
+  public void setEthernetSegmentIdentifier(String ethernetSegmentIdentifier) {
+    _ethernetSegmentIdentifier = ethernetSegmentIdentifier;
+  }
+
+  public void setEthernetSegmentRedundancyMode(
+      EthernetSegmentRedundancyMode ethernetSegmentRedundancyMode) {
+    _ethernetSegmentRedundancyMode = ethernetSegmentRedundancyMode;
+  }
+
   public void setIncomingFilter(@Nullable String accessListName) {
     _incomingFilter = accessListName;
     _incomingFilterList = null;
+  }
+
+  public void setIncomingPolicer(@Nullable String incomingPolicer) {
+    _incomingPolicer = incomingPolicer;
   }
 
   public void addIncomingFilterList(@Nonnull String accessListName) {
@@ -495,6 +688,18 @@ public class Interface implements Serializable {
     _incomingFilterList6 = null;
   }
 
+  public void setIncomingPolicer6(@Nullable String incomingPolicer6) {
+    _incomingPolicer6 = incomingPolicer6;
+  }
+
+  public void setInterfaceGroup(int interfaceGroup) {
+    _interfaceGroup = interfaceGroup;
+  }
+
+  public void setInterfaceGroup6(int interfaceGroup6) {
+    _interfaceGroup6 = interfaceGroup6;
+  }
+
   public void addIncomingFilterList6(@Nonnull String accessListName) {
     _incomingFilter6 = null;
     if (_incomingFilterList6 == null) {
@@ -507,8 +712,24 @@ public class Interface implements Serializable {
     _isoAddress = address;
   }
 
+  public void setInnerVlanTag(@Nullable InterfaceVlanTag innerVlanTag) {
+    _innerVlanTag = innerVlanTag;
+  }
+
+  public void setLacpForceUp(boolean lacpForceUp) {
+    _lacpForceUp = lacpForceUp;
+  }
+
   public void setMtu(Integer mtu) {
     _mtu = mtu;
+  }
+
+  public void setMacsecConnectivityAssociation(String macsecConnectivityAssociation) {
+    _macsecConnectivityAssociation = macsecConnectivityAssociation;
+  }
+
+  public void setMultipoint(boolean multipoint) {
+    _multipoint = multipoint;
   }
 
   public void setNativeVlan(Integer vlan) {
@@ -519,9 +740,17 @@ public class Interface implements Serializable {
     _ospfSettings = ospfSettings;
   }
 
+  public void setOuterVlanTag(@Nullable InterfaceVlanTag outerVlanTag) {
+    _outerVlanTag = outerVlanTag;
+  }
+
   public void setOutgoingFilter(@Nullable String accessListName) {
     _outgoingFilter = accessListName;
     _outgoingFilterList = null;
+  }
+
+  public void setOutgoingPolicer(@Nullable String outgoingPolicer) {
+    _outgoingPolicer = outgoingPolicer;
   }
 
   public void addOutgoingFilterList(@Nonnull String accessListName) {
@@ -535,6 +764,10 @@ public class Interface implements Serializable {
   public void setOutgoingFilter6(@Nullable String accessListName) {
     _outgoingFilter6 = accessListName;
     _outgoingFilterList6 = null;
+  }
+
+  public void setOutgoingPolicer6(@Nullable String outgoingPolicer6) {
+    _outgoingPolicer6 = outgoingPolicer6;
   }
 
   public void addOutgoingFilterList6(@Nonnull String accessListName) {
@@ -577,12 +810,28 @@ public class Interface implements Serializable {
     _routingInstance = routingInstance;
   }
 
+  public void setVirtualGatewayAcceptData(boolean virtualGatewayAcceptData) {
+    _virtualGatewayAcceptData = virtualGatewayAcceptData;
+  }
+
+  public void setVirtualGatewayV4Mac(@Nullable MacAddress virtualGatewayV4Mac) {
+    _virtualGatewayV4Mac = virtualGatewayV4Mac;
+  }
+
   public void setTcpMss(@Nullable Integer tcpMss) {
     _tcpMss = tcpMss;
   }
 
   public @Nullable Integer getTcpMss() {
     return _tcpMss;
+  }
+
+  public boolean getTunnelTermination() {
+    return _tunnelTermination;
+  }
+
+  public void setTunnelTermination(boolean tunnelTermination) {
+    _tunnelTermination = tunnelTermination;
   }
 
   @Override

@@ -79,6 +79,12 @@ public abstract class BgpRib<R extends BgpRoute<?, ?>> extends AbstractRib<R> {
   protected final @Nonnull Map<Prefix, R> _bestPaths;
 
   /**
+   * Memoized {@link #getBestPathRoutes()}, dropped when {@link #_bestPaths} changes. Every BGP
+   * process asks for it at the end of every round, and most rounds change few RIBs.
+   */
+  private transient @Nullable Set<R> _bestPathRoutes;
+
+  /**
    * This logical clock helps us keep track when routes were merged into the RIB to determine their
    * age. It's incremented each time a route is merged into the RIB.
    */
@@ -242,8 +248,8 @@ public abstract class BgpRib<R extends BgpRoute<?, ?>> extends AbstractRib<R> {
         route.isTrackableLocalRoute() ? RibDelta.empty() : evictSamePrefixReceivedFromPathId(route);
 
     RibDelta<R> delta = actionRouteGetDelta(route, super::mergeRouteGetDelta);
-    if (_tieBreaker == BgpTieBreaker.ARRIVAL_ORDER) {
-      _logicalArrivalTime.put(route, _logicalClock);
+    if (_tieBreaker == BgpTieBreaker.ARRIVAL_ORDER
+        && _logicalArrivalTime.putIfAbsent(route, _logicalClock) == null) {
       _logicalClock++;
     }
     if (!delta.isEmpty()) {
@@ -258,9 +264,7 @@ public abstract class BgpRib<R extends BgpRoute<?, ?>> extends AbstractRib<R> {
    */
   private @Nonnull RibDelta<R> evictSamePrefixReceivedFromPathId(R route) {
     Prefix prefix = route.getNetwork();
-    R oldRoute =
-        getRouteSamePrefixReceivedFromPathId(
-            route, _backupRoutes != null ? _backupRoutes.get(prefix) : super.getRoutes(prefix));
+    R oldRoute = getRouteSamePrefixReceivedFromPathId(route, getRoutesAndBackups(prefix));
     if (oldRoute == null || route.equals(oldRoute)) {
       return RibDelta.empty();
     } else {
@@ -474,7 +478,10 @@ public abstract class BgpRib<R extends BgpRoute<?, ?>> extends AbstractRib<R> {
   }
 
   public Set<R> getBestPathRoutes() {
-    return ImmutableSet.copyOf(_bestPaths.values());
+    if (_bestPathRoutes == null) {
+      _bestPathRoutes = ImmutableSet.copyOf(_bestPaths.values());
+    }
+    return _bestPathRoutes;
   }
 
   private int compareRouteAsPath(R lhs, R rhs) {
@@ -505,11 +512,15 @@ public abstract class BgpRib<R extends BgpRoute<?, ?>> extends AbstractRib<R> {
     Set<R> remainingBestPaths = super.getRoutes(prefix);
     if (remainingBestPaths.isEmpty()) {
       // Remove best path and return
-      _bestPaths.remove(prefix);
+      if (_bestPaths.remove(prefix) != null) {
+        _bestPathRoutes = null;
+      }
       return;
     }
     R best = Collections.max(remainingBestPaths, this::bestPathComparator);
-    _bestPaths.put(prefix, best);
+    if (!best.equals(_bestPaths.put(prefix, best))) {
+      _bestPathRoutes = null;
+    }
   }
 
   /**
@@ -532,16 +543,26 @@ public abstract class BgpRib<R extends BgpRoute<?, ?>> extends AbstractRib<R> {
       }
     }
 
+    if (_tieBreaker == BgpTieBreaker.CLUSTER_LIST_LENGTH) {
+      // Prefer lower cluster list length before originator ID (lower is better)
+      result = Integer.compare(lhs.getClusterList().size(), rhs.getClusterList().size());
+      if (result != 0) {
+        return -result;
+      }
+    }
+
     // Prefer lower originator router ID (lower is better)
     result = lhs.getOriginatorIp().compareTo(rhs.getOriginatorIp());
     if (result != 0) {
       return -result;
     }
 
-    // Prefer lower cluster list length. Only applicable to iBGP (lower is better)
-    result = Integer.compare(lhs.getClusterList().size(), rhs.getClusterList().size());
-    if (result != 0) {
-      return -result;
+    if (_tieBreaker != BgpTieBreaker.CLUSTER_LIST_LENGTH) {
+      // Prefer lower cluster list length after originator ID (lower is better)
+      result = Integer.compare(lhs.getClusterList().size(), rhs.getClusterList().size());
+      if (result != 0) {
+        return -result;
+      }
     }
 
     // Compare ReceivedFrom

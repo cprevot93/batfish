@@ -25,6 +25,7 @@ import com.google.common.collect.Sets;
 import com.google.common.collect.Table;
 import com.google.common.collect.Table.Cell;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +36,7 @@ import java.util.SortedMap;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -466,7 +468,7 @@ final class IncrementalBdpEngine {
      */
     IncrementalBdpAnswerElement answerElement = new IncrementalBdpAnswerElement();
     // TODO: eventually, IGP needs to be part of fixed-point below, because tunnels.
-    computeIgpDataPlane(nodes, vrs, initialTopologyContext, answerElement);
+    computeIgpDataPlane(nodes, vrs, initialTopologyContext, networkConfigurations, answerElement);
 
     LOGGER.info("Initialize virtual routers before topology fixed point");
     vrs.parallelStream()
@@ -517,6 +519,12 @@ final class IncrementalBdpEngine {
     boolean converged = false;
     while (!converged && topologyIterations++ < MAX_TOPOLOGY_ITERATIONS) {
       LOGGER.info("Starting topology iteration {}", topologyIterations);
+      // The previous round's FIBs and forwarding analysis have served their purpose (the topology
+      // and tracks above were derived from them) and are rebuilt below. Drop them now, from the
+      // dataplane and from every virtual router, rather than holding them through the route
+      // computation, where they would sit beside the RIBs and message queues at their largest.
+      currentDataplane = null;
+      vrs.forEach(VirtualRouter::clearFib);
       boolean isOscillating =
           computeNonMonotonicPortionOfDataPlane(
               nodes,
@@ -534,7 +542,6 @@ final class IncrementalBdpEngine {
       }
 
       updateLayer3Vnis(vrs);
-      currentDataplane = null; // free the old one
       currentDataplane = nextDataplane(currentTopologyContext, nodes, vrs, currentIpOwners);
       TopologyContext nextTopologyContext =
           nextTopologyContext(
@@ -863,7 +870,7 @@ final class IncrementalBdpEngine {
 
     // EIGRP
     LOGGER.info("{}: Propagate EIGRP routes", iterationLabel);
-    vrs.parallelStream().forEach(vr -> vr.eigrpIteration(allNodes));
+    vrs.parallelStream().forEach(vr -> vr.eigrpIteration(allNodes, networkConfigurations));
     vrs.parallelStream().forEach(VirtualRouter::mergeEigrpRoutesToMainRib);
 
     // Re-initialize IS-IS exports.
@@ -892,10 +899,10 @@ final class IncrementalBdpEngine {
     }
 
     LOGGER.info("{}: Propagate OSPF external", iterationLabel);
-    vrs.parallelStream().forEach(vr -> vr.ospfIteration(allNodes));
+    vrs.parallelStream().forEach(vr -> vr.ospfIteration(allNodes, networkConfigurations));
     vrs.parallelStream().forEach(VirtualRouter::mergeOspfRoutesToMainRib);
 
-    computeIterationOfBgpRoutes(iterationLabel, allNodes, vrs);
+    computeIterationOfBgpRoutes(iterationLabel, allNodes, vrs, networkConfigurations);
 
     leakAcrossVrfs(vrs, iterationLabel);
 
@@ -909,9 +916,12 @@ final class IncrementalBdpEngine {
   }
 
   private static void computeIterationOfBgpRoutes(
-      String iterationLabel, Map<String, Node> allNodes, List<VirtualRouter> vrs) {
+      String iterationLabel,
+      Map<String, Node> allNodes,
+      List<VirtualRouter> vrs,
+      NetworkConfigurations nc) {
     LOGGER.info("{}: Init for new BGP iteration", iterationLabel);
-    vrs.parallelStream().forEach(vr -> vr.bgpIteration(allNodes));
+    vrs.parallelStream().forEach(vr -> vr.bgpIteration(allNodes, nc));
     LOGGER.info("{}: Init BGP generated/aggregate routes", iterationLabel);
     // first let's initialize nodes-level generated/aggregate routes
     vrs.parallelStream().forEach(VirtualRouter::initBgpAggregateRoutes);
@@ -953,6 +963,7 @@ final class IncrementalBdpEngine {
       SortedMap<String, Node> nodes,
       List<VirtualRouter> vrs,
       TopologyContext topologyContext,
+      NetworkConfigurations nc,
       IncrementalBdpAnswerElement ae) {
     LOGGER.info("Compute IGP");
     int numOspfInternalIterations;
@@ -969,7 +980,8 @@ final class IncrementalBdpEngine {
     vrs.stream().forEach(VirtualRouter::applyRibGroupsForIgp);
 
     // OSPF internal routes
-    numOspfInternalIterations = initOspfInternalRoutes(nodes, topologyContext.getOspfTopology());
+    numOspfInternalIterations =
+        initOspfInternalRoutes(nodes, topologyContext.getOspfTopology(), nc);
 
     // RIP internal routes
     initRipInternalRoutes(nodes, vrs, topologyContext.getLayer3Topology());
@@ -979,7 +991,6 @@ final class IncrementalBdpEngine {
     vrs.parallelStream()
         .forEach(
             vr -> {
-              importRib(vr.getMainRib(), vr._independentRib);
               // Use static evaluator since we don't have dataplane yet
               vr.activateStaticRoutes(new PreDataPlaneTrackMethodEvaluator(vr.getConfiguration()));
             });
@@ -1031,15 +1042,22 @@ final class IncrementalBdpEngine {
     Map<Integer, SortedSet<Integer>> iterationsByHashCode = new HashMap<>();
 
     Schedule currentSchedule = _settings.getScheduleName();
+    // The node schedule depends on the nodes, the topology, and the schedule type. Within a round
+    // only the type can change, on oscillation, so compute the schedule once per type.
+    List<Map<String, Node>> scheduleSteps = null;
+    Schedule scheduleStepsFor = null;
 
     // Go into iteration mode, until the routes converge (or oscillation is detected)
     do {
       _numIterations++;
       LOGGER.info("Iteration {} begins", _numIterations);
-      LOGGER.info("Compute schedule");
-      // Compute node schedule
-      IbdpSchedule schedule =
-          IbdpSchedule.getSchedule(_settings, currentSchedule, nodes, topologyContext);
+      if (scheduleSteps == null || scheduleStepsFor != currentSchedule) {
+        LOGGER.info("Compute schedule");
+        scheduleSteps =
+            IbdpSchedule.getSchedule(_settings, currentSchedule, nodes, topologyContext)
+                .getAllRemaining();
+        scheduleStepsFor = currentSchedule;
+      }
 
       // (Re)initialization of dependent route calculation
       //  Since this is a local step, coloring not required.
@@ -1063,8 +1081,7 @@ final class IncrementalBdpEngine {
 
       // compute dependent routes for each allowable set of nodes until we cover all nodes
       int nodeSet = 0;
-      while (schedule.hasNext()) {
-        Map<String, Node> iterationNodes = schedule.next();
+      for (Map<String, Node> iterationNodes : scheduleSteps) {
         List<VirtualRouter> iterationVrs =
             toListInRandomOrder(
                 iterationNodes.values().stream().flatMap(n -> n.getVirtualRouters().stream()));
@@ -1102,6 +1119,7 @@ final class IncrementalBdpEngine {
               _numIterations);
           currentSchedule = Schedule.NODE_SERIALIZED;
         } else {
+          logOscillatingVrs(vrs);
           return true; // Found an oscillation
         }
       }
@@ -1114,8 +1132,62 @@ final class IncrementalBdpEngine {
   /** Check if we have reached a routing fixed point */
   private boolean hasNotReachedRoutingFixedPoint(List<VirtualRouter> vrs) {
     LOGGER.info("Iteration {}: Check if fixed point reached", _numIterations);
-    return vrs.parallelStream().anyMatch(VirtualRouter::isDirty);
+    if (!LOGGER.isDebugEnabled()) {
+      return vrs.parallelStream().anyMatch(VirtualRouter::isDirty);
+    }
+    List<String> dirty =
+        vrs.parallelStream()
+            .filter(VirtualRouter::isDirty)
+            .map(IncrementalBdpEngine::vrName)
+            .sorted()
+            .collect(Collectors.toList());
+    LOGGER.debug(
+        "Iteration {}: {} dirty VRs: {}",
+        _numIterations,
+        dirty.size(),
+        dirty.stream().limit(DEBUG_MAX_LISTED_VRS).collect(Collectors.joining(", ")));
+    return !dirty.isEmpty();
   }
+
+  /** How many VRs the per-iteration debug logs and the oscillation report name. */
+  private static final int DEBUG_MAX_LISTED_VRS = 40;
+
+  /** How many pending routes the oscillation report prints per VR. */
+  private static final int DEBUG_MAX_ROUTES_PER_VR = 60;
+
+  private static String vrName(VirtualRouter vr) {
+    return vr.getHostname() + ":" + vr.getName();
+  }
+
+  /**
+   * Report which VRs are still dirty when the computation is declared oscillating, and what each
+   * one is waiting to do. Nothing else about an oscillation is otherwise recorded.
+   */
+  private static void logOscillatingVrs(List<VirtualRouter> vrs) {
+    List<VirtualRouter> dirty =
+        vrs.stream()
+            .filter(VirtualRouter::isDirty)
+            .sorted(Comparator.comparing(IncrementalBdpEngine::vrName))
+            .collect(Collectors.toList());
+    LOGGER.error(
+        "Oscillation detected with {} dirty VRs: {}",
+        dirty.size(),
+        dirty.stream()
+            .map(IncrementalBdpEngine::vrName)
+            .limit(DEBUG_MAX_LISTED_VRS)
+            .collect(Collectors.joining(", ")));
+    dirty.stream()
+        .limit(DEBUG_MAX_LISTED_VRS)
+        .forEach(
+            vr ->
+                LOGGER.error(
+                    "Dirty VR {}:\n{}",
+                    vrName(vr),
+                    vr.describeDirtyState(DEBUG_MAX_ROUTES_PER_VR)));
+  }
+
+  /** Per-VR iteration hash codes from the previous iteration; only kept when debug logging. */
+  private final Map<String, Integer> _previousVrHashCodes = new HashMap<>();
 
   /**
    * Compute the hashcode that uniquely identifies the state of the network at a given iteration
@@ -1125,7 +1197,31 @@ final class IncrementalBdpEngine {
    */
   private int computeIterationHashCode(List<VirtualRouter> vrs) {
     LOGGER.info("Iteration {}: Compute hashCode", _numIterations);
-    return vrs.parallelStream().mapToInt(VirtualRouter::computeIterationHashCode).sum();
+    if (!LOGGER.isDebugEnabled()) {
+      return vrs.parallelStream().mapToInt(VirtualRouter::computeIterationHashCode).sum();
+    }
+    // Also name the VRs whose state changed since the previous iteration. An iteration in which
+    // nothing changed but some VR is still dirty is an engine bug rather than a network
+    // oscillation.
+    Map<String, Integer> hashes =
+        vrs.parallelStream()
+            .collect(
+                Collectors.toConcurrentMap(
+                    IncrementalBdpEngine::vrName, VirtualRouter::computeIterationHashCode));
+    List<String> changed =
+        hashes.entrySet().stream()
+            .filter(e -> !e.getValue().equals(_previousVrHashCodes.get(e.getKey())))
+            .map(Map.Entry::getKey)
+            .sorted()
+            .collect(Collectors.toList());
+    LOGGER.debug(
+        "Iteration {}: {} VRs changed state: {}",
+        _numIterations,
+        changed.size(),
+        changed.stream().limit(DEBUG_MAX_LISTED_VRS).collect(Collectors.joining(", ")));
+    _previousVrHashCodes.clear();
+    _previousVrHashCodes.putAll(hashes);
+    return hashes.values().stream().mapToInt(Integer::intValue).sum();
   }
 
   private static void computeIterationStatistics(
@@ -1139,7 +1235,7 @@ final class IncrementalBdpEngine {
     ae.getBgpMultipathRibRoutesByIteration()
         .put(dependentRoutesIterations, numBgpMultipathRibRoutes);
     int numMainRibRoutes =
-        vrs.parallelStream().mapToInt(vr -> vr.getMainRib().getRoutes().size()).sum();
+        vrs.parallelStream().mapToInt(vr -> vr.getMainRib().getNumRoutes()).sum();
     ae.getMainRibRoutesByIteration().put(dependentRoutesIterations, numMainRibRoutes);
   }
 
@@ -1170,7 +1266,8 @@ final class IncrementalBdpEngine {
    * @param ospfTopology graph of OSPF adjacencies
    * @return the number of iterations it took for internal OSPF routes to converge
    */
-  private int initOspfInternalRoutes(Map<String, Node> allNodes, OspfTopology ospfTopology) {
+  private int initOspfInternalRoutes(
+      Map<String, Node> allNodes, OspfTopology ospfTopology, NetworkConfigurations nc) {
     int ospfInternalIterations = 0;
     boolean dirty = true;
 
@@ -1191,7 +1288,7 @@ final class IncrementalBdpEngine {
             toListInRandomOrder(
                 scheduleNodes.values().stream().flatMap(n -> n.getVirtualRouters().stream()));
         scheduleVrs.parallelStream()
-            .forEach(virtualRouter -> virtualRouter.ospfIteration(allNodes));
+            .forEach(virtualRouter -> virtualRouter.ospfIteration(allNodes, nc));
         scheduleVrs.parallelStream().forEach(VirtualRouter::mergeOspfRoutesToMainRib);
       }
       dirty =
@@ -1241,7 +1338,7 @@ final class IncrementalBdpEngine {
           .forEach(
               vr -> {
                 importRib(vr._ripRib, vr._ripInternalRib);
-                importRib(vr._independentRib, vr._ripRib, vr.getName());
+                importRib(vr.getMainRib(), vr._ripRib, vr.getName());
               });
     }
   }

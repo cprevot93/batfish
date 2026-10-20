@@ -10,6 +10,7 @@ import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.lessThan;
 
 import com.google.common.collect.ImmutableList;
+import java.util.Set;
 import org.batfish.datamodel.AbstractRoute;
 import org.batfish.datamodel.AnnotatedRoute;
 import org.batfish.datamodel.Bgpv4Route;
@@ -102,10 +103,80 @@ public class RibTest {
                 .build());
     rib.mergeRoute(r1);
     assertThat(rib.longestPrefixMatch(ip, ResolutionRestriction.alwaysTrue()), contains(r1));
+    assertThat(rib.getBackupRoutes(), contains(r1));
+    // r2 is preferred: r1 is displaced into backup
     rib.mergeRoute(r2);
     assertThat(rib.longestPrefixMatch(ip, ResolutionRestriction.alwaysTrue()), contains(r2));
+    assertThat(rib.getBackupRoutes(), containsInAnyOrder(r1, r2));
+    // offering r1 again changes nothing
+    assertThat(rib.mergeRoute(r1), equalTo(false));
+    assertThat(rib.getBackupRoutes(), containsInAnyOrder(r1, r2));
+    // withdrawing r2 promotes r1
     rib.removeRoute(r2);
     assertThat(rib.longestPrefixMatch(ip, ResolutionRestriction.alwaysTrue()), contains(r1));
+    assertThat(rib.getBackupRoutes(), contains(r1));
+    // a losing route can be withdrawn while in backup
+    rib.mergeRoute(r2);
+    assertThat(rib.removeRoute(r1), equalTo(false));
+    assertThat(rib.getBackupRoutes(), contains(r2));
+    rib.removeRoute(r2);
+    assertThat(rib.getRoutes(), empty());
+    assertThat(rib.getBackupRoutes(), empty());
+  }
+
+  /** The maintained hash code tracks {@link Set#hashCode()} of the routes through every change. */
+  @Test
+  public void testRoutesHashCode() {
+    Prefix prefix = Prefix.strict("1.0.0.0/31");
+    Rib rib = new Rib();
+    AnnotatedRoute<AbstractRoute> worse =
+        annotateRoute(
+            OspfIntraAreaRoute.builder()
+                .setNetwork(prefix)
+                .setArea(0L)
+                .setNextHopInterface("foo")
+                .setAdmin(110)
+                .setMetric(1L)
+                .setNextHopIp(Ip.parse("2.0.0.1"))
+                .build());
+    AnnotatedRoute<AbstractRoute> better =
+        annotateRoute(
+            Bgpv4Route.testBuilder()
+                .setAdmin(20)
+                .setNetwork(prefix)
+                .setNextHopInterface("bar")
+                .setOriginatorIp(Ip.parse("1.1.1.1"))
+                .setOriginType(OriginType.IGP)
+                .setProtocol(RoutingProtocol.BGP)
+                .build());
+    AnnotatedRoute<AbstractRoute> other =
+        annotateRoute(new ConnectedRoute(Prefix.strict("2.0.0.0/24"), "baz"));
+    assertThat(rib.getRoutesHashCode(), equalTo(rib.getRoutes().hashCode()));
+    rib.mergeRoute(worse);
+    assertThat(rib.getRoutesHashCode(), equalTo(rib.getRoutes().hashCode()));
+    rib.mergeRoute(other);
+    assertThat(rib.getRoutesHashCode(), equalTo(rib.getRoutes().hashCode()));
+    // replaces worse
+    rib.mergeRoute(better);
+    assertThat(rib.getRoutesHashCode(), equalTo(rib.getRoutes().hashCode()));
+    int installed = rib.getRoutesHashCode();
+    // duplicate offer, no change
+    assertThat(rib.mergeRoute(better), equalTo(false));
+    assertThat(rib.getRoutesHashCode(), equalTo(installed));
+    // loses to better, kept only as a backup, no change
+    assertThat(rib.mergeRoute(worse), equalTo(false));
+    assertThat(rib.getRoutesHashCode(), equalTo(installed));
+    // not present, no change
+    assertThat(rib.removeRoute(annotateRoute(new ConnectedRoute(prefix, "qux"))), equalTo(false));
+    assertThat(rib.getRoutesHashCode(), equalTo(installed));
+    assertThat(rib.getRoutesHashCode(), equalTo(rib.getRoutes().hashCode()));
+    // restores worse
+    rib.removeRoute(better);
+    assertThat(rib.getRoutesHashCode(), equalTo(rib.getRoutes().hashCode()));
+    rib.removeRoute(other);
+    rib.removeRoute(worse);
+    assertThat(rib.getRoutes(), empty());
+    assertThat(rib.getRoutesHashCode(), equalTo(0));
   }
 
   @Test

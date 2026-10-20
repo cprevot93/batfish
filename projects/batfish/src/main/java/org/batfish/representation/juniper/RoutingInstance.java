@@ -5,6 +5,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import com.google.common.collect.ImmutableMap;
 import java.io.Serializable;
 import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -30,31 +31,55 @@ public class RoutingInstance implements Serializable {
   private @Nullable Long _as;
   private AggregateRoute _aggregateRouteDefaults;
   private @Nonnull Map<RoutingProtocol, String> _appliedRibGroups;
+  private boolean _bgpAlwaysCompareMed;
+  private boolean _bgpCompareClusterLengthBeforeOriginatorId;
+  private boolean _bgpExternalRouterId;
+  private boolean _bgpMedPlusIgp;
+  private @Nullable Integer _bgpMedPlusIgpIgpMultiplier;
+  private @Nullable Integer _bgpMedPlusIgpMedMultiplier;
   private Long _confederation;
   private Set<Long> _confederationMembers;
   private final SortedMap<String, DhcpRelayGroup> _dhcpRelayGroups;
   private final SortedMap<String, DhcpRelayServerGroup> _dhcpRelayServerGroups;
   private String _domainName;
+  private final @Nonnull Map<String, DynamicTunnel> _dynamicTunnels;
+  private @Nullable String _dynamicTunnelsForwardingRib;
+  private @Nullable String _dynamicTunnelsInetImportPolicy;
   private boolean _exportLocalRoutesLan;
   private boolean _exportLocalRoutesPointToPoint;
+  private final Set<Family> _explicitNullCosFamilies;
   private String _forwardingTableExportPolicy;
   private GeneratedRoute _generatedRouteDefaults;
   private final Interface _globalMasterInterface;
   private String _hostname;
+  private final List<String> _instanceExports;
   private final List<String> _instanceImports;
+  private @Nullable RoutingInstanceType _instanceType;
   private final Map<String, Interface> _interfaces;
+  private boolean _independentDomain;
+  private boolean _independentDomainNoAttrset;
   private Map<Prefix, IpBgpGroup> _ipBgpGroups;
   private final @Nonnull IsisSettings _isisSettings;
   private @Nullable IsisInterfaceSettings _interfaceAllIsisSettings;
   private @Nullable Integer _loops;
+  private @Nullable MacVrfServiceType _macVrfServiceType;
+  private final SortedMap<String, MacVrfVlan> _macVrfVlans;
   private BgpGroup _masterBgpGroup;
   private final @Nonnull String _name;
   private Map<String, NamedBgpGroup> _namedBgpGroups;
   private final Map<String, NodeDevice> _nodeDevices;
+  private @Nullable Long _ospf3DomainVpnTag;
+  private final Map<String, String> _ospf3RibGroups;
   private Map<Long, OspfArea> _ospfAreas;
+  private @Nullable Long _ospfDomainVpnTag;
   private List<String> _ospfExportPolicies;
+  private boolean _ospfIgnoreLspMetrics;
+  private final @Nonnull Set<String> _ospfOverloadedTopologies;
   private @Nullable Boolean _ospfDisable;
+  private @Nullable Long _ospfExternalPreference;
+  private @Nullable Long _ospfPreference;
   private double _ospfReferenceBandwidth;
+  private final Map<String, String> _ospfRibGroups;
   private @Nullable OspfInterfaceSettings _interfaceAllOspfSettings;
   private final Map<String, RoutingInformationBase> _ribs;
   private Ip _routerId;
@@ -69,6 +94,9 @@ public class RoutingInstance implements Serializable {
   private @Nullable ExtendedCommunity _vrfTargetImport;
   private @Nullable ExtendedCommunity _vrfTargetExport;
   private @Nullable String _vrfImportPolicy;
+  private @Nullable Boolean _vrfPropagateTtl;
+  private boolean _vrfTableLabel;
+  private boolean _vrfTableLabelSourceClassUsage;
 
   public RoutingInstance(@Nonnull String name) {
     _aggregateRouteDefaults = initAggregateRouteDefaults();
@@ -76,11 +104,15 @@ public class RoutingInstance implements Serializable {
     _confederationMembers = new TreeSet<>();
     _dhcpRelayGroups = new TreeMap<>();
     _dhcpRelayServerGroups = new TreeMap<>();
+    _dynamicTunnels = new TreeMap<>();
+    _explicitNullCosFamilies = EnumSet.noneOf(Family.class);
     _generatedRouteDefaults = initGeneratedRouteDefaults();
     _isisSettings = new IsisSettings();
+    _instanceExports = new LinkedList<>();
     _instanceImports = new LinkedList<>();
     _interfaces = new TreeMap<>();
     _ipBgpGroups = new TreeMap<>();
+    _macVrfVlans = new TreeMap<>();
     _masterBgpGroup = new BgpGroup();
     _masterBgpGroup.setMultipath(false);
     _masterBgpGroup.setMultipathMultipleAs(false);
@@ -89,9 +121,12 @@ public class RoutingInstance implements Serializable {
     _name = name;
     _namedBgpGroups = new TreeMap<>();
     _nodeDevices = new TreeMap<>();
+    _ospf3RibGroups = new TreeMap<>();
     _ospfAreas = new TreeMap<>();
     _ospfExportPolicies = new LinkedList<>();
+    _ospfOverloadedTopologies = new TreeSet<>();
     _ospfReferenceBandwidth = DEFAULT_OSPF_REFERENCE_BANDWIDTH;
+    _ospfRibGroups = new TreeMap<>();
     _ribs = new TreeMap<>();
     _ribs.put(
         RoutingInformationBase.RIB_IPV4_UNICAST,
@@ -123,6 +158,30 @@ public class RoutingInstance implements Serializable {
     return _appliedRibGroups;
   }
 
+  public boolean getBgpAlwaysCompareMed() {
+    return _bgpAlwaysCompareMed;
+  }
+
+  public boolean getBgpCompareClusterLengthBeforeOriginatorId() {
+    return _bgpCompareClusterLengthBeforeOriginatorId;
+  }
+
+  public boolean getBgpExternalRouterId() {
+    return _bgpExternalRouterId;
+  }
+
+  public boolean getBgpMedPlusIgp() {
+    return _bgpMedPlusIgp;
+  }
+
+  public @Nullable Integer getBgpMedPlusIgpIgpMultiplier() {
+    return _bgpMedPlusIgpIgpMultiplier;
+  }
+
+  public @Nullable Integer getBgpMedPlusIgpMedMultiplier() {
+    return _bgpMedPlusIgpMedMultiplier;
+  }
+
   public void applyRibGroup(RoutingProtocol protocol, String ribGroupName) {
     _appliedRibGroups.put(protocol, ribGroupName);
   }
@@ -139,12 +198,28 @@ public class RoutingInstance implements Serializable {
     return _domainName;
   }
 
+  public @Nonnull Map<String, DynamicTunnel> getDynamicTunnels() {
+    return _dynamicTunnels;
+  }
+
+  public @Nullable String getDynamicTunnelsForwardingRib() {
+    return _dynamicTunnelsForwardingRib;
+  }
+
+  public @Nullable String getDynamicTunnelsInetImportPolicy() {
+    return _dynamicTunnelsInetImportPolicy;
+  }
+
   public boolean getExportLocalRoutesLan() {
     return _exportLocalRoutesLan;
   }
 
   public boolean getExportLocalRoutesPointToPoint() {
     return _exportLocalRoutesPointToPoint;
+  }
+
+  public Set<Family> getExplicitNullCosFamilies() {
+    return _explicitNullCosFamilies;
   }
 
   public String getForwardingTableExportPolicy() {
@@ -177,12 +252,28 @@ public class RoutingInstance implements Serializable {
     return _hostname;
   }
 
+  public List<String> getInstanceExports() {
+    return _instanceExports;
+  }
+
   public List<String> getInstanceImports() {
     return _instanceImports;
   }
 
   public Map<String, Interface> getInterfaces() {
     return _interfaces;
+  }
+
+  public boolean getIndependentDomain() {
+    return _independentDomain;
+  }
+
+  public boolean getIndependentDomainNoAttrset() {
+    return _independentDomainNoAttrset;
+  }
+
+  public @Nullable RoutingInstanceType getInstanceType() {
+    return _instanceType;
   }
 
   public Map<Prefix, IpBgpGroup> getIpBgpGroups() {
@@ -201,6 +292,14 @@ public class RoutingInstance implements Serializable {
     return _masterBgpGroup;
   }
 
+  public @Nullable MacVrfServiceType getMacVrfServiceType() {
+    return _macVrfServiceType;
+  }
+
+  public SortedMap<String, MacVrfVlan> getMacVrfVlans() {
+    return _macVrfVlans;
+  }
+
   public @Nonnull String getName() {
     return _name;
   }
@@ -213,24 +312,60 @@ public class RoutingInstance implements Serializable {
     return _nodeDevices;
   }
 
+  public @Nullable Long getOspf3DomainVpnTag() {
+    return _ospf3DomainVpnTag;
+  }
+
+  public Map<String, String> getOspf3RibGroups() {
+    return _ospf3RibGroups;
+  }
+
   public Map<Long, OspfArea> getOspfAreas() {
     return _ospfAreas;
+  }
+
+  public @Nullable Long getOspfDomainVpnTag() {
+    return _ospfDomainVpnTag;
   }
 
   public List<String> getOspfExportPolicies() {
     return _ospfExportPolicies;
   }
 
+  public boolean getOspfIgnoreLspMetrics() {
+    return _ospfIgnoreLspMetrics;
+  }
+
+  public @Nonnull Set<String> getOspfOverloadedTopologies() {
+    return _ospfOverloadedTopologies;
+  }
+
   public @Nullable Boolean getOspfDisable() {
     return _ospfDisable;
+  }
+
+  public @Nullable Long getOspfExternalPreference() {
+    return _ospfExternalPreference;
+  }
+
+  public @Nullable Long getOspfPreference() {
+    return _ospfPreference;
   }
 
   public double getOspfReferenceBandwidth() {
     return _ospfReferenceBandwidth;
   }
 
+  public Map<String, String> getOspfRibGroups() {
+    return _ospfRibGroups;
+  }
+
   public Map<String, RoutingInformationBase> getRibs() {
     return _ribs;
+  }
+
+  public @Nullable Boolean getVrfPropagateTtl() {
+    return _vrfPropagateTtl;
   }
 
   public Ip getRouterId() {
@@ -253,6 +388,14 @@ public class RoutingInstance implements Serializable {
     _domainName = domainName;
   }
 
+  public void setDynamicTunnelsForwardingRib(String dynamicTunnelsForwardingRib) {
+    _dynamicTunnelsForwardingRib = dynamicTunnelsForwardingRib;
+  }
+
+  public void setDynamicTunnelsInetImportPolicy(String dynamicTunnelsInetImportPolicy) {
+    _dynamicTunnelsInetImportPolicy = dynamicTunnelsInetImportPolicy;
+  }
+
   public void setExportLocalRoutesLan(boolean exportLocalRoutesLan) {
     _exportLocalRoutesLan = exportLocalRoutesLan;
   }
@@ -265,9 +408,50 @@ public class RoutingInstance implements Serializable {
     _forwardingTableExportPolicy = forwardingTableExportPolicy;
   }
 
+  public void setBgpAlwaysCompareMed(boolean bgpAlwaysCompareMed) {
+    _bgpAlwaysCompareMed = bgpAlwaysCompareMed;
+  }
+
+  public void setBgpCompareClusterLengthBeforeOriginatorId(
+      boolean bgpCompareClusterLengthBeforeOriginatorId) {
+    _bgpCompareClusterLengthBeforeOriginatorId = bgpCompareClusterLengthBeforeOriginatorId;
+  }
+
+  public void setBgpExternalRouterId(boolean bgpExternalRouterId) {
+    _bgpExternalRouterId = bgpExternalRouterId;
+  }
+
+  public void setBgpMedPlusIgp(boolean bgpMedPlusIgp) {
+    _bgpMedPlusIgp = bgpMedPlusIgp;
+  }
+
+  public void setBgpMedPlusIgpIgpMultiplier(int bgpMedPlusIgpIgpMultiplier) {
+    _bgpMedPlusIgpIgpMultiplier = bgpMedPlusIgpIgpMultiplier;
+  }
+
+  public void setBgpMedPlusIgpMedMultiplier(int bgpMedPlusIgpMedMultiplier) {
+    _bgpMedPlusIgpMedMultiplier = bgpMedPlusIgpMedMultiplier;
+  }
+
   public void setHostname(String hostname) {
     checkNotNull(hostname, "'hostname' cannot be null");
     _hostname = hostname.toLowerCase();
+  }
+
+  public void setIndependentDomain(boolean independentDomain) {
+    _independentDomain = independentDomain;
+  }
+
+  public void setIndependentDomainNoAttrset(boolean independentDomainNoAttrset) {
+    _independentDomainNoAttrset = independentDomainNoAttrset;
+  }
+
+  public void setInstanceType(RoutingInstanceType instanceType) {
+    _instanceType = instanceType;
+  }
+
+  public void setMacVrfServiceType(MacVrfServiceType macVrfServiceType) {
+    _macVrfServiceType = macVrfServiceType;
   }
 
   /** Sets the OSPF settings configures for "interface all" */
@@ -280,12 +464,40 @@ public class RoutingInstance implements Serializable {
     _interfaceAllIsisSettings = interfaceAllIsisSettings;
   }
 
+  public void setOspf3DomainVpnTag(@Nullable Long ospf3DomainVpnTag) {
+    _ospf3DomainVpnTag = ospf3DomainVpnTag;
+  }
+
+  public void setOspf3RibGroup(String family, String ribGroup) {
+    _ospf3RibGroups.put(family, ribGroup);
+  }
+
   public void setOspfDisable(boolean ospfDisable) {
     _ospfDisable = ospfDisable;
   }
 
+  public void setOspfDomainVpnTag(@Nullable Long ospfDomainVpnTag) {
+    _ospfDomainVpnTag = ospfDomainVpnTag;
+  }
+
+  public void setOspfExternalPreference(long ospfExternalPreference) {
+    _ospfExternalPreference = ospfExternalPreference;
+  }
+
+  public void setOspfPreference(long ospfPreference) {
+    _ospfPreference = ospfPreference;
+  }
+
+  public void setOspfIgnoreLspMetrics(boolean ospfIgnoreLspMetrics) {
+    _ospfIgnoreLspMetrics = ospfIgnoreLspMetrics;
+  }
+
   public void setOspfReferenceBandwidth(double ospfReferenceBandwidth) {
     _ospfReferenceBandwidth = ospfReferenceBandwidth;
+  }
+
+  public void setOspfRibGroup(String family, String ribGroup) {
+    _ospfRibGroups.put(family, ribGroup);
   }
 
   public void setLoops(@Nullable Integer loops) {
@@ -298,6 +510,10 @@ public class RoutingInstance implements Serializable {
 
   public void setSnmpServer(SnmpServer snmpServer) {
     _snmpServer = snmpServer;
+  }
+
+  public void setVrfPropagateTtl(boolean vrfPropagateTtl) {
+    _vrfPropagateTtl = vrfPropagateTtl;
   }
 
   public void setConfederation(@Nullable Long confederation) {
@@ -437,5 +653,21 @@ public class RoutingInstance implements Serializable {
 
   public void setVrfImportPolicy(@Nullable String vrfImportPolicy) {
     _vrfImportPolicy = vrfImportPolicy;
+  }
+
+  public boolean getVrfTableLabel() {
+    return _vrfTableLabel;
+  }
+
+  public void setVrfTableLabel(boolean vrfTableLabel) {
+    _vrfTableLabel = vrfTableLabel;
+  }
+
+  public boolean getVrfTableLabelSourceClassUsage() {
+    return _vrfTableLabelSourceClassUsage;
+  }
+
+  public void setVrfTableLabelSourceClassUsage(boolean vrfTableLabelSourceClassUsage) {
+    _vrfTableLabelSourceClassUsage = vrfTableLabelSourceClassUsage;
   }
 }

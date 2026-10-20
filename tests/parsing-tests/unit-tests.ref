@@ -40408,15 +40408,20 @@
             "      (statement*",
             "        (s_common*",
             "          (s_null*",
-            "            (ri_chassis_null*",
+            "            (ri_chassis*",
             "              CHASSIS:'chassis'",
-            "              (null_filler*",
-            "                UNRECOGNIZED_WORD:'fpc'",
-            "                UINT8:'0'",
-            "                UNRECOGNIZED_WORD:'pic'",
-            "                UINT8:'0'",
-            "                INTERFACE_TYPE:'interface-type'",
-            "                UNRECOGNIZED_WORD:'xe'))))))",
+            "              (ric_fpc",
+            "                FPC:'fpc'",
+            "                fpc = (dec*",
+            "                  UINT8:'0')",
+            "                (ricf_pic*",
+            "                  PIC:'pic'",
+            "                  pic = (dec*",
+            "                    UINT8:'0')",
+            "                  (ricfp_interface_type_null*",
+            "                    INTERFACE_TYPE:'interface-type'",
+            "                    (null_filler*",
+            "                      UNRECOGNIZED_WORD:'xe')))))))))",
             "    NEWLINE:'\\n')",
             "  (set_line*",
             "    SET:'set'",
@@ -40424,12 +40429,15 @@
             "      (statement*",
             "        (s_common*",
             "          (s_null*",
-            "            (ri_chassis_null*",
+            "            (ri_chassis*",
             "              CHASSIS:'chassis'",
-            "              (null_filler*",
-            "                UNRECOGNIZED_WORD:'fpc'",
-            "                UINT8:'0'",
-            "                UNRECOGNIZED_WORD:'lite-mode'))))))",
+            "              (ric_fpc",
+            "                FPC:'fpc'",
+            "                fpc = (dec*",
+            "                  UINT8:'0')",
+            "                (ricf_lite_mode_null*",
+            "                  LITE_MODE:'lite-mode'",
+            "                  (null_filler*))))))))",
             "    NEWLINE:'\\n')",
             "  (set_line*",
             "    SET:'set'",
@@ -41428,7 +41436,7 @@
             "            (ri_named_routing_instance",
             "              name = (junos_name*",
             "                NAME:'vr'  <== mode:M_Routing_Instances)",
-            "              (ri_instance_type*",
+            "              (ri_instance_type",
             "                INSTANCE_TYPE:'instance-type'",
             "                VIRTUAL_ROUTER:'virtual-router'))))))",
             "    NEWLINE:'\\n')",
@@ -41472,7 +41480,7 @@
             "            (ri_named_routing_instance",
             "              name = (junos_name*",
             "                NAME:'fabric'  <== mode:M_Routing_Instances)",
-            "              (ri_instance_type*",
+            "              (ri_instance_type",
             "                INSTANCE_TYPE:'instance-type'",
             "                VIRTUAL_SWITCH:'virtual-switch'))))))",
             "    NEWLINE:'\\n')",
@@ -49451,7 +49459,7 @@
             "                INTERFACE_ID:'node1:xe-0/0/0'  <== mode:M_Interface)",
             "              (i_common*",
             "                (apply*",
-            "                  (apply_groups*",
+            "                  (apply_groups",
             "                    APPLY_GROUPS:'apply-groups'",
             "                    name = (junos_name*",
             "                      NAME:'MTU_GROUP'  <== mode:M_ApplyGroups)))))))))",
@@ -49468,7 +49476,7 @@
             "                INTERFACE_ID:'node1:xe-0/0/0:0'  <== mode:M_Interface)",
             "              (i_common*",
             "                (apply*",
-            "                  (apply_groups*",
+            "                  (apply_groups",
             "                    APPLY_GROUPS:'apply-groups'",
             "                    name = (junos_name*",
             "                      NAME:'MTU_GROUP'  <== mode:M_ApplyGroups)))))))))",
@@ -49485,7 +49493,7 @@
             "                INTERFACE_ID:'node1:xe-0/0/0:0.0'  <== mode:M_Interface)",
             "              (i_common*",
             "                (apply*",
-            "                  (apply_groups*",
+            "                  (apply_groups",
             "                    APPLY_GROUPS:'apply-groups'",
             "                    name = (junos_name*",
             "                      NAME:'MTU_GROUP'  <== mode:M_ApplyGroups)))))))))",
@@ -49502,7 +49510,7 @@
             "                INTERFACE_ID:'xe-0/0/0'  <== mode:M_Interface)",
             "              (i_common*",
             "                (apply*",
-            "                  (apply_groups*",
+            "                  (apply_groups",
             "                    APPLY_GROUPS:'apply-groups'",
             "                    name = (junos_name*",
             "                      NAME:'MTU_GROUP'  <== mode:M_ApplyGroups)))))))))",
@@ -49519,7 +49527,7 @@
             "                INTERFACE_ID:'xe-0/0/0:0'  <== mode:M_Interface)",
             "              (i_common*",
             "                (apply*",
-            "                  (apply_groups*",
+            "                  (apply_groups",
             "                    APPLY_GROUPS:'apply-groups'",
             "                    name = (junos_name*",
             "                      NAME:'MTU_GROUP'  <== mode:M_ApplyGroups)))))))))",
@@ -49536,7 +49544,7 @@
             "                INTERFACE_ID:'xe-0/0/0:0.0'  <== mode:M_Interface)",
             "              (i_common*",
             "                (apply*",
-            "                  (apply_groups*",
+            "                  (apply_groups",
             "                    APPLY_GROUPS:'apply-groups'",
             "                    name = (junos_name*",
             "                      NAME:'MTU_GROUP'  <== mode:M_ApplyGroups)))))))))",
@@ -49553,7 +49561,7 @@
             "                INTERFACE_ID:'xe-0/0/0.0'  <== mode:M_Interface)",
             "              (i_common*",
             "                (apply*",
-            "                  (apply_groups*",
+            "                  (apply_groups",
             "                    APPLY_GROUPS:'apply-groups'",
             "                    name = (junos_name*",
             "                      NAME:'MTU_GROUP'  <== mode:M_ApplyGroups)))))))))",
@@ -49677,12 +49685,13 @@
             "            APPLICATIONS:'applications'",
             "            (a_application",
             "              APPLICATION:'application'",
-            "              name = (junos_name*",
-            "                NAME:'APP'  <== mode:M_Application)",
-            "              (aa_description*",
-            "                DESCRIPTION:'description'",
-            "                (null_filler*",
-            "                  M_Description_DESCRIPTION:'APP-description'  <== mode:M_Description)))))))",
+            "              (aa_named",
+            "                name = (junos_name*",
+            "                  NAME:'APP'  <== mode:M_Application)",
+            "                (aa_description*",
+            "                  DESCRIPTION:'description'",
+            "                  (null_filler*",
+            "                    M_Description_DESCRIPTION:'APP-description'  <== mode:M_Description))))))))",
             "    NEWLINE:'\\n'  <== mode:M_Description)",
             "  (set_line*",
             "    SET:'set'",
@@ -49693,13 +49702,14 @@
             "            APPLICATIONS:'applications'",
             "            (a_application",
             "              APPLICATION:'application'",
-            "              name = (junos_name*",
-            "                NAME:'APP-POP3'  <== mode:M_Application)",
-            "              (aa_common*",
-            "                (aat_protocol",
-            "                  PROTOCOL:'protocol'",
-            "                  (ip_protocol*",
-            "                    TCP:'tcp'))))))))",
+            "              (aa_named",
+            "                name = (junos_name*",
+            "                  NAME:'APP-POP3'  <== mode:M_Application)",
+            "                (aa_common*",
+            "                  (aat_protocol",
+            "                    PROTOCOL:'protocol'",
+            "                    (ip_protocol*",
+            "                      TCP:'tcp')))))))))",
             "    NEWLINE:'\\n')",
             "  (set_line*",
             "    SET:'set'",
@@ -49710,14 +49720,15 @@
             "            APPLICATIONS:'applications'",
             "            (a_application",
             "              APPLICATION:'application'",
-            "              name = (junos_name*",
-            "                NAME:'APP-POP3'  <== mode:M_Application)",
-            "              (aa_common*",
-            "                (aat_destination_port",
-            "                  DESTINATION_PORT:'destination-port'",
-            "                  (port_range*",
-            "                    named = (named_port*",
-            "                      POP3:'pop3'  <== mode:M_Port)))))))))",
+            "              (aa_named",
+            "                name = (junos_name*",
+            "                  NAME:'APP-POP3'  <== mode:M_Application)",
+            "                (aa_common*",
+            "                  (aat_destination_port",
+            "                    DESTINATION_PORT:'destination-port'",
+            "                    (port_range*",
+            "                      named = (named_port*",
+            "                        POP3:'pop3'  <== mode:M_Port))))))))))",
             "    NEWLINE:'\\n\\n')",
             "  EOF:<EOF>)"
           ]
@@ -52955,7 +52966,7 @@
             "          (s_forwarding_options*",
             "            FORWARDING_OPTIONS:'forwarding-options'",
             "            (apply*",
-            "              (apply_groups*",
+            "              (apply_groups",
             "                APPLY_GROUPS:'apply-groups'",
             "                name = (junos_name*",
             "                  NAME:'g1'  <== mode:M_ApplyGroups)))))))",
@@ -54297,7 +54308,7 @@
             "              (foh_bootp*",
             "                BOOTP:'bootp'",
             "                (apply*",
-            "                  (apply_groups*",
+            "                  (apply_groups",
             "                    APPLY_GROUPS:'apply-groups'",
             "                    name = (junos_name*",
             "                      NAME:'DHCP'  <== mode:M_ApplyGroups)))))))))",
@@ -54401,7 +54412,7 @@
             "                        EIGHT02_3AD:'802.3ad'",
             "                        (eo8023ad_interface",
             "                          (interface_id*",
-            "                            INTERFACE_ID:'ae0'  <== mode:M_Interface))))))))))))",
+            "                            INTERFACE_ID:'ae0'  <== mode:M_8023ad))))))))))))",
             "    NEWLINE:'\\n')",
             "  (set_line*",
             "    SET:'set'",
@@ -55081,8 +55092,9 @@
             "(flat_juniper_configuration",
             "  (protect_line*",
             "    PROTECT:'protect'",
-            "    (hierarchy_element*",
-            "      SYSTEM:'system')",
+            "    (protect_line_tail*",
+            "      (hierarchy_element*",
+            "        SYSTEM:'system'))",
             "    NEWLINE:'\\n')",
             "  (set_line*",
             "    SET:'set'",
@@ -58944,9 +58956,10 @@
             "                (rog_common*",
             "                  (rog_community",
             "                    COMMUNITY:'community'",
-            "                    (standard_community*",
-            "                      (sc_literal*",
-            "                        STANDARD_COMMUNITY:'2:6'))))))))))",
+            "                    (route_community*",
+            "                      (standard_community*",
+            "                        (sc_literal*",
+            "                          STANDARD_COMMUNITY:'2:6')))))))))))",
             "    NEWLINE:'\\n')",
             "  (set_line*",
             "    SET:'set'",
@@ -62229,7 +62242,7 @@
             "          (s_system*",
             "            SYSTEM:'system'",
             "            (apply*",
-            "              (apply_groups*",
+            "              (apply_groups",
             "                APPLY_GROUPS:'apply-groups'",
             "                name = (junos_name*",
             "                  NAME:'TACACS'  <== mode:M_ApplyGroups)))))))",
@@ -62247,7 +62260,7 @@
             "                (ip_address*",
             "                  IP_ADDRESS:'1.2.3.4'))",
             "              (apply*",
-            "                (apply_groups*",
+            "                (apply_groups",
             "                  APPLY_GROUPS:'apply-groups'",
             "                  name = (junos_name*",
             "                    NAME:'bippety'  <== mode:M_ApplyGroups))))))))",
@@ -62332,7 +62345,7 @@
             "                (ip_address*",
             "                  IP_ADDRESS:'5.6.7.8'))",
             "              (apply*",
-            "                (apply_groups_except*",
+            "                (apply_groups_except",
             "                  APPLY_GROUPS_EXCEPT:'apply-groups-except'",
             "                  name = (junos_name*",
             "                    NAME:'TACACS'  <== mode:M_Name))))))))",
@@ -69194,7 +69207,7 @@
             "            (ri_named_routing_instance",
             "              name = (junos_name*",
             "                NAME:'test_vrf'  <== mode:M_Routing_Instances)",
-            "              (ri_instance_type*",
+            "              (ri_instance_type",
             "                INSTANCE_TYPE:'instance-type'",
             "                VRF:'vrf'))))))",
             "    NEWLINE:'\\n')",
@@ -72003,16 +72016,6 @@
             }
           ]
         },
-        "configs/juniper_bgp" : {
-          "Parse warnings" : [
-            {
-              "Comment" : "This feature is not currently supported",
-              "Line" : 46,
-              "Parser_Context" : "[bps_external_router_id b_path_selection b_common p_bgp s_protocols s_common statement set_line_tail set_line flat_juniper_configuration]",
-              "Text" : "external-router-id"
-            }
-          ]
-        },
         "configs/juniper_bgp_authentication" : {
           "Red flags" : [
             {
@@ -72026,6 +72029,34 @@
             {
               "tag" : "MISCELLANEOUS",
               "text" : "Unencrypted key stored at line: 4"
+            }
+          ]
+        },
+        "configs/juniper_bgp_remove_private_as" : {
+          "Parse warnings" : [
+            {
+              "Comment" : "This feature is not currently supported",
+              "Line" : 10,
+              "Parser_Context" : "[b_remove_private b_common b_group p_bgp s_protocols s_common statement set_line_tail set_line flat_juniper_configuration]",
+              "Text" : "remove-private nearest"
+            },
+            {
+              "Comment" : "This feature is not currently supported",
+              "Line" : 11,
+              "Parser_Context" : "[b_remove_private b_common b_group p_bgp s_protocols s_common statement set_line_tail set_line flat_juniper_configuration]",
+              "Text" : "remove-private replace"
+            },
+            {
+              "Comment" : "This feature is not currently supported",
+              "Line" : 14,
+              "Parser_Context" : "[b_remove_private b_common b_group p_bgp s_protocols s_common statement set_line_tail set_line flat_juniper_configuration]",
+              "Text" : "remove-private nearest"
+            },
+            {
+              "Comment" : "This feature is not currently supported",
+              "Line" : 15,
+              "Parser_Context" : "[b_remove_private b_common b_group p_bgp s_protocols s_common statement set_line_tail set_line flat_juniper_configuration]",
+              "Text" : "remove-private replace"
             }
           ]
         },
@@ -72122,14 +72153,6 @@
             {
               "tag" : "MISCELLANEOUS",
               "text" : "FATAL: Firewall next-ip 1.2.3.4/5 is not a valid network prefix (host bits are set)"
-            }
-          ]
-        },
-        "configs/juniper_forwarding_options" : {
-          "Red flags" : [
-            {
-              "tag" : "MISCELLANEOUS",
-              "text" : "apply-groups statement at path: 'forwarding-options' refers to non-existent group: 'g1'\n"
             }
           ]
         },
@@ -72346,10 +72369,6 @@
             {
               "tag" : "MISCELLANEOUS",
               "text" : "Unencrypted key stored at line: 12"
-            },
-            {
-              "tag" : "MISCELLANEOUS",
-              "text" : "apply-groups statement at path: 'system tacplus-server 1.2.3.4' refers to non-existent group: 'bippety'\n"
             }
           ]
         },
@@ -75628,6 +75647,12 @@
         "configs/isr_crypto" : { },
         "configs/isr_voip" : { },
         "configs/juniper-interfaces" : {
+          "apply-group" : {
+            "MTU_GROUP" : {
+              "definitionLines" : "4-5",
+              "numReferrers" : 7
+            }
+          },
           "interface" : {
             "node1::xe-0/0/0:0" : {
               "definitionLines" : "8-9",
@@ -75696,6 +75721,12 @@
           }
         },
         "configs/juniper_apply_macro" : {
+          "apply-group" : {
+            "jctyztp" : {
+              "definitionLines" : "3",
+              "numReferrers" : 0
+            }
+          },
           "routing-instance" : {
             "master" : {
               "definitionLines" : "0",
@@ -75982,6 +76013,12 @@
           }
         },
         "configs/juniper_forwarding_options" : {
+          "apply-group" : {
+            "DHCP" : {
+              "definitionLines" : "84",
+              "numReferrers" : 1
+            }
+          },
           "dhcp-relay server-group" : {
             "dhcpgrp" : {
               "definitionLines" : "24-25",
@@ -76000,6 +76037,12 @@
           }
         },
         "configs/juniper_interfaces" : {
+          "apply-group" : {
+            "VRRP-A" : {
+              "definitionLines" : "29",
+              "numReferrers" : 0
+            }
+          },
           "interface" : {
             "ae0" : {
               "definitionLines" : "5",
@@ -76112,6 +76155,12 @@
           }
         },
         "configs/juniper_isis" : {
+          "apply-group" : {
+            "gname" : {
+              "definitionLines" : "4",
+              "numReferrers" : 0
+            }
+          },
           "interface" : {
             "ge-0/0/0" : {
               "definitionLines" : "6",
@@ -76582,6 +76631,12 @@
           }
         },
         "configs/juniper_tacplus" : {
+          "apply-group" : {
+            "TACACS" : {
+              "definitionLines" : "4",
+              "numReferrers" : 2
+            }
+          },
           "routing-instance" : {
             "master" : {
               "definitionLines" : "0",
@@ -82923,6 +82978,19 @@
           }
         },
         "configs/juniper-interfaces" : {
+          "apply-group" : {
+            "MTU_GROUP" : {
+              "apply-groups" : [
+                7,
+                8,
+                9,
+                10,
+                11,
+                12,
+                13
+              ]
+            }
+          },
           "interface" : {
             "node1::xe-0/0/0:0" : {
               "interface" : [
@@ -83336,6 +83404,18 @@
           }
         },
         "configs/juniper_forwarding_options" : {
+          "apply-group" : {
+            "DHCP" : {
+              "apply-groups" : [
+                85
+              ]
+            },
+            "g1" : {
+              "apply-groups" : [
+                4
+              ]
+            }
+          },
           "dhcp-relay server-group" : {
             "site-dhcp" : {
               "dhcp relay group active-server-group" : [
@@ -84204,6 +84284,21 @@
           }
         },
         "configs/juniper_tacplus" : {
+          "apply-group" : {
+            "TACACS" : {
+              "apply-groups" : [
+                5
+              ],
+              "apply-groups-except" : [
+                11
+              ]
+            },
+            "bippety" : {
+              "apply-groups" : [
+                6
+              ]
+            }
+          },
           "routing-instance" : {
             "master" : {
               "routing-instance" : [
@@ -87733,6 +87828,13 @@
           }
         },
         "configs/juniper_forwarding_options" : {
+          "apply-group" : {
+            "g1" : {
+              "apply-groups" : [
+                4
+              ]
+            }
+          },
           "dhcp-relay server-group" : {
             "site-dhcp" : {
               "dhcp relay group active-server-group" : [
@@ -87900,7 +88002,15 @@
             }
           }
         },
-        "configs/juniper_tacplus" : { },
+        "configs/juniper_tacplus" : {
+          "apply-group" : {
+            "bippety" : {
+              "apply-groups" : [
+                6
+              ]
+            }
+          }
+        },
         "configs/juniper_trailing_space" : { },
         "configs/juniper_vlan" : {
           "interface" : {

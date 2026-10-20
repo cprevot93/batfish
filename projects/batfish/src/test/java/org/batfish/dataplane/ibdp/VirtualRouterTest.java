@@ -13,6 +13,7 @@ import static org.batfish.dataplane.ibdp.VirtualRouter.shouldGenerateLocalRoute;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.anEmptyMap;
 import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasItem;
@@ -20,6 +21,7 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.notNullValue;
+import static org.hamcrest.Matchers.nullValue;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
@@ -50,7 +52,9 @@ import org.batfish.datamodel.ConnectedRoute;
 import org.batfish.datamodel.ConnectedRouteMetadata;
 import org.batfish.datamodel.EigrpExternalRoute;
 import org.batfish.datamodel.EigrpInternalRoute;
+import org.batfish.datamodel.Fib;
 import org.batfish.datamodel.GeneratedRoute;
+import org.batfish.datamodel.InactiveReason;
 import org.batfish.datamodel.Interface;
 import org.batfish.datamodel.Ip;
 import org.batfish.datamodel.IsisRoute;
@@ -119,6 +123,19 @@ public class VirtualRouterTest {
     interfaceAddresses.forEach(
         (ifaceName, address) ->
             ib.setName(ifaceName).setAddress(address).setBandwidth(100d).build());
+  }
+
+  /** The dirty-state description names the pending main RIB delta that makes a VR dirty. */
+  @Test
+  public void testDescribeDirtyState() {
+    VirtualRouter vr = makeIosVirtualRouter("r1");
+    addInterfaces(vr.getConfiguration(), exampleInterfaceAddresses);
+    vr.initForIgpComputation(TopologyContext.builder().build());
+    assertThat(vr.describeDirtyState(10), equalTo(""));
+    vr.initForEgpComputationBeforeTopologyLoop(ImmutableSet.of(), ImmutableMap.of());
+    assertTrue(vr.isDirty());
+    assertThat(vr.describeDirtyState(10), containsString("mainRibDeltaPrevRound"));
+    assertThat(vr.describeDirtyState(10), containsString("ADD "));
   }
 
   private static VirtualRouter makeF5VirtualRouter(String hostname) {
@@ -243,12 +260,109 @@ public class VirtualRouterTest {
     vr.initStaticRibs();
     vr.activateStaticRoutes(new PreDataPlaneTrackMethodEvaluator(vr.getConfiguration()));
 
-    // Test: remove baseRoute, rerun activation
-    vr.getMainRib().removeRoute(new AnnotatedRoute<>(baseRoute, DEFAULT_VRF_NAME));
+    // Test: remove baseRoute, report it in the previous round's delta, rerun activation
+    AnnotatedRoute<AbstractRoute> annotatedBaseRoute =
+        new AnnotatedRoute<>(baseRoute, DEFAULT_VRF_NAME);
+    vr.getMainRib().removeRoute(annotatedBaseRoute);
+    vr._mainRibDeltaPrevRound = RibDelta.of(RouteAdvertisement.withdrawing(annotatedBaseRoute));
     vr.activateStaticRoutes(new PreDataPlaneTrackMethodEvaluator(vr.getConfiguration()));
 
     // Assert dependent route is not there
     assertThat(vr.getMainRib().getUnannotatedRoutes(), not(hasItem(dependentRoute)));
+  }
+
+  /**
+   * Test that within a round, {@link VirtualRouter#activateStaticRoutes(TrackMethodEvaluator)} only
+   * re-evaluates static routes whose next hop IP is covered by a route in the previous round's main
+   * RIB delta.
+   */
+  @Test
+  public void testActivateStaticRoutesOnlyForAffectedNextHops() {
+    VirtualRouter vr = makeIosVirtualRouter("n1");
+    addInterfaces(vr.getConfiguration(), exampleInterfaceAddresses);
+
+    ConnectedRoute baseRoute = new ConnectedRoute(Prefix.parse("1.1.1.0/24"), "Ethernet1");
+    StaticRoute dependentRoute =
+        StaticRoute.testBuilder()
+            .setNetwork(Prefix.parse("2.2.2.2/32"))
+            .setNextHopIp(Ip.parse("1.1.1.1"))
+            .setAdministrativeCost(1)
+            .build();
+    StaticRoute unresolvableRoute =
+        StaticRoute.testBuilder()
+            .setNetwork(Prefix.parse("3.3.3.3/32"))
+            .setNextHopIp(Ip.parse("9.9.9.9"))
+            .setAdministrativeCost(1)
+            .build();
+    vr.getConfiguration()
+        .getVrfs()
+        .get(DEFAULT_VRF_NAME)
+        .setStaticRoutes(ImmutableSortedSet.of(dependentRoute, unresolvableRoute));
+    vr.initStaticRibs();
+    AnnotatedRoute<AbstractRoute> annotatedBaseRoute =
+        new AnnotatedRoute<>(baseRoute, DEFAULT_VRF_NAME);
+    vr.getMainRib().mergeRoute(annotatedBaseRoute);
+    TrackMethodEvaluator evaluator = new PreDataPlaneTrackMethodEvaluator(vr.getConfiguration());
+
+    // Initial activation is a full pass
+    vr.activateStaticRoutes(evaluator);
+    assertThat(vr.getMainRib().getUnannotatedRoutes(), hasItem(dependentRoute));
+    assertThat(vr.getMainRib().getUnannotatedRoutes(), not(hasItem(unresolvableRoute)));
+
+    // Remove baseRoute behind the delta's back. A delta not covering 1.1.1.1 must not re-evaluate
+    // the dependent route, so it stays in the RIB.
+    vr.getMainRib().removeRoute(annotatedBaseRoute);
+    vr._mainRibDeltaPrevRound =
+        RibDelta.of(
+            RouteAdvertisement.adding(
+                new AnnotatedRoute<>(
+                    new ConnectedRoute(Prefix.parse("5.5.5.0/24"), "Ethernet1"),
+                    DEFAULT_VRF_NAME)));
+    vr.activateStaticRoutes(evaluator);
+    assertThat(vr.getMainRib().getUnannotatedRoutes(), hasItem(dependentRoute));
+
+    // An empty delta must not re-evaluate anything either.
+    vr._mainRibDeltaPrevRound = RibDelta.empty();
+    vr.activateStaticRoutes(evaluator);
+    assertThat(vr.getMainRib().getUnannotatedRoutes(), hasItem(dependentRoute));
+
+    // A delta covering 1.1.1.1 re-evaluates the dependent route, which is now unresolvable.
+    vr._mainRibDeltaPrevRound = RibDelta.of(RouteAdvertisement.withdrawing(annotatedBaseRoute));
+    vr.activateStaticRoutes(evaluator);
+    assertThat(vr.getMainRib().getUnannotatedRoutes(), not(hasItem(dependentRoute)));
+
+    // A new topology round forces a full pass regardless of the delta.
+    vr.getMainRib().mergeRoute(annotatedBaseRoute);
+    vr.endOfEgpRound(); // clears the delta builder, as the engine does before a new round
+    vr._mainRibDeltaPrevRound = RibDelta.empty();
+    vr.activateStaticRoutes(evaluator);
+    assertThat(vr.getMainRib().getUnannotatedRoutes(), not(hasItem(dependentRoute)));
+    vr.initForEgpComputationWithNewTopology(TopologyContext.builder().build(), c -> evaluator);
+    vr.activateStaticRoutes(evaluator);
+    assertThat(vr.getMainRib().getUnannotatedRoutes(), hasItem(dependentRoute));
+  }
+
+  /** The FIB is dropped between topology rounds and rebuilt from the main RIB on demand. */
+  @Test
+  public void testClearFibDropsItAndComputeFibRebuildsIt() {
+    VirtualRouter vr = makeIosVirtualRouter(null);
+    addInterfaces(vr.getConfiguration(), exampleInterfaceAddresses);
+    vr.initRibs();
+    vr.initConnectedRib();
+    for (AnnotatedRoute<ConnectedRoute> r : vr.getConnectedRib().getRoutes()) {
+      vr.getMainRib().mergeRoute(new AnnotatedRoute<AbstractRoute>(r.getRoute(), r.getSourceVrf()));
+    }
+    vr.computeFib();
+    Fib before = vr.getFib();
+    assertThat(before, notNullValue());
+    assertThat(before.allEntries(), not(empty()));
+
+    vr.clearFib();
+    assertThat(vr.getFib(), nullValue());
+
+    vr.computeFib();
+    assertThat(vr.getFib(), notNullValue());
+    assertThat(vr.getFib().allEntries(), equalTo(before.allEntries()));
   }
 
   /** Check that initialization of Connected RIB is as expected */
@@ -309,11 +423,10 @@ public class VirtualRouterTest {
     vr.initKernelRoutes();
 
     // Assert that all kernel routes have been processed
-    // The kernel routes not requiring owned IPs should be present in the independent RIB.
+    // The kernel routes not requiring owned IPs should be present in the main RIB.
     // All others should be present in _kernelConditionalRoutes.
     assertThat(
-        vr._independentRib.getRoutes(),
-        containsInAnyOrder(vr.annotateRoute(noRequiredOwnedIpRoute)));
+        vr.getMainRib().getRoutes(), containsInAnyOrder(vr.annotateRoute(noRequiredOwnedIpRoute)));
     assertThat(
         vr._kernelConditionalRoutes,
         containsInAnyOrder(missingRequiredOwnedIpRoute, presentRequiredOwnedIpRoute));
@@ -419,7 +532,8 @@ public class VirtualRouterTest {
 
     assertThat(vr._unconditionalStatics, containsInAnyOrder(routes.get(3)));
     assertThat(
-        vr._conditionalStatics, containsInAnyOrder(routes.get(0), routes.get(1), routes.get(2)));
+        vr.getConditionalStatics(),
+        containsInAnyOrder(routes.get(0), routes.get(1), routes.get(2)));
   }
 
   @Test
@@ -431,9 +545,9 @@ public class VirtualRouterTest {
 
     // Simple RIBs
     assertThat(vr.getConnectedRib().getUnannotatedRoutes(), empty());
-    assertThat(vr._conditionalStatics, empty());
+    assertThat(vr.getConditionalStatics(), empty());
     assertThat(vr._unconditionalStatics, empty());
-    assertThat(vr._independentRib.getUnannotatedRoutes(), empty());
+    assertThat(vr.getMainRib().getUnannotatedRoutes(), empty());
 
     // RIP RIBs
     assertThat(vr._ripInternalRib.getUnannotatedRoutes(), empty());
@@ -499,7 +613,7 @@ public class VirtualRouterTest {
     // Test
     vr.initStaticRibs();
 
-    assertThat(vr._conditionalStatics, containsInAnyOrder(routeSet.toArray()));
+    assertThat(vr.getConditionalStatics(), containsInAnyOrder(routeSet.toArray()));
   }
 
   /** Test basic message queuing operations */
@@ -1014,5 +1128,28 @@ public class VirtualRouterTest {
           PreDataPlaneTrackMethodEvaluator::new,
           false);
     }
+  }
+
+  /**
+   * Connected and local routes withdrawn because autostate took their interface down must stay out
+   * of the main RIB for the rest of the computation.
+   */
+  @Test
+  public void testAutostateChangeDoesNotResurrectConnectedRoutes() {
+    VirtualRouter vr = makeIosVirtualRouter(null);
+    Configuration c = vr.getConfiguration();
+    addInterfaces(c, ImmutableMap.of("Ethernet1", ConcreteInterfaceAddress.parse("10.1.0.1/16")));
+    vr.initRibs();
+    vr.initForIgpComputation(TopologyContext.builder().build());
+    ConnectedRoute connected = new ConnectedRoute(Prefix.parse("10.1.0.0/16"), "Ethernet1");
+    assertThat(vr.getMainRib().getUnannotatedRoutes(), hasItem(connected));
+
+    // Autostate takes the interface down during a topology iteration.
+    c.getAllInterfaces().get("Ethernet1").deactivate(InactiveReason.AUTOSTATE_FAILURE);
+    vr.updateConnectedAndLocalRoutesForAutostateChange();
+    assertThat(vr.getMainRib().getUnannotatedRoutes(), not(hasItem(connected)));
+
+    vr.reinitForNewIteration();
+    assertThat(vr.getMainRib().getUnannotatedRoutes(), not(hasItem(connected)));
   }
 }

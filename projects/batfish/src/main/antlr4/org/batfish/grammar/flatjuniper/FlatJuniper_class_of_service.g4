@@ -11,7 +11,9 @@ s_class_of_service
        | scos_application_traffic_control_null
        | scos_classifiers
        | scos_code_point_aliases
+       | scos_dedicated_buffer_null
        | scos_drop_profiles_null
+       | scos_forwarding_class_sets
        | scos_forwarding_classes
        | scos_forwarding_policy_null
        | scos_fragmentation_maps_null
@@ -25,12 +27,29 @@ s_class_of_service
        | scos_scheduler_maps
        | scos_schedulers
        | scos_shared_buffer_null
+       | scos_system_defaults
        | scos_trace_options_null
        | scos_traffic_control_profiles_null
        | scos_translation_table_null
        | scos_tri_color_null
        | scos_virtual_channel_null
    )
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/system-defaults-edit-cos.html
+scos_system_defaults
+:
+    SYSTEM_DEFAULTS scossd_classifiers
+;
+
+scossd_classifiers
+:
+    CLASSIFIERS scossdc_exp
+;
+
+scossdc_exp
+:
+    EXP name = junos_name
 ;
 
 scos_classifiers
@@ -261,6 +280,17 @@ scoscpa_inet_precedence
     INET_PRECEDENCE name = junos_name code = inet_precedence_code_point
 ;
 
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/forwarding-class-sets-edit-class-of-service.html
+scos_forwarding_class_sets
+:
+    FORWARDING_CLASS_SETS name = junos_name scosfcs_class
+;
+
+scosfcs_class
+:
+    CLASS fc = junos_name
+;
+
 scos_forwarding_classes
 :
     FORWARDING_CLASSES
@@ -343,21 +373,25 @@ scos_interfaces
 :
     INTERFACES
     (
-        scosi_interface
+        apply
+        | scosi_interface
     )
 ;
 
 scosi_interface
 :
     (
-        interface_wildcard
+        ALL
+        | interface_wildcard
         | interface_id
     )
     (
-        scosii_classifiers
+        apply
+        | scosii_classifiers
         | scosii_forwarding_class
         | scosii_forwarding_class_set
         | scosii_output_traffic_control_profile
+        | scosii_rewrite_rules
         | scosii_scheduler_map
         | scosii_unit
     )
@@ -396,6 +430,44 @@ scosii_output_traffic_control_profile
 scosii_forwarding_class
 :
     FORWARDING_CLASS name = junos_name
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/rewrite-rules-edit-cos-interfaces.html
+scosii_rewrite_rules
+:
+    REWRITE_RULES
+    (
+        scosiir_dscp
+        | scosiir_dscp_ipv6
+        | scosiir_exp
+        | scosiir_ieee_802_1
+        | scosiir_inet_precedence
+    )
+;
+
+scosiir_dscp
+:
+    DSCP name = junos_name
+;
+
+scosiir_dscp_ipv6
+:
+    DSCP_IPV6 name = junos_name
+;
+
+scosiir_exp
+:
+    EXP name = junos_name (PROTOCOL proto = scos_protocol_type)?
+;
+
+scosiir_ieee_802_1
+:
+    IEEE_802_1 name = junos_name
+;
+
+scosiir_inet_precedence
+:
+    INET_PRECEDENCE name = junos_name
 ;
 
 scosii_scheduler_map
@@ -772,6 +844,18 @@ scos_application_traffic_control_null
 :
    APPLICATION_TRAFFIC_CONTROL null_filler
 ;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/class-of-service-dedicated-buffer.html
+scos_dedicated_buffer_null
+:
+   DEDICATED_BUFFER
+   (
+      EGRESS
+      | INGRESS
+   )
+   PERCENT dec
+;
+
 scos_drop_profiles_null
 :
    DROP_PROFILES null_filler
@@ -824,4 +908,3 @@ scos_virtual_channel_null
 :
    VIRTUAL_CHANNEL null_filler
 ;
-

@@ -758,6 +758,41 @@ public class Bgpv4RibTest {
   }
 
   @Test
+  public void testBestPathSelectionArrivalOrderUnchangedByDuplicateMerge() {
+    _bestPathRib =
+        new Bgpv4Rib(
+            null,
+            BgpTieBreaker.ARRIVAL_ORDER,
+            null,
+            MultipathEquivalentAsPathMatchMode.EXACT_PATH,
+            false,
+            LocalOriginationTypeTieBreaker.NO_PREFERENCE,
+            NextHopIpTieBreaker.HIGHEST_NEXT_HOP_IP,
+            NextHopIpTieBreaker.HIGHEST_NEXT_HOP_IP,
+            ResolutionRestriction.alwaysTrue());
+    Bgpv4Route oldest =
+        _rb.setNextHop(NextHopIp.of(Ip.parse("1.1.1.1")))
+            .setReceivedFrom(ReceivedFromIp.of(Ip.parse("1.1.1.1")))
+            .build();
+    Bgpv4Route secondOldest =
+        _rb.setNextHop(NextHopIp.of(Ip.parse("2.2.2.2")))
+            .setReceivedFrom(ReceivedFromIp.of(Ip.parse("2.2.2.2")))
+            .build();
+    Bgpv4Route newest =
+        _rb.setNextHop(NextHopIp.of(Ip.parse("3.3.3.3")))
+            .setReceivedFrom(ReceivedFromIp.of(Ip.parse("3.3.3.3")))
+            .build();
+
+    _bestPathRib.mergeRoute(oldest);
+    _bestPathRib.mergeRoute(secondOldest);
+    assertThat(_bestPathRib.mergeRouteGetDelta(oldest), equalTo(RibDelta.empty()));
+    // A later change recomputes the best path and exposes any corruption of oldest's arrival time.
+    _bestPathRib.mergeRoute(newest);
+
+    assertThat(_bestPathRib.getBestPathRoutes(), contains(oldest));
+  }
+
+  @Test
   public void testBestPathSelectionTieBreakingEbgpOnly() {
     _bestPathRib =
         new Bgpv4Rib(
@@ -1418,6 +1453,131 @@ public class Bgpv4RibTest {
           bgpRib.updateActiveRoutes(mainRibDelta).getMultipathDelta(),
           equalTo(RibDelta.of(RouteAdvertisement.adding(dependentRoute))));
       assertThat(bgpRib.getRoutes(), contains(dependentRoute));
+    }
+  }
+
+  /**
+   * A main RIB change to a prefix that contains a next hop IP but is shadowed by a more specific
+   * route must not change the BGP RIB.
+   */
+  @Test
+  public void testUpdateActiveRoutesShadowedPrefix() {
+    Ip nhip = Ip.parse("1.1.1.1");
+    Bgpv4Route dependentRoute =
+        Bgpv4Route.testBuilder()
+            .setNetwork(Prefix.parse("5.0.0.0/8"))
+            .setNextHop(NextHopIp.of(nhip))
+            .build();
+    AnnotatedRoute<AbstractRoute> resolvingRoute =
+        new AnnotatedRoute<>(
+            StaticRoute.testBuilder().setNetwork(nhip.toPrefix()).build(), "default");
+    AnnotatedRoute<AbstractRoute> shadowedRoute =
+        new AnnotatedRoute<>(
+            StaticRoute.testBuilder().setNetwork(Prefix.parse("1.0.0.0/8")).build(), "default");
+    Rib mainRib = new Rib();
+    mainRib.mergeRoute(resolvingRoute);
+    Bgpv4Rib bgpRib =
+        new Bgpv4Rib(
+            mainRib,
+            BgpTieBreaker.ARRIVAL_ORDER,
+            1,
+            null,
+            false,
+            LocalOriginationTypeTieBreaker.NO_PREFERENCE,
+            NextHopIpTieBreaker.HIGHEST_NEXT_HOP_IP,
+            NextHopIpTieBreaker.HIGHEST_NEXT_HOP_IP,
+            ResolutionRestriction.alwaysTrue());
+    assertThat(bgpRib.mergeRouteGetDelta(dependentRoute), equalTo(RibDelta.adding(dependentRoute)));
+
+    // Adding and removing the shadowed prefix does not change resolvability.
+    RibDelta<AnnotatedRoute<AbstractRoute>> mainRibDelta =
+        mainRib.mergeRouteGetDelta(shadowedRoute);
+    assertThat(
+        bgpRib.updateActiveRoutes(mainRibDelta).getMultipathDelta(), equalTo(RibDelta.empty()));
+    mainRibDelta = mainRib.removeRouteGetDelta(shadowedRoute);
+    assertThat(
+        bgpRib.updateActiveRoutes(mainRibDelta).getMultipathDelta(), equalTo(RibDelta.empty()));
+    assertThat(bgpRib.getRoutes(), contains(dependentRoute));
+
+    // Removing the resolving route does, even though the shadowed prefix is present again.
+    mainRib.mergeRoute(shadowedRoute);
+    mainRibDelta = mainRib.removeRouteGetDelta(resolvingRoute);
+    assertThat(
+        bgpRib.updateActiveRoutes(mainRibDelta).getMultipathDelta(), equalTo(RibDelta.empty()));
+    assertThat(bgpRib.getRoutes(), contains(dependentRoute));
+    mainRibDelta = mainRib.removeRouteGetDelta(shadowedRoute);
+    assertThat(
+        bgpRib.updateActiveRoutes(mainRibDelta).getMultipathDelta(),
+        equalTo(RibDelta.of(RouteAdvertisement.withdrawing(dependentRoute))));
+    assertThat(bgpRib.getRoutes(), empty());
+  }
+
+  /**
+   * Routes with the same next hop IP that arrived under different main RIB states must all be
+   * (de)activated by the next {@link Bgpv4Rib#updateActiveRoutes}, even if that update finds the
+   * next hop's resolvability unchanged from the last time all of them were evaluated.
+   */
+  @Test
+  public void testUpdateActiveRoutesMixedNextHopState() {
+    Ip nhip = Ip.parse("1.1.1.1");
+    Bgpv4Route route1 =
+        Bgpv4Route.testBuilder()
+            .setNetwork(Prefix.parse("5.0.0.0/8"))
+            .setNextHop(NextHopIp.of(nhip))
+            .build();
+    Bgpv4Route route2 = route1.toBuilder().setNetwork(Prefix.parse("6.0.0.0/8")).build();
+    AnnotatedRoute<AbstractRoute> resolvingRoute =
+        new AnnotatedRoute<>(
+            StaticRoute.testBuilder().setNetwork(nhip.toPrefix()).build(), "default");
+    {
+      // route1 arrives unresolvable, route2 after the resolving route was added but before the
+      // BGP RIB heard about it.
+      Rib mainRib = new Rib();
+      Bgpv4Rib bgpRib =
+          new Bgpv4Rib(
+              mainRib,
+              BgpTieBreaker.ARRIVAL_ORDER,
+              1,
+              null,
+              false,
+              LocalOriginationTypeTieBreaker.NO_PREFERENCE,
+              NextHopIpTieBreaker.HIGHEST_NEXT_HOP_IP,
+              NextHopIpTieBreaker.HIGHEST_NEXT_HOP_IP,
+              ResolutionRestriction.alwaysTrue());
+      assertThat(bgpRib.mergeRouteGetDelta(route1), equalTo(RibDelta.empty()));
+      RibDelta<AnnotatedRoute<AbstractRoute>> mainRibDelta =
+          mainRib.mergeRouteGetDelta(resolvingRoute);
+      assertThat(bgpRib.mergeRouteGetDelta(route2), equalTo(RibDelta.adding(route2)));
+      assertThat(
+          bgpRib.updateActiveRoutes(mainRibDelta).getMultipathDelta(),
+          equalTo(RibDelta.adding(route1)));
+      assertThat(bgpRib.getRoutes(), containsInAnyOrder(route1, route2));
+    }
+    {
+      // route1 arrives resolvable; the resolving route is removed and re-added within one delta,
+      // and route2 arrives in between, unresolvable.
+      Rib mainRib = new Rib();
+      mainRib.mergeRoute(resolvingRoute);
+      Bgpv4Rib bgpRib =
+          new Bgpv4Rib(
+              mainRib,
+              BgpTieBreaker.ARRIVAL_ORDER,
+              1,
+              null,
+              false,
+              LocalOriginationTypeTieBreaker.NO_PREFERENCE,
+              NextHopIpTieBreaker.HIGHEST_NEXT_HOP_IP,
+              NextHopIpTieBreaker.HIGHEST_NEXT_HOP_IP,
+              ResolutionRestriction.alwaysTrue());
+      assertThat(bgpRib.mergeRouteGetDelta(route1), equalTo(RibDelta.adding(route1)));
+      RibDelta.Builder<AnnotatedRoute<AbstractRoute>> mainRibDelta = RibDelta.builder();
+      mainRibDelta.from(mainRib.removeRouteGetDelta(resolvingRoute));
+      assertThat(bgpRib.mergeRouteGetDelta(route2), equalTo(RibDelta.empty()));
+      mainRibDelta.from(mainRib.mergeRouteGetDelta(resolvingRoute));
+      assertThat(
+          bgpRib.updateActiveRoutes(mainRibDelta.build()).getMultipathDelta(),
+          equalTo(RibDelta.adding(route2)));
+      assertThat(bgpRib.getRoutes(), containsInAnyOrder(route1, route2));
     }
   }
 

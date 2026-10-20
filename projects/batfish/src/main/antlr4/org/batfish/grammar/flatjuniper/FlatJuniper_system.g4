@@ -30,8 +30,10 @@ s_system
       | sy_license_null
       | sy_location_null
       | sy_login
+      | sy_management_instance
       | sy_max_configuration_rollbacks_null
       | sy_max_configurations_on_flash_null
+      | sy_memory_null
       | sy_name_resolution_null
       | sy_name_server
       | sy_no_ping_record_route_null
@@ -39,6 +41,7 @@ s_system
       | sy_no_redirects_ipv6_null
       | sy_no_redirects_null
       | sy_ntp
+      | sy_phone_home_null
       | sy_ports
       | sy_processes_null
       | sy_radius_options_null
@@ -55,6 +58,28 @@ s_system
       | sy_tacplus_server
       | sy_time_zone_null
    )
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/management-instance-edit-system.html
+sy_management_instance
+:
+   MANAGEMENT_INSTANCE
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/junos-install-upgrade/topics/concept/phone-home-client-understanding.html
+sy_phone_home_null
+:
+   PHONE_HOME
+   (
+      RFC_COMPLIANT
+      | SERVER junos_name
+   )
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/nfx250-jdm/topics/topic-map/nfx-enhanced-orchestration-hugepages.html
+sy_memory_null
+:
+   MEMORY HUGEPAGES PAGE_SIZE dec PAGE_COUNT dec
 ;
 
 sy_authentication_method
@@ -555,6 +580,7 @@ syl_idle_timeout_null
 :
    IDLE_TIMEOUT null_filler
 ;
+// https://www.juniper.net/documentation/us/en/software/junos/cli/topics/topic-map/cli-configuration.html#id-entering-configuration-statements-and-identifiers
 syl_message_null
 :
    MESSAGE null_filler
@@ -1353,6 +1379,7 @@ syserv_ssh
       | syservs_client_alive_interval_null
       | syservs_fingerprint_hash_null
       | syservs_hostkey_algorithm_null
+      | syservs_hostkey_algorithm_list_null
       | syservs_key_exchange_null
       | syservs_macs_null
       | syservs_max_pre_authentication_packets_null
@@ -1591,6 +1618,22 @@ syservs_hostkey_algorithm_null
 :
    HOSTKEY_ALGORITHM null_filler
 ;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/system-edit-ssh-hostkey-algorithm-list.html
+syservs_hostkey_algorithm_list_null
+:
+   HOSTKEY_ALGORITHM_LIST
+   (
+      ECDSA_SHA2_NISTP256
+      | ECDSA_SHA2_NISTP384
+      | ECDSA_SHA2_NISTP521
+      | ED25519
+      | RSA
+      | RSA_SHA2_256
+      | RSA_SHA2_512
+   )
+;
+
 syservs_key_exchange_null
 :
    KEY_EXCHANGE null_filler
@@ -1661,4 +1704,3 @@ sysp_zone_null
 :
    ZONE null_filler
 ;
-

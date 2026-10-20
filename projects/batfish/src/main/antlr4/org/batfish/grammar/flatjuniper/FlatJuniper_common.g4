@@ -493,6 +493,7 @@ filter_name
 :
   junos_name
   // Edge-cases due to language ambiguity
+  | GROUP
   | INPUT
   | OUTPUT
 ;
@@ -703,6 +704,11 @@ sc_named
   NO_ADVERTISE
   | NO_EXPORT
   | NO_EXPORT_SUBCONFED
+;
+
+large_community
+:
+  LARGE_COMMUNITY
 ;
 
 standard_community

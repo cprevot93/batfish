@@ -23,6 +23,7 @@ ri_instance_type
    (
       FORWARDING
       | L2VPN
+      | MAC_VRF
       | VIRTUAL_ROUTER
       | VIRTUAL_SWITCH
       | VRF
@@ -34,12 +35,21 @@ ri_interface
    INTERFACE id = interface_id
 ;
 
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/no-vrf-propagate-ttl-edit-routing-instances.html
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/vrf-propagate-ttl-edit-routing-instances2.html
+ri_vrf_propagate_ttl
+:
+   NO_VRF_PROPAGATE_TTL
+   | VRF_PROPAGATE_TTL
+;
+
 ri_named_routing_instance
 :
    name = junos_name
    (
       apply
-      | ri_chassis_null
+      | ri_access_null
+      | ri_chassis
       | ri_event_options_null
       | ri_provider_tunnel_null
       | ri_services_null
@@ -51,18 +61,221 @@ ri_named_routing_instance
       | ri_interface
       | ri_protocols
       | ri_route_distinguisher
+      | ri_service_type
       | ri_snmp
+      | ri_system
+      | ri_vlans
       | ri_vrf_export
       | ri_vrf_import
+      | ri_vrf_propagate_ttl
       | ri_vrf_table_label
       | ri_vrf_target
       | ri_vtep_source_interface
    )
 ;
 
-ri_chassis_null
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/access-edit-address-assignment.html
+ri_access_null
 :
-   CHASSIS null_filler
+   ACCESS sa_address_assignment_null
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/dhcp-local-server-edit-system-services.html
+ri_system
+:
+   SYSTEM ris_services
+;
+
+ris_services
+:
+   SERVICES riss_dhcp_local_server
+;
+
+riss_dhcp_local_server
+:
+   DHCP_LOCAL_SERVER rissd_group
+;
+
+rissd_group
+:
+   GROUP name = junos_name rissdg_interface
+;
+
+rissdg_interface
+:
+   INTERFACE id = interface_id
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/apply-groups.html
+ri_chassis
+:
+   CHASSIS
+   (
+      apply
+      | ric_alarm_null
+      | ric_aggregated_devices_null
+      | ric_enhanced_policer_null
+      | ric_fabric_null
+      | ric_fpc
+      | ric_forwarding_options_null
+      | ric_maximum_ecmp
+      | ric_network_services_null
+      | ric_redundancy_null
+   )
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/management-ethernet-edit-chassis.html
+ric_alarm_null
+:
+   ALARM null_filler
+;
+
+ric_aggregated_devices_null
+:
+   AGGREGATED_DEVICES null_filler
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/enhanced-policer-edit-chassis.html
+ric_enhanced_policer_null
+:
+   ENHANCED_POLICER
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/redundancy-mode-redundant.html
+ric_fabric_null
+:
+   FABRIC REDUNDANCY_MODE (INCREASED_BANDWIDTH | REDUNDANT)
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/forwarding-options-edit-chassis.html
+ric_forwarding_options_null
+:
+   FORWARDING_OPTIONS null_filler
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/maximum-ecmp-edit-chassis.html
+ric_maximum_ecmp
+:
+   MAXIMUM_ECMP maximum_ecmp = uint8
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/network-services-edit-chassis.html
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/enhanced-mode-edit-chassis-network-services.html
+ric_network_services_null
+:
+   NETWORK_SERVICES (ENHANCED_IP | ENHANCED_MODE)
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/redundancy-edit-chassis.html
+ric_redundancy_null
+:
+   REDUNDANCY null_filler
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/speed-edit-chassis.html
+ric_fpc
+:
+   FPC fpc = dec
+   (
+      ricf_auto_speed_detection
+      | ricf_error_null
+      | ricf_inline_services_null
+      | ricf_lite_mode_null
+      | ricf_pic
+      | ricf_sampling_instance_null
+      | ricf_temperature_threshold_null
+   )
+;
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/fpc-edit-chassis.html
+ricf_auto_speed_detection
+:
+   AUTO_SPEED_DETECTION (DISABLE | ENABLE)
+;
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/error-edit-chassis-fpc.html
+ricf_error_null
+:
+   ERROR null_filler
+;
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/flow-table-size-edit-services.html
+ricf_inline_services_null
+:
+   INLINE_SERVICES null_filler
+;
+ricf_lite_mode_null
+:
+   LITE_MODE null_filler
+;
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/sampling-instance-edit-chassis.html
+ricf_sampling_instance_null
+:
+   SAMPLING_INSTANCE null_filler
+;
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/chassis-adc-temperature-sensor.html
+ricf_temperature_threshold_null
+:
+   TEMPERATURE_THRESHOLD null_filler
+;
+ricf_pic
+:
+   PIC pic = dec
+   (
+      ricfp_interface_type_null
+      | ricfp_number_of_ports
+      | ricfp_pic_mode
+      | ricfp_port
+      | ricfp_port_range
+      | ricfp_tunnel_services
+   )
+;
+ricfp_interface_type_null
+:
+   INTERFACE_TYPE null_filler
+;
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/number-of-ports-edit-chassis.html
+ricfp_number_of_ports
+:
+   NUMBER_OF_PORTS number = uint8
+;
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/pic-mode-edit-chassis-mx-series.html
+ricfp_pic_mode
+:
+   PIC_MODE value = uint16 G
+;
+ricfp_port
+:
+   PORT port_num = uint16
+   (
+      ricfpp_channel_speed
+      | ricfpp_number_of_sub_ports
+      | ricfpp_speed
+   )
+;
+ricfp_port_range
+:
+   PORT_RANGE low = uint16 high = uint16 ricfpp_channel_speed
+;
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/tunnel-services-edit-chassis.html
+ricfp_tunnel_services
+:
+   TUNNEL_SERVICES (BANDWIDTH bandwidth)?
+;
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/channel-speed-edit-chassis.html
+ricfpp_channel_speed
+:
+   CHANNEL_SPEED
+   (
+      DISABLE_AUTO_SPEED_DETECTION
+      | value = uint16 unit = speed_abbreviation
+   )
+;
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/port-edit-chassis-fpc-pic.html
+ricfpp_number_of_sub_ports
+:
+   NUMBER_OF_SUB_PORTS number = uint8
+;
+ricfpp_speed
+:
+   SPEED value = dec unit = speed_abbreviation?
 ;
 ri_event_options_null
 :
@@ -87,6 +300,12 @@ ri_route_distinguisher
    ROUTE_DISTINGUISHER route_distinguisher
 ;
 
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/service-type.html
+ri_service_type
+:
+   SERVICE_TYPE (VLAN_AWARE | VLAN_BASED | VLAN_BUNDLE)
+;
+
 ri_snmp
 :
    s_snmp
@@ -102,9 +321,15 @@ ri_vrf_import
    VRF_IMPORT name = junos_name
 ;
 
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/vrf-table-label-edit-routing-instances-vp.html
 ri_vrf_table_label
 :
-   VRF_TABLE_LABEL
+   VRF_TABLE_LABEL rivtl_source_class_usage?
+;
+
+rivtl_source_class_usage
+:
+   SOURCE_CLASS_USAGE
 ;
 
 ri_vrf_target
@@ -120,6 +345,44 @@ ri_vrf_target
 ri_vtep_source_interface
 :
    VTEP_SOURCE_INTERFACE iface = interface_id
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/mac-vrf.html
+ri_vlans
+:
+   VLANS name = junos_name
+   (
+      rivl_description
+      | rivl_forwarding_options_null
+      | rivl_l3_interface
+      | rivl_vlan_id
+      | rivl_vxlan
+   )
+;
+
+rivl_description
+:
+   description
+;
+
+rivl_forwarding_options_null
+:
+   FORWARDING_OPTIONS null_filler
+;
+
+rivl_l3_interface
+:
+   L3_INTERFACE id = interface_id
+;
+
+rivl_vlan_id
+:
+   VLAN_ID id = vlan_number
+;
+
+rivl_vxlan
+:
+   VXLAN VNI id = vni_number
 ;
 
 riv_community
@@ -160,6 +423,7 @@ ro_autonomous_system
       |
       (
          roas_asdot_notation
+         | roas_independent_domain
          | roas_loops
       )*
    )
@@ -177,11 +441,93 @@ ro_forwarding_table
 :
    FORWARDING_TABLE
    (
-      rof_export
+      rof_chained_composite_next_hop_null
+      | rof_export
       | rof_indirect_next_hop_change_acknowledgements_null
       | rof_indirect_next_hop_null
+      | rof_krt_nexthop_ack_timeout_null
       | rof_no_ecmp_fast_reroute
       | rof_traceoptions_null
+   )
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/krt-nexthop-ack-timeout-edit-routing-options-forwarding-options.html
+rof_krt_nexthop_ack_timeout_null
+:
+   KRT_NEXTHOP_ACK_TIMEOUT dec
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/chained-composite-next-hop-edit-routing-options.html
+rof_chained_composite_next_hop_null
+:
+   CHAINED_COMPOSITE_NEXT_HOP
+   (
+      rofcc_ingress_null
+      | rofcc_transit_null
+   )
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/ingress-edit-routing-options-chained.html
+rofcc_ingress_null
+:
+   INGRESS
+   (
+      EVPN
+      | FEC129_VPWS
+      | L2CKT
+      | L2VPN
+      | LDP
+      | NO_EVPN
+      | NO_FEC129_VPWS
+      | NO_L2CKT
+      | NO_L2VPN
+      | rofcci_l3vpn_null
+      | rofcci_labeled_bgp_null
+   )
+;
+
+rofcci_l3vpn_null
+:
+   L3VPN
+   (
+      EXTENDED_SPACE
+      | PE_PE_CONNECTION EXTENDED_SPACE
+   )
+;
+
+rofcci_labeled_bgp_null
+:
+   LABELED_BGP
+   (
+      INET
+      | INET6
+   )
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/transit-edit-routing-options-chained.html
+rofcc_transit_null
+:
+   TRANSIT
+   (
+      ALL
+      | L2VPN
+      | L3VPN
+      | LABELED_BGP
+      | LDP
+      | LDP_P2MP
+      | LSP_STATISTICS_FROM_ROUTE
+      | NO_ALL
+      | NO_L2VPN
+      | NO_L3VPN
+      | NO_LABELED_BGP
+      | NO_LDP
+      | NO_LDP_P2MP
+      | NO_RSVP
+      | NO_RSVP_P2MP
+      | NO_STATIC
+      | RSVP
+      | RSVP_P2MP
+      | STATIC
    )
 ;
 
@@ -193,6 +539,12 @@ ro_generate
     | rog_defaults
     | rog_route
   )
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/instance-export-edit-routing-options.html
+ro_instance_export
+:
+   INSTANCE_EXPORT name = junos_name
 ;
 
 ro_instance_import
@@ -231,9 +583,14 @@ ro_multicast_null
 :
    MULTICAST null_filler
 ;
-ro_multipath_null
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/multipath-edit-routing-options.html
+ro_multipath
 :
-   MULTIPATH null_filler
+  MULTIPATH
+  (
+    AS_PATH_COMPARE
+    | VPN_UNEQUAL_COST EQUAL_EXTERNAL_INTERNAL?
+  )?
 ;
 ro_nonstop_routing_null
 :
@@ -257,8 +614,15 @@ ro_resolution
   RESOLUTION
   (
     apply
+    | rores_preserve_nexthop_hierarchy
     | rores_rib
   )
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/resolution-edit-routing-options.html
+rores_preserve_nexthop_hierarchy
+:
+  PRESERVE_NEXTHOP_HIERARCHY
 ;
 
 rores_rib
@@ -266,13 +630,56 @@ rores_rib
   RIB name = rib_name
   (
     apply
+    | roresr_inet6_import
+    | roresr_inet6_resolution_ribs
+    | roresr_inet_import
+    | roresr_inet_resolution_ribs
     | roresr_import
+    | roresr_iso_import
+    | roresr_iso_resolution_ribs
+    | roresr_resolution_ribs
   )
+;
+
+roresr_inet6_import
+:
+  INET6_IMPORT expr = policy_expression
+;
+
+roresr_inet6_resolution_ribs
+:
+  INET6_RESOLUTION_RIBS name = rib_name
+;
+
+roresr_inet_import
+:
+  INET_IMPORT expr = policy_expression
+;
+
+roresr_inet_resolution_ribs
+:
+  INET_RESOLUTION_RIBS name = rib_name
 ;
 
 roresr_import
 :
   IMPORT expr = policy_expression
+;
+
+roresr_iso_import
+:
+  ISO_IMPORT expr = policy_expression
+;
+
+roresr_iso_resolution_ribs
+:
+  ISO_RESOLUTION_RIBS name = rib_name
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/resolution-ribs-edit-routing-options.html
+roresr_resolution_ribs
+:
+  RESOLUTION_RIBS name = rib_name
 ;
 
 ro_rib
@@ -283,6 +690,7 @@ ro_rib
       | ror_inet6
       | ror_iso
       | ror_mpls
+      | ror_vxlan
    )
 ;
 
@@ -300,6 +708,7 @@ ror_inet6
       | ro_aggregate
       | ro_generate
       | ro_martians
+      | ro_multipath
       | ro6_static
    )
 ;
@@ -314,6 +723,12 @@ ror_mpls
     name = mpls_rib_name ror_common
 ;
 
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/rib-edit-routing-options.html
+ror_vxlan
+:
+    name = vxlan_rib_name ro_martians
+;
+
 
 ror_common
 :
@@ -321,6 +736,7 @@ ror_common
   | ro_aggregate
   | ro_generate
   | ro_martians
+  | ro_multipath
   | ro_static
 ;
 
@@ -346,9 +762,19 @@ ro_router_id
 
 ro_srlg
 :
-   SRLG name = junos_name
+   SRLG
    (
-      roslrg_srlg_cost
+      apply
+      | ro_srlg_named
+   )
+;
+
+ro_srlg_named
+:
+   name = junos_name
+   (
+      apply
+      | roslrg_srlg_cost
       | roslrg_srlg_value
    )
 ;
@@ -479,7 +905,7 @@ roa_common
 
 roa_community
 :
-   COMMUNITY community = STANDARD_COMMUNITY
+   COMMUNITY route_community
 ;
 
 roa_defaults
@@ -545,6 +971,12 @@ roas_asdot_notation
    ASDOT_NOTATION
 ;
 
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/independent-domain-edit-routing-options.html
+roas_independent_domain
+:
+  INDEPENDENT_DOMAIN NO_ATTRSET?
+;
+
 roas_loops
 :
    LOOPS dec
@@ -592,7 +1024,7 @@ rog_common
 
 rog_community
 :
-   COMMUNITY standard_community
+   COMMUNITY route_community
 ;
 
 rog_defaults
@@ -751,11 +1183,94 @@ rosr_as_path
    AS_PATH PATH path = as_path_expr
 ;
 
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/bfd-liveness-detection-edit-routing-options.html
+bfd_liveness_detection_holddown_interval
+:
+   // 0-255000
+   uint32
+;
+
+bfd_liveness_detection_interval
+:
+   // 1-255000
+   uint32
+;
+
+bfd_liveness_detection_threshold_or_multiplier
+:
+   // 1-255
+   uint8
+;
+
+rosr_bfd_liveness_detection
+:
+   BFD_LIVENESS_DETECTION
+   (
+      rosrbfd_detection_time
+      | rosrbfd_holddown_interval
+      | rosrbfd_minimum_interval
+      | rosrbfd_minimum_receive_interval
+      | rosrbfd_multiplier
+      | rosrbfd_no_adaptation
+      | rosrbfd_transmit_interval
+   )
+;
+
+rosrbfd_detection_time
+:
+   DETECTION_TIME THRESHOLD value = bfd_liveness_detection_threshold_or_multiplier
+;
+
+rosrbfd_holddown_interval
+:
+   HOLDDOWN_INTERVAL interval = bfd_liveness_detection_holddown_interval
+;
+
+rosrbfd_minimum_interval
+:
+   MINIMUM_INTERVAL interval = bfd_liveness_detection_interval
+;
+
+rosrbfd_minimum_receive_interval
+:
+   MINIMUM_RECEIVE_INTERVAL interval = bfd_liveness_detection_interval
+;
+
+rosrbfd_multiplier
+:
+   MULTIPLIER multiplier = bfd_liveness_detection_threshold_or_multiplier
+;
+
+rosrbfd_no_adaptation
+:
+   NO_ADAPTATION
+;
+
+rosrbfd_transmit_interval
+:
+   TRANSMIT_INTERVAL
+   (
+      rosrbfdt_minimum_interval
+      | rosrbfdt_threshold
+   )
+;
+
+rosrbfdt_minimum_interval
+:
+   MINIMUM_INTERVAL interval = bfd_liveness_detection_interval
+;
+
+rosrbfdt_threshold
+:
+   THRESHOLD value = bfd_liveness_detection_threshold_or_multiplier
+;
+
 rosr_common
 :
    apply
    | rosr_active
    | rosr_as_path
+   | rosr_bfd_liveness_detection
    | rosr_community
    | rosr_discard
    | rosr_install
@@ -777,7 +1292,7 @@ rosr_common
 
 rosr_community
 :
-   COMMUNITY standard_community
+   COMMUNITY route_community
 ;
 
 rosr_discard
@@ -840,9 +1355,10 @@ rosr_preference
 
 rosr_qualified_next_hop
 :
+   // https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/qualified-next-hop-edit-routing-options.html
    QUALIFIED_NEXT_HOP
    (
-      ip_address
+      ip_address (INTERFACE interface_id)?
       | interface_id
    )
    rosrqnh_common?
@@ -852,7 +1368,7 @@ rosr_qualified_next_hop6
 :
    QUALIFIED_NEXT_HOP
    (
-      ipv6_address
+      ipv6_address (INTERFACE interface_id)?
       | interface_id
    )
    rosrqnh_common?
@@ -888,13 +1404,88 @@ rosr_tag2
    TAG2 tag = uint32
 ;
 
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/community-edit-routing-options.html
+// The CLI reference excludes extended communities at the routing-options hierarchy. Lab
+// validation in batfish/batfish#10367 confirms standard and large communities for static,
+// aggregate, and generated routes.
+route_community
+:
+   large_community
+   | standard_community
+;
+
 rosrqnh_common
 :
    (
-      rosrqnhc_metric
+      rosrqnhc_bfd_liveness_detection
+      | rosrqnhc_metric
       | rosrqnhc_preference
       | rosrqnhc_tag
    )
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/bfd-liveness-detection-edit-routing-options.html
+rosrqnhc_bfd_liveness_detection
+:
+   BFD_LIVENESS_DETECTION
+   (
+      rosrqnhcbfd_detection_time
+      | rosrqnhcbfd_holddown_interval
+      | rosrqnhcbfd_minimum_interval
+      | rosrqnhcbfd_minimum_receive_interval
+      | rosrqnhcbfd_multiplier
+      | rosrqnhcbfd_no_adaptation
+      | rosrqnhcbfd_transmit_interval
+   )
+;
+
+rosrqnhcbfd_detection_time
+:
+   DETECTION_TIME THRESHOLD value = bfd_liveness_detection_threshold_or_multiplier
+;
+
+rosrqnhcbfd_holddown_interval
+:
+   HOLDDOWN_INTERVAL interval = bfd_liveness_detection_holddown_interval
+;
+
+rosrqnhcbfd_minimum_interval
+:
+   MINIMUM_INTERVAL interval = bfd_liveness_detection_interval
+;
+
+rosrqnhcbfd_minimum_receive_interval
+:
+   MINIMUM_RECEIVE_INTERVAL interval = bfd_liveness_detection_interval
+;
+
+rosrqnhcbfd_multiplier
+:
+   MULTIPLIER multiplier = bfd_liveness_detection_threshold_or_multiplier
+;
+
+rosrqnhcbfd_no_adaptation
+:
+   NO_ADAPTATION
+;
+
+rosrqnhcbfd_transmit_interval
+:
+   TRANSMIT_INTERVAL
+   (
+      rosrqnhcbfdt_minimum_interval
+      | rosrqnhcbfdt_threshold
+   )
+;
+
+rosrqnhcbfdt_minimum_interval
+:
+   MINIMUM_INTERVAL interval = bfd_liveness_detection_interval
+;
+
+rosrqnhcbfdt_threshold
+:
+   THRESHOLD value = bfd_liveness_detection_threshold_or_multiplier
 ;
 
 rosrqnhc_metric
@@ -931,16 +1522,18 @@ s_routing_options
       | ro_autonomous_system
       | ro_bmp
       | ro_confederation
+      | ro_dynamic_tunnels
       | ro_forwarding_table
       | ro_generate
       | ro_graceful_restart_null
+      | ro_instance_export
       | ro_instance_import
       | ro_interface_routes
       | ro_lsp_telemetry_null
       | ro_martians
       | ro_maximum_prefixes
       | ro_multicast_null
-      | ro_multipath_null
+      | ro_multipath
       | ro_nonstop_routing_null
       | ro_options_null
       | ro_ppm_null
@@ -954,4 +1547,56 @@ s_routing_options
       | ro_traceoptions_null
       | ro_validation
    )
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/dynamic-tunnels-edit-routing-options.html
+ro_dynamic_tunnels
+:
+   DYNAMIC_TUNNELS
+   (
+      rodt_forwarding_rib
+      | rodt_named
+   )
+;
+
+rodt_forwarding_rib
+:
+   FORWARDING_RIB rib = junos_name INET_IMPORT policy = junos_name
+;
+
+rodt_named
+:
+   name = junos_name
+   (
+      rodtn_bgp_signal
+      | rodtn_destination_networks
+      | rodtn_ipip
+      | rodtn_source_address
+      | rodtn_udp
+   )
+;
+
+rodtn_bgp_signal
+:
+   BGP_SIGNAL
+;
+
+rodtn_destination_networks
+:
+   DESTINATION_NETWORKS prefix = ip_prefix (PREFERENCE preference = uint32)?
+;
+
+rodtn_ipip
+:
+   IPIP
+;
+
+rodtn_source_address
+:
+   SOURCE_ADDRESS address = ip_address
+;
+
+rodtn_udp
+:
+   UDP
 ;

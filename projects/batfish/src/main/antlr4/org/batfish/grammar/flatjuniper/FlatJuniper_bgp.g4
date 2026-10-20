@@ -96,6 +96,7 @@ b_cluster
 b_common
 :
    apply
+   | b_accept_remote_nexthop
    | b_advertise_external
    | b_advertise_inactive
    | b_advertise_peer_as
@@ -105,23 +106,28 @@ b_common
    | b_authentication_key_chain
    | b_authentication_key_null
    | b_bfd_liveness_detection_null
+   | b_bgp_error_tolerance
    | b_bmp
    | b_cluster
    | b_damping
    | b_description
    | b_disable_4byte_as
+   | b_disable_linklocal_addr
+   | b_domain_path_id
    | b_enforce_first_as
    | b_export
    | b_family
    | b_forwarding_context
    | b_graceful_restart_null
    | b_hold_time_null
+   | b_holddown_all_stale_labels_null
    | b_import
    | b_keep
    | b_local_address
    | b_local_as
    | b_local_preference
    | b_log_updown_null
+   | b_metric_out
    | b_mtu_discovery_null
    | b_multihop
    | b_multipath
@@ -132,10 +138,32 @@ b_common
    | b_peer_as
    | b_precision_timers_null
    | b_preference
+   | b_receive_buffer
    | b_remove_private
+   | b_send_buffer
+   | b_stale_labels_holddown_period_null
    | b_tcp_mss
    | b_traceoptions_null
+   | b_ttl
    | b_type
+   | b_vpn_apply_export
+;
+
+// Undocumented Junos statements validated by batfish/lab-validation#242.
+b_receive_buffer
+:
+   RECEIVE_BUFFER size = bandwidth
+;
+
+b_send_buffer
+:
+   SEND_BUFFER size = bandwidth
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/accept-remote-nexthop-edit-protocols-bgp.html
+b_accept_remote_nexthop
+:
+   ACCEPT_REMOTE_NEXTHOP
 ;
 
 b_damping
@@ -150,6 +178,12 @@ b_description
    DESCRIPTION text = bgp_description_text
 ;
 
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/dynamic-neighbor-edit-protocols-bgp.html
+b_dynamic_neighbor
+:
+   DYNAMIC_NEIGHBOR name = junos_name b_allow
+;
+
 b_disable
 :
    DISABLE
@@ -160,9 +194,38 @@ b_disable_4byte_as
    DISABLE_4BYTE_AS
 ;
 
+// https://github.com/batfish/lab-validation/tree/main/snapshots/junos_bgp_disable_linklocal_addr
+b_disable_linklocal_addr
+:
+   DISABLE_LINKLOCAL_ADDR
+;
+
 b_drop_path_attributes
 :
    DROP_PATH_ATTRIBUTES attr = uint8_range
+;
+
+// The BGP domain path attribute is not modeled.
+b_domain_path_id
+:
+   DOMAIN_PATH_ID
+   (
+      apply
+      | bdpi_receive_null
+      | bdpi_send_null
+   )
+;
+
+// Allow receiving the BGP domain path attribute.
+bdpi_receive_null
+:
+   RECEIVE
+;
+
+// Allow sending the BGP domain path attribute.
+bdpi_send_null
+:
+   SEND
 ;
 
 b_enable
@@ -201,6 +264,7 @@ b_group
    GROUP name = junos_name
    (
       b_common
+      | b_dynamic_neighbor
       | b_neighbor
       | b_allow
    )
@@ -233,6 +297,16 @@ b_local_as
 b_local_preference
 :
    LOCAL_PREFERENCE localpref = uint32
+;
+
+b_metric_out
+:
+   METRIC_OUT
+   (
+      bmo_igp_null
+      | bmo_med_null
+      | bmo_minimum_igp_null
+   )
 ;
 
 b_multihop
@@ -319,12 +393,15 @@ b_passive
    PASSIVE
 ;
 
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/path-selection-edit-protocols-bgp.html
 b_path_selection
 :
    PATH_SELECTION
    (
       bps_always_compare_med
+      | bps_compare_cluster_length_before_originator_id
       | bps_external_router_id
+      | bps_med_plus_igp
    )
 ;
 
@@ -342,6 +419,7 @@ b_preference
   PREFERENCE pref = dec
 ;
 
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/remove-private-edit-protocols-bgp.html
 b_remove_private
 :
    REMOVE_PRIVATE
@@ -350,12 +428,30 @@ b_remove_private
      | NEAREST
      | REPLACE
      | NO_PEER_LOOP_CHECK
-   )?
+   )*
+;
+
+// https://github.com/Juniper/yang/blob/master/20.3/20.3R1/junos/conf-with-extensions/junos-conf-protocols%402019-01-01.yang
+b_holddown_all_stale_labels_null
+:
+   HOLDDOWN_ALL_STALE_LABELS
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/stale-labels-holddown-period-edit-protocols-bgp.html
+b_stale_labels_holddown_period_null
+:
+   STALE_LABELS_HOLDDOWN_PERIOD uint32
 ;
 
 b_tcp_mss
 :
    TCP_MSS dec
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/multihop-edit-protocols-bgp.html
+b_ttl
+:
+   TTL ttl = uint8
 ;
 
 b_type
@@ -365,6 +461,12 @@ b_type
       EXTERNAL
       | INTERNAL
    )
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/vpn-apply-export-edit-protocols-bgp-vp.html
+b_vpn_apply_export
+:
+   VPN_APPLY_EXPORT
 ;
 
 bf_accepted_prefix_limit
@@ -469,6 +571,7 @@ bfi_unicast
    (
       apply
       | bfiu_add_path
+      | bfiu_delay_route_advertisements_null
       | bfiu_extended_nexthop_tunnel_null
       | bfiu_loops
       | bfiu_prefix_limit
@@ -497,11 +600,24 @@ bfi6_unicast
    (
       apply
       | bfi6u_add_path
+      | bfi6u_delay_route_advertisements_null
       | bfi6u_extended_nexthop_tunnel_null
       | bfi6u_loops
       | bfi6u_prefix_limit
+      | bfi6u_rib_group
       | bfi6u_withdraw_priority
    )
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/bgp/topics/ref/statement/delay-route-advertisements-edit-protocols-group-family-unicast.html
+bfiu_delay_route_advertisements_null
+:
+   DELAY_ROUTE_ADVERTISEMENTS null_filler
+;
+
+bfi6u_delay_route_advertisements_null
+:
+   DELAY_ROUTE_ADVERTISEMENTS null_filler
 ;
 
 bfi6u_add_path
@@ -568,6 +684,12 @@ bfi6u_prefix_limit
    PREFIX_LIMIT null_filler
 ;
 
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/rib-group-edit-protocols-bgp.html
+bfi6u_rib_group
+:
+   RIB_GROUP name = junos_name
+;
+
 bfi6u_withdraw_priority: WITHDRAW_PRIORITY bgp_priority_queue_id;
 
 bfiu_add_path
@@ -593,6 +715,7 @@ bfiu_prefix_limit
    PREFIX_LIMIT null_filler
 ;
 
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/rib-group-edit-protocols-bgp.html
 bfiu_rib_group
 :
    RIB_GROUP name = junos_name
@@ -681,9 +804,34 @@ bm_no_nexthop_change
    NO_NEXTHOP_CHANGE
 ;
 
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/multihop-edit-protocols-bgp.html
 bm_ttl
 :
-   TTL dec
+   TTL ttl = uint8
+;
+
+// Set the MED to the most recent IGP metric to the BGP next hop.
+bmo_igp_null
+:
+   IGP offset = bmo_offset? DELAY_MED_UPDATE?
+;
+
+// Set the MED to a constant.
+bmo_med_null
+:
+   med = uint32
+;
+
+// Set the MED to the lowest IGP metric to the BGP next hop seen so far.
+bmo_minimum_igp_null
+:
+   MINIMUM_IGP offset = bmo_offset?
+;
+
+// Amount by which the IGP-derived MED is increased (positive) or decreased (negative).
+bmo_offset
+:
+   DASH? uint32
 ;
 
 bpa_as
@@ -696,9 +844,25 @@ bps_always_compare_med
    ALWAYS_COMPARE_MED
 ;
 
+// https://github.com/batfish/lab-validation/pull/238
+bps_compare_cluster_length_before_originator_id
+:
+   COMPARE_CLUSTER_LENGTH_BEFORE_ORIGINATOR_ID
+;
+
 bps_external_router_id
 :
    EXTERNAL_ROUTER_ID
+;
+
+bps_med_plus_igp
+:
+   MED_PLUS_IGP
+   (
+      apply
+      | IGP_MULTIPLIER igp_multiplier = uint16
+      | MED_MULTIPLIER med_multiplier = uint16
+   )
 ;
 
 p_bgp
@@ -706,7 +870,6 @@ p_bgp
    BGP
    (
       b_advertise_from_main_vpn_tables_null
-      | b_bgp_error_tolerance_null
       | b_common
       | b_disable
       | b_drop_path_attributes
@@ -714,10 +877,28 @@ p_bgp
       | b_group
       | b_neighbor
       | b_output_queue_priority
+      | b_send_addpath_optimization_null
    )
 ;
 
 // Protocol-wide config only
 b_advertise_from_main_vpn_tables_null: ADVERTISE_FROM_MAIN_VPN_TABLES;
-b_bgp_error_tolerance_null: BGP_ERROR_TOLERANCE;
+
+// https://github.com/Juniper/yang/blob/master/21.4/21.4R1/junos/conf-with-extensions/junos-conf-protocols%402019-01-01.yang
+b_send_addpath_optimization_null: SEND_ADDPATH_OPTIMIZATION;
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/bgp-error-tolerance.html
+b_bgp_error_tolerance
+:
+   BGP_ERROR_TOLERANCE
+   (
+      bbet_malformed_route_limit
+      | bbet_malformed_update_log_interval
+      | bbet_no_malformed_route_limit
+   )?
+;
+
+bbet_malformed_route_limit: MALFORMED_ROUTE_LIMIT limit = uint32;
+bbet_malformed_update_log_interval: MALFORMED_UPDATE_LOG_INTERVAL interval = uint16;
+bbet_no_malformed_route_limit: NO_MALFORMED_ROUTE_LIMIT;
+
 b_forwarding_context: FORWARDING_CONTEXT name = junos_name;

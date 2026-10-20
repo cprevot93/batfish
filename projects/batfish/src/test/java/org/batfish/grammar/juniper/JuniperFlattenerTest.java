@@ -57,6 +57,28 @@ public class JuniperFlattenerTest {
     assertThat(flatText, containsString(String.join("\n", copies)));
   }
 
+  @Test
+  public void testEscapedQuotedStrings() {
+    Flattener flattener =
+        Batfish.flatten(
+            readResource(TESTCONFIGS_PREFIX + "junos-escaped-quoted-string", UTF_8),
+            new BatfishLogger(BatfishLogger.LEVELSTR_OUTPUT, false),
+            new Settings(),
+            new Warnings(),
+            ConfigurationFormat.JUNIPER,
+            VendorConfigurationFormatDetector.BATFISH_FLATTENED_JUNIPER_HEADER);
+    assertThat(flattener, instanceOf(JuniperFlattener.class));
+    assertThat(
+        flattener.getFlattenedConfigurationText(),
+        allOf(
+            containsString(
+                "commands \"request pfe execute target fpc0 command \\\"set slot[0] register"
+                    + " example 1\\\"\""),
+            containsString(
+                "commands \"request pfe execute target fpc0 command \\\"set shell"
+                    + " \\\\\"register EXAMPLE=1\\\\\"\\\"\"")));
+  }
+
   /** Test that configurations with `apply-flags omit` are flattened correctly. */
   @Test
   public void testFlattenWithApplyFlagsOmit() {
@@ -144,6 +166,50 @@ public class JuniperFlattenerTest {
         assertThat(lineMap.getOriginalLine(3, index), equalTo(5));
       }
     }
+  }
+
+  @Test
+  public void testRoutingEnginePrompts() {
+    Flattener flattener =
+        Batfish.flatten(
+            readResource(TESTCONFIGS_PREFIX + "flatten-routing-engine-prompts", UTF_8),
+            new BatfishLogger(BatfishLogger.LEVELSTR_OUTPUT, false),
+            new Settings(),
+            new Warnings(),
+            ConfigurationFormat.JUNIPER,
+            VendorConfigurationFormatDetector.BATFISH_FLATTENED_JUNIPER_HEADER);
+    assertThat(flattener, instanceOf(JuniperFlattener.class));
+    assertThat(
+        flattener.getFlattenedConfigurationText(),
+        equalTo(
+            """
+            ####BATFISH FLATTENED JUNIPER CONFIG####
+            set system host-name device
+            """));
+  }
+
+  /** A protected parent hierarchy and all its children remain in the effective configuration. */
+  @Test
+  public void testProtectedHierarchy() {
+    Flattener flattener =
+        Batfish.flatten(
+            readResource(TESTCONFIGS_PREFIX + "flatten-protect", UTF_8),
+            new BatfishLogger(BatfishLogger.LEVELSTR_OUTPUT, false),
+            new Settings(),
+            new Warnings(),
+            ConfigurationFormat.JUNIPER,
+            VendorConfigurationFormatDetector.BATFISH_FLATTENED_JUNIPER_HEADER);
+    assertThat(flattener, instanceOf(JuniperFlattener.class));
+    assertThat(
+        flattener.getFlattenedConfigurationText(),
+        equalTo(
+            """
+            ####BATFISH FLATTENED JUNIPER CONFIG####
+            protect system
+            set system host-name router
+            set system license keys key "%CENSORED%"
+            set system login user test-user uid 1000
+            """));
   }
 
   /**

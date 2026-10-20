@@ -28,6 +28,7 @@ import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.not;
 
 import com.google.common.collect.ImmutableList;
@@ -38,11 +39,16 @@ import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.graph.MutableValueGraph;
 import com.google.common.graph.ValueGraphBuilder;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.annotation.Nonnull;
 import org.batfish.datamodel.AbstractRoute;
+import org.batfish.datamodel.AbstractRouteDecorator;
 import org.batfish.datamodel.AnnotatedRoute;
 import org.batfish.datamodel.AsPath;
 import org.batfish.datamodel.BgpActivePeerConfig;
@@ -51,6 +57,7 @@ import org.batfish.datamodel.BgpAdvertisement.BgpAdvertisementType;
 import org.batfish.datamodel.BgpPeerConfig;
 import org.batfish.datamodel.BgpPeerConfigId;
 import org.batfish.datamodel.BgpProcess;
+import org.batfish.datamodel.BgpRoute;
 import org.batfish.datamodel.BgpSessionProperties;
 import org.batfish.datamodel.BgpVrfLeakConfig;
 import org.batfish.datamodel.Bgpv4Route;
@@ -60,7 +67,9 @@ import org.batfish.datamodel.ConfigurationFormat;
 import org.batfish.datamodel.ConnectedRoute;
 import org.batfish.datamodel.EvpnType3Route;
 import org.batfish.datamodel.EvpnType5Route;
+import org.batfish.datamodel.GeneratedRoute;
 import org.batfish.datamodel.Ip;
+import org.batfish.datamodel.NetworkConfigurations;
 import org.batfish.datamodel.NetworkFactory;
 import org.batfish.datamodel.OriginMechanism;
 import org.batfish.datamodel.OriginType;
@@ -73,6 +82,7 @@ import org.batfish.datamodel.RoutingProtocol;
 import org.batfish.datamodel.StaticRoute;
 import org.batfish.datamodel.SubRange;
 import org.batfish.datamodel.Vrf;
+import org.batfish.datamodel.VrfLeakConfig;
 import org.batfish.datamodel.bgp.AddressFamily.Type;
 import org.batfish.datamodel.bgp.BgpAggregate;
 import org.batfish.datamodel.bgp.BgpTopology;
@@ -90,10 +100,12 @@ import org.batfish.datamodel.routing_policy.RoutingPolicy;
 import org.batfish.datamodel.routing_policy.expr.BgpPeerAddressNextHop;
 import org.batfish.datamodel.routing_policy.expr.DestinationNetwork;
 import org.batfish.datamodel.routing_policy.expr.ExplicitPrefixSet;
+import org.batfish.datamodel.routing_policy.expr.LiteralLong;
 import org.batfish.datamodel.routing_policy.expr.LiteralOrigin;
 import org.batfish.datamodel.routing_policy.expr.MatchPrefixSet;
 import org.batfish.datamodel.routing_policy.expr.MatchProtocol;
 import org.batfish.datamodel.routing_policy.statement.If;
+import org.batfish.datamodel.routing_policy.statement.SetLocalPreference;
 import org.batfish.datamodel.routing_policy.statement.SetNextHop;
 import org.batfish.datamodel.routing_policy.statement.SetOrigin;
 import org.batfish.datamodel.routing_policy.statement.Statements;
@@ -143,6 +155,43 @@ public class BgpRoutingProcessTest {
     assertThat(_routingProcess._ebgpv4Rib.getUnannotatedRoutes(), empty());
     // Combined bgp
     assertThat(_routingProcess._bgpv4Rib.getUnannotatedRoutes(), empty());
+  }
+
+  @Test
+  public void testPreallocatePathIdsDeterministic() {
+    Prefix prefix = Prefix.parse("10.0.0.0/24");
+    Bgpv4Route route1 =
+        Bgpv4Route.testBuilder()
+            .setNetwork(prefix)
+            .setNextHop(NextHopInterface.of("Ethernet1"))
+            .build();
+    Bgpv4Route route2 =
+        Bgpv4Route.testBuilder()
+            .setNetwork(prefix)
+            .setNextHop(NextHopInterface.of("Ethernet2"))
+            .build();
+    Map<Prefix, Integer> forwardGenerators = new HashMap<>();
+    Map<AbstractRouteDecorator, Integer> forwardAssignments = new HashMap<>();
+    Map<Prefix, Integer> reverseGenerators = new HashMap<>();
+    Map<AbstractRouteDecorator, Integer> reverseAssignments = new HashMap<>();
+
+    BgpRoutingProcess.preallocatePathIds(
+        Stream.of(route1, route2), forwardGenerators, forwardAssignments);
+    BgpRoutingProcess.preallocatePathIds(
+        Stream.of(route2, route1), reverseGenerators, reverseAssignments);
+
+    assertThat(reverseGenerators, equalTo(forwardGenerators));
+    assertThat(reverseAssignments, equalTo(forwardAssignments));
+
+    Map<Prefix, Integer> existingGenerators = new HashMap<>();
+    existingGenerators.put(prefix, 1);
+    Map<AbstractRouteDecorator, Integer> existingAssignments = new HashMap<>();
+    existingAssignments.put(route1, 1);
+
+    BgpRoutingProcess.preallocatePathIds(
+        Stream.of(route2, route1), existingGenerators, existingAssignments);
+
+    assertThat(existingAssignments, equalTo(ImmutableMap.of(route1, 1, route2, 2)));
   }
 
   @Test
@@ -435,7 +484,8 @@ public class BgpRoutingProcessTest {
     4. Ensure BGP rib state (at least type 3 routes) are sent to new neighbors.
     */
     routingProcNode1.initialize(node);
-    routingProcNode1.executeIteration(ImmutableMap.of());
+    routingProcNode1.executeIteration(
+        ImmutableMap.of(), NetworkConfigurations.of(ImmutableMap.of()));
     // Update topology
     MutableValueGraph<BgpPeerConfigId, BgpSessionProperties> graph =
         ValueGraphBuilder.directed().build();
@@ -467,12 +517,20 @@ public class BgpRoutingProcessTest {
         sessionBuilderReverse.setAddressFamilies(ImmutableSet.of(Type.EVPN)).build());
     routingProcNode1.updateTopology(new BgpTopology(graph));
     routingProcNode2.updateTopology(new BgpTopology(graph));
-    routingProcNode1.executeIteration(
+    Map<String, Node> nodes =
         ImmutableSortedMap.of(
             node.getConfiguration().getHostname(),
             node,
             node2.getConfiguration().getHostname(),
-            node2));
+            node2);
+    routingProcNode1.executeIteration(
+        nodes,
+        NetworkConfigurations.of(
+            ImmutableMap.of(
+                node.getConfiguration().getHostname(),
+                node.getConfiguration(),
+                node2.getConfiguration().getHostname(),
+                node2.getConfiguration())));
 
     assertThat(
         routingProcNode2._evpnType3IncomingRoutes.get(new BgpTopology.EdgeId(peer1Id, peer2Id)),
@@ -661,7 +719,8 @@ public class BgpRoutingProcessTest {
 
     Node node = new Node(_c);
     _routingProcess.initialize(node);
-    _routingProcess.executeIteration(ImmutableMap.of());
+    _routingProcess.executeIteration(
+        ImmutableMap.of(), NetworkConfigurations.of(ImmutableMap.of()));
     assertThat(
         _routingProcess._bgpv4Rib.getUnannotatedRoutes(),
         contains(
@@ -800,6 +859,244 @@ public class BgpRoutingProcessTest {
     // Fake up end of round
     _routingProcess.endOfRound();
     assertThat(_routingProcess.getRoutesToLeak().collect(Collectors.toList()), empty());
+  }
+
+  @Test
+  public void testCrossVrfWithdrawRemovesTheLeakedRoute() {
+    // A leak rewrites the next hop to the source VRF, so what it merged is not the route the
+    // source withdraws, and removing the source's route left the leaked one in place.
+    BgpVrfLeakConfig leak =
+        BgpVrfLeakConfig.builder().setImportFromVrf("otherVrf").setAdmin(0).setWeight(0).build();
+    Bgpv4Route route =
+        Bgpv4Route.testBuilder()
+            .setNetwork(Prefix.parse("1.1.1.0/24"))
+            .setSrcProtocol(RoutingProtocol.BGP)
+            .build();
+    _routingProcess.importCrossVrfV4Routes(Stream.of(RouteAdvertisement.adding(route)), leak);
+    assertThat(_routingProcess._bgpv4Rib.getUnannotatedRoutes(), hasSize(1));
+
+    _routingProcess.importCrossVrfV4Routes(Stream.of(RouteAdvertisement.withdrawing(route)), leak);
+    assertThat(_routingProcess._bgpv4Rib.getUnannotatedRoutes(), empty());
+  }
+
+  private RoutingPolicy leakPolicy(String name, boolean accept) {
+    return RoutingPolicy.builder()
+        .setOwner(_c)
+        .setName(name)
+        .addStatement(
+            accept
+                ? Statements.ExitAccept.toStaticStatement()
+                : Statements.ExitReject.toStaticStatement())
+        .build();
+  }
+
+  /** A BGP process over the current configuration, so that it sees the policies defined on it. */
+  private BgpRoutingProcess newRoutingProcess() {
+    return new BgpRoutingProcess(
+        _bgpProcess, _c, DEFAULT_VRF_NAME, new Rib(), BgpTopology.EMPTY, new PrefixTracer());
+  }
+
+  @Test
+  public void testCrossVrfLeaksFromOneSourceKeepTheirImportsApart() {
+    // Two leaks from one VRF: one rule's rejection must not take back what the other imported.
+    leakPolicy("accept", true);
+    leakPolicy("reject", false);
+    _routingProcess = newRoutingProcess();
+    Bgpv4Route route =
+        Bgpv4Route.testBuilder()
+            .setNetwork(Prefix.parse("1.1.1.0/24"))
+            .setSrcProtocol(RoutingProtocol.BGP)
+            .build();
+    BgpVrfLeakConfig.Builder leak =
+        BgpVrfLeakConfig.builder().setImportFromVrf("otherVrf").setAdmin(0).setWeight(0);
+
+    _routingProcess.importCrossVrfV4Routes(
+        Stream.of(RouteAdvertisement.adding(route)), leak.setImportPolicy("accept").build());
+    _routingProcess.importCrossVrfV4Routes(
+        Stream.of(RouteAdvertisement.adding(route)), leak.setImportPolicy("reject").build());
+
+    assertThat(_routingProcess._bgpv4Rib.getUnannotatedRoutes(), hasSize(1));
+  }
+
+  @Test
+  public void testCrossVrfLeaksStageOnlyTheirNetChange() {
+    // Equal routes for one prefix leaked from two VRFs, so arrival order picks between them.
+    // Withdrawing and re-adding each in turn moves the best path away and back, and the main RIB
+    // must not be left holding the step in between.
+    leakPolicy("accept", true);
+    _routingProcess = newRoutingProcess();
+    Prefix prefix = Prefix.parse("1.1.1.0/24");
+    Bgpv4Route route =
+        Bgpv4Route.testBuilder().setNetwork(prefix).setSrcProtocol(RoutingProtocol.BGP).build();
+    BgpVrfLeakConfig fromA =
+        BgpVrfLeakConfig.builder()
+            .setImportFromVrf("vrfA")
+            .setImportPolicy("accept")
+            .setAdmin(0)
+            .setWeight(0)
+            .build();
+    BgpVrfLeakConfig fromB =
+        BgpVrfLeakConfig.builder()
+            .setImportFromVrf("vrfB")
+            .setImportPolicy("accept")
+            .setAdmin(0)
+            .setWeight(0)
+            .build();
+    _routingProcess.importCrossVrfV4Routes(Stream.of(RouteAdvertisement.adding(route)), fromA);
+    _routingProcess.importCrossVrfV4Routes(Stream.of(RouteAdvertisement.adding(route)), fromB);
+    _routingProcess.stageCrossVrfImports();
+    Set<BgpRoute<?, ?>> mainRib = new HashSet<>();
+    applyTo(mainRib, _routingProcess.getUpdatesForMainRib());
+
+    _routingProcess.importCrossVrfV4Routes(
+        Stream.of(RouteAdvertisement.withdrawing(route), RouteAdvertisement.adding(route)), fromA);
+    _routingProcess.importCrossVrfV4Routes(
+        Stream.of(RouteAdvertisement.withdrawing(route), RouteAdvertisement.adding(route)), fromB);
+    _routingProcess.stageCrossVrfImports();
+    applyTo(mainRib, _routingProcess.getUpdatesForMainRib());
+
+    assertThat(
+        mainRib, equalTo(ImmutableSet.copyOf(_routingProcess._bgpv4Rib.getUnannotatedRoutes())));
+  }
+
+  @Test
+  public void testALaterStagingReplacesWhatAnEarlierOneStaged() {
+    // Peer processing stages before the leaks run, and a leak can then displace what it staged: a
+    // route at local preference 100, then a better one at 200, with only the second selected.
+    RoutingPolicy.builder()
+        .setOwner(_c)
+        .setName("lp100")
+        .addStatement(new SetLocalPreference(new LiteralLong(100)))
+        .addStatement(Statements.ExitAccept.toStaticStatement())
+        .build();
+    RoutingPolicy.builder()
+        .setOwner(_c)
+        .setName("lp200")
+        .addStatement(new SetLocalPreference(new LiteralLong(200)))
+        .addStatement(Statements.ExitAccept.toStaticStatement())
+        .build();
+    _routingProcess = newRoutingProcess();
+    Bgpv4Route route =
+        Bgpv4Route.testBuilder()
+            .setNetwork(Prefix.parse("1.1.1.0/24"))
+            .setSrcProtocol(RoutingProtocol.BGP)
+            .build();
+    BgpVrfLeakConfig.Builder leak = BgpVrfLeakConfig.builder().setAdmin(0).setWeight(0);
+    _routingProcess.importCrossVrfV4Routes(
+        Stream.of(RouteAdvertisement.adding(route)),
+        leak.setImportFromVrf("vrfA").setImportPolicy("lp100").build());
+    _routingProcess.stageCrossVrfImports();
+    _routingProcess.importCrossVrfV4Routes(
+        Stream.of(RouteAdvertisement.adding(route)),
+        leak.setImportFromVrf("vrfB").setImportPolicy("lp200").build());
+    _routingProcess.stageCrossVrfImports();
+
+    Set<BgpRoute<?, ?>> mainRib = new HashSet<>();
+    applyTo(mainRib, _routingProcess.getUpdatesForMainRib());
+    assertThat(
+        mainRib, equalTo(ImmutableSet.copyOf(_routingProcess._bgpv4Rib.getUnannotatedRoutes())));
+  }
+
+  @Test
+  public void testACrossVrfLeakReofferedUnchangedLeavesTheRibAlone() {
+    // Re-offering a route the leak already imported as is must not withdraw and re-add it, which
+    // costs as much as the import and resets its arrival order.
+    _routingProcess = newRoutingProcess();
+    Bgpv4Route route =
+        Bgpv4Route.testBuilder()
+            .setNetwork(Prefix.parse("1.1.1.0/24"))
+            .setSrcProtocol(RoutingProtocol.BGP)
+            .build();
+    BgpVrfLeakConfig leak =
+        BgpVrfLeakConfig.builder().setImportFromVrf("otherVrf").setAdmin(0).setWeight(0).build();
+    _routingProcess.importCrossVrfV4Routes(Stream.of(RouteAdvertisement.adding(route)), leak);
+    _routingProcess.endOfInnerRound();
+
+    _routingProcess.importCrossVrfV4Routes(Stream.of(RouteAdvertisement.adding(route)), leak);
+    _routingProcess.reevaluateCrossVrfV4Routes(leak);
+
+    assertThat(_routingProcess.getBgpv4DeltaBuilder().build().getActions(), empty());
+    assertThat(_routingProcess._bgpv4Rib.getUnannotatedRoutes(), hasSize(1));
+  }
+
+  /** A BGP process over the current configuration that {@link #_vrf2} leaks BGP routes from. */
+  private BgpRoutingProcess newLeakSourceProcess() {
+    _vrf2.setVrfLeakConfig(
+        VrfLeakConfig.builder(true)
+            .addBgpVrfLeakConfig(
+                BgpVrfLeakConfig.builder()
+                    .setImportFromVrf(DEFAULT_VRF_NAME)
+                    .setAdmin(0)
+                    .setWeight(0)
+                    .build())
+            .build());
+    return newRoutingProcess();
+  }
+
+  @Test
+  public void testRoutesToLeakAreTheRoundsDeltaLessWhatThisVrfImported() {
+    // A route this VRF itself imported from another VRF is in its delta like any other, but is not
+    // offered on to the VRFs that leak from this one.
+    _c.setExportBgpFromBgpRib(true);
+    _bgpProcess.setRedistributionPolicy(leakPolicy("accept", true).getName());
+    _routingProcess = newLeakSourceProcess();
+    Prefix local = Prefix.parse("1.1.1.0/24");
+    _routingProcess.redistribute(
+        RibDelta.adding(
+            new AnnotatedRoute<>(
+                StaticRoute.testBuilder().setNetwork(local).build(), _vrf.getName())));
+    Bgpv4Route imported =
+        Bgpv4Route.testBuilder()
+            .setNetwork(Prefix.parse("2.2.2.0/24"))
+            .setSrcProtocol(RoutingProtocol.BGP)
+            .build();
+    BgpVrfLeakConfig leak =
+        BgpVrfLeakConfig.builder().setImportFromVrf("otherVrf").setAdmin(0).setWeight(0).build();
+    _routingProcess.importCrossVrfV4Routes(Stream.of(RouteAdvertisement.adding(imported)), leak);
+    assertThat(_routingProcess.getBgpv4DeltaBuilder().build().getActions(), hasSize(2));
+
+    _routingProcess.endOfInnerRound();
+
+    assertThat(
+        _routingProcess
+            .getRoutesToLeak()
+            .map(RouteAdvertisement::getRoute)
+            .collect(Collectors.toList()),
+        contains(isBgpv4RouteThat(hasPrefix(local))));
+  }
+
+  @Test
+  public void testRoutesToLeakAreFixedAtTheEndOfTheRound() {
+    // Every VRF runs its iteration, leaks included, in one parallel step, so a VRF leaking from
+    // this one may read what this one offers while this one is already importing for its next
+    // round. What it reads must not depend on that.
+    _routingProcess = newLeakSourceProcess();
+    Bgpv4Route route =
+        Bgpv4Route.testBuilder()
+            .setNetwork(Prefix.parse("1.1.1.0/24"))
+            .setSrcProtocol(RoutingProtocol.BGP)
+            .build();
+    BgpVrfLeakConfig leak =
+        BgpVrfLeakConfig.builder().setImportFromVrf("otherVrf").setAdmin(0).setWeight(0).build();
+    _routingProcess.importCrossVrfV4Routes(Stream.of(RouteAdvertisement.adding(route)), leak);
+    _routingProcess.endOfInnerRound();
+    assertThat(_routingProcess.getRoutesToLeak().collect(Collectors.toList()), empty());
+
+    // Withdrawing the import takes the route out of what this VRF imported, so filtering the
+    // previous round's delta against the live imports would now offer it.
+    _routingProcess.importCrossVrfV4Routes(Stream.of(RouteAdvertisement.withdrawing(route)), leak);
+
+    assertThat(_routingProcess.getRoutesToLeak().collect(Collectors.toList()), empty());
+  }
+
+  private static void applyTo(Set<BgpRoute<?, ?>> rib, RibDelta<BgpRoute<?, ?>> delta) {
+    for (RouteAdvertisement<BgpRoute<?, ?>> a : delta.getActions()) {
+      if (a.isWithdrawn()) {
+        rib.remove(a.getRoute());
+      } else {
+        rib.add(a.getRoute());
+      }
+    }
   }
 
   /**
@@ -1159,5 +1456,143 @@ public class BgpRoutingProcessTest {
             .setNextHop(NextHopDiscard.instance())
             .build();
     assertThat(evpnRouteToBgpv4Route(inputRoute, 1).build(), hasTag(5L));
+  }
+
+  /**
+   * A neighbor-specific generated route (e.g. default-originate) is advertised when the session
+   * comes up and withdrawn when it deactivates, not re-advertised on every pull. Re-advertising
+   * every round keeps the receiver dirty forever when several senders share a peer IP.
+   */
+  @Test
+  public void testNeighborGeneratedRouteAdvertisedOnceAndWithdrawnOnDeactivation() {
+    Ip localIp = Ip.parse("1.1.1.1");
+    Ip peerIp = Ip.parse("1.1.1.2");
+    Prefix condition = Prefix.parse("10.0.0.0/24");
+    // Generate the default route only while the main RIB has a route to the condition prefix.
+    RoutingPolicy.builder()
+        .setOwner(_c)
+        .setName("gen")
+        .addStatement(
+            new If(
+                new MatchPrefixSet(
+                    DestinationNetwork.instance(),
+                    new ExplicitPrefixSet(new PrefixSpace(PrefixRange.fromPrefix(condition)))),
+                ImmutableList.of(Statements.ReturnTrue.toStaticStatement()),
+                ImmutableList.of(Statements.ReturnFalse.toStaticStatement())))
+        .build();
+    RoutingPolicy.builder()
+        .setOwner(_c)
+        .setName("export")
+        .addStatement(Statements.ExitAccept.toStaticStatement())
+        .build();
+    GeneratedRoute defaultRoute =
+        GeneratedRoute.builder().setNetwork(Prefix.ZERO).setGenerationPolicy("gen").build();
+    BgpActivePeerConfig ourPeer =
+        BgpActivePeerConfig.builder()
+            .setPeerAddress(peerIp)
+            .setLocalIp(localIp)
+            .setLocalAs(1L)
+            .setRemoteAs(2L)
+            .setGeneratedRoutes(ImmutableSet.of(defaultRoute))
+            .setIpv4UnicastAddressFamily(
+                Ipv4UnicastAddressFamily.builder().setExportPolicy("export").build())
+            .build();
+    _bgpProcess.getActiveNeighbors().put(peerIp, ourPeer);
+    Rib mainRib = new Rib();
+    Node node1 = new Node(_c);
+    BgpRoutingProcess proc =
+        new BgpRoutingProcess(
+            _bgpProcess, _c, DEFAULT_VRF_NAME, mainRib, BgpTopology.EMPTY, new PrefixTracer());
+
+    Configuration c2 =
+        _nf.configurationBuilder()
+            .setConfigurationFormat(ConfigurationFormat.CISCO_IOS)
+            .setHostname("c2")
+            .build();
+    Vrf vrf2 = _nf.vrfBuilder().setOwner(c2).setName(DEFAULT_VRF_NAME).build();
+    BgpProcess bgp2 = BgpProcess.testBgpProcess(peerIp);
+    vrf2.setBgpProcess(bgp2);
+    BgpActivePeerConfig remotePeer =
+        BgpActivePeerConfig.builder()
+            .setPeerAddress(localIp)
+            .setLocalIp(peerIp)
+            .setLocalAs(2L)
+            .setRemoteAs(1L)
+            .setIpv4UnicastAddressFamily(Ipv4UnicastAddressFamily.builder().build())
+            .build();
+    bgp2.getActiveNeighbors().put(localIp, remotePeer);
+    Node node2 = new Node(c2);
+
+    BgpPeerConfigId ourId =
+        new BgpPeerConfigId(_c.getHostname(), DEFAULT_VRF_NAME, peerIp.toPrefix(), false);
+    BgpPeerConfigId remoteId =
+        new BgpPeerConfigId("c2", DEFAULT_VRF_NAME, localIp.toPrefix(), false);
+    MutableValueGraph<BgpPeerConfigId, BgpSessionProperties> graph =
+        ValueGraphBuilder.directed().build();
+    graph.putEdgeValue(
+        ourId,
+        remoteId,
+        BgpSessionProperties.builder()
+            .setLocalAs(1L)
+            .setRemoteAs(2L)
+            .setLocalIp(localIp)
+            .setRemoteIp(peerIp)
+            .setAddressFamilies(ImmutableSet.of(Type.IPV4_UNICAST))
+            .build());
+    graph.putEdgeValue(
+        remoteId,
+        ourId,
+        BgpSessionProperties.builder()
+            .setLocalAs(2L)
+            .setRemoteAs(1L)
+            .setLocalIp(peerIp)
+            .setRemoteIp(localIp)
+            .setAddressFamilies(ImmutableSet.of(Type.IPV4_UNICAST))
+            .build());
+    BgpTopology topology = new BgpTopology(graph);
+    Map<String, Node> nodes = ImmutableMap.of("c1", node1, "c2", node2);
+    NetworkConfigurations nc = NetworkConfigurations.of(ImmutableMap.of("c1", _c, "c2", c2));
+    proc.initialize(node1);
+    proc.updateTopology(topology);
+    BgpTopology.EdgeId edge = new BgpTopology.EdgeId(ourId, remoteId);
+
+    // Condition holds: the new session gets the default route.
+    mainRib.mergeRoute(
+        new AnnotatedRoute<>(
+            StaticRoute.testBuilder().setNetwork(condition).setAdmin(1).build(), DEFAULT_VRF_NAME));
+    List<RouteAdvertisement<Bgpv4Route>> first =
+        proc.getOutgoingRoutesForEdge(edge, nodes, topology, nc, true)
+            .collect(ImmutableList.toImmutableList());
+    assertThat(first, hasSize(1));
+    assertThat(first.get(0).getRoute().getNetwork(), equalTo(Prefix.ZERO));
+    assertThat(first.get(0).isWithdrawn(), equalTo(false));
+
+    // Nothing changed: nothing to send.
+    assertThat(
+        proc.getOutgoingRoutesForEdge(edge, nodes, topology, nc, false)
+            .collect(ImmutableList.toImmutableList()),
+        empty());
+
+    // The session survives a topology update: what it already holds is still remembered.
+    proc.updateTopology(topology);
+    assertThat(
+        proc.getOutgoingRoutesForEdge(edge, nodes, topology, nc, false)
+            .collect(ImmutableList.toImmutableList()),
+        empty());
+
+    // Condition no longer holds: the default route is withdrawn, once.
+    mainRib.removeRoute(
+        new AnnotatedRoute<>(
+            StaticRoute.testBuilder().setNetwork(condition).setAdmin(1).build(), DEFAULT_VRF_NAME));
+    List<RouteAdvertisement<Bgpv4Route>> third =
+        proc.getOutgoingRoutesForEdge(edge, nodes, topology, nc, false)
+            .collect(ImmutableList.toImmutableList());
+    assertThat(third, hasSize(1));
+    assertThat(third.get(0).getRoute().getNetwork(), equalTo(Prefix.ZERO));
+    assertThat(third.get(0).isWithdrawn(), equalTo(true));
+    assertThat(
+        proc.getOutgoingRoutesForEdge(edge, nodes, topology, nc, false)
+            .collect(ImmutableList.toImmutableList()),
+        empty());
   }
 }

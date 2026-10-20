@@ -20,9 +20,13 @@ statement
   | s_ip
   | s_logging
   | s_no
+  | s_passwords
   | s_set
   | s_sntp
   | s_tacacs_server
+  | s_taskgroup
+  | s_usergroup
+  | s_username
 ;
 
 s_hostname
@@ -311,6 +315,7 @@ s_no
   (
     no_ip
     | no_logging
+    | no_username_null
   )
 ;
 
@@ -607,4 +612,204 @@ aaaiu_password_null
 aaa_session_id_null
 :
   SESSION_ID null_rest_of_line
+;
+
+s_username
+:
+  USERNAME name = word
+  (
+    u_password
+    | u_nopassword_null
+    | u_usergroup
+    | u_unlock_null
+    | u_level_null
+  )
+;
+
+u_password
+:
+  PASSWORD SECRET
+  (
+    ENCRYPTED OVERRIDE_COMPLEXITY_CHECK?
+    | LEVEL level = uint16
+      (
+        ENCRYPTED OVERRIDE_COMPLEXITY_CHECK?
+      )?
+    | OVERRIDE_COMPLEXITY_CHECK
+  )? NEWLINE
+;
+
+// `username <name> level <n> [override-complexity-check] password` prompts for the password
+// interactively
+u_level_null
+:
+  LEVEL uint16 OVERRIDE_COMPLEXITY_CHECK? PASSWORD NEWLINE
+;
+
+u_nopassword_null
+:
+  NOPASSWORD null_rest_of_line
+;
+
+u_unlock_null
+:
+  UNLOCK null_rest_of_line
+;
+
+u_usergroup
+:
+  USERGROUP group = word NEWLINE
+;
+
+s_usergroup
+:
+  USERGROUP name = word NEWLINE
+  usergroup_taskgroup*
+  EXIT NEWLINE
+;
+
+usergroup_taskgroup
+:
+  TASKGROUP name = word NEWLINE
+;
+
+s_taskgroup
+:
+  TASKGROUP name = word NEWLINE
+  taskgroup_task*
+  EXIT NEWLINE
+;
+
+taskgroup_task
+:
+  TASK task_permission+ task_component NEWLINE
+;
+
+task_permission
+:
+  READ
+  | WRITE
+  | EXECUTE
+  | DEBUG
+;
+
+task_component
+:
+  AAA
+  | OSPF
+  | BGP
+;
+
+no_username_null
+:
+  USERNAME null_rest_of_line
+;
+
+s_passwords
+:
+  PASSWORDS
+  (
+    passwords_aging
+    | passwords_history
+    | passwords_lock_out
+    | passwords_min_length
+    | passwords_strength
+    | passwords_strength_check
+  )
+;
+
+passwords_aging
+:
+  AGING count = uint16 NEWLINE
+;
+
+passwords_history
+:
+  HISTORY count = uint8 NEWLINE
+;
+
+passwords_lock_out
+:
+  LOCK_OUT count = uint8 NEWLINE
+;
+
+passwords_min_length
+:
+  MIN_LENGTH count = uint8 NEWLINE
+;
+
+passwords_strength
+:
+  STRENGTH
+  (
+    ps_maximum
+    | ps_minimum
+    | ps_exclude_keyword
+  )
+;
+
+ps_maximum
+:
+  MAXIMUM
+  (
+    psmax_consecutive_characters
+    | psmax_repeated_characters
+  )
+;
+
+psmax_consecutive_characters
+:
+  CONSECUTIVE_CHARACTERS count = uint8 NEWLINE
+;
+
+psmax_repeated_characters
+:
+  REPEATED_CHARACTERS count = uint8 NEWLINE
+;
+
+ps_minimum
+:
+  MINIMUM
+  (
+    psmin_uppercase_letters
+    | psmin_lowercase_letters
+    | psmin_numeric_characters
+    | psmin_special_characters
+    | psmin_character_classes
+  )
+;
+
+psmin_uppercase_letters
+:
+  UPPERCASE_LETTERS count = uint8 NEWLINE
+;
+
+psmin_lowercase_letters
+:
+  LOWERCASE_LETTERS count = uint8 NEWLINE
+;
+
+psmin_numeric_characters
+:
+  NUMERIC_CHARACTERS count = uint8 NEWLINE
+;
+
+psmin_special_characters
+:
+  SPECIAL_CHARACTERS count = uint8 NEWLINE
+;
+
+psmin_character_classes
+:
+  CHARACTER_CLASSES count = uint8 NEWLINE
+;
+
+ps_exclude_keyword
+:
+  EXCLUDE_KEYWORD keyword = word NEWLINE
+;
+
+passwords_strength_check
+:
+  STRENGTH_CHECK NEWLINE
 ;

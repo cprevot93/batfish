@@ -33,15 +33,19 @@ p_mpls
    (
        apply
        | mpls_admin_groups
+       | mpls_disable
        | mpls_explicit_null_null
        | mpls_icmp_tunneling_null
        | mpls_interface
        | mpls_ipv6_tunneling_null
+       | mpls_label_space
        | mpls_label_switched_path
        | mpls_log_lsp_history_null
        | mpls_log_updown_null
+       | mpls_no_propagate_ttl
        | mpls_optimize_adaptive_teardown_null
        | mpls_optimize_aggressive_null
+       | mpls_optimize_switchover_delay_null
        | mpls_optimize_timer_null
        | mpls_path
        | mpls_path_mtu_null
@@ -52,6 +56,35 @@ p_mpls
        | mpls_traffic_engineering_null
        | mpls_traceoptions_null
    )
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/disable-edit-protocols-mpls.html
+mpls_disable
+:
+   DISABLE
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/no-propagate-ttl-edit-protocols-mpls.html
+mpls_no_propagate_ttl
+:
+   NO_PROPAGATE_TTL
+;
+
+// https://apps.juniper.net/feature-explorer/feature/3866
+mpls_label_space
+:
+   LABEL_SPACE mpls_label_space_option_null
+;
+
+mpls_label_space_option_null
+:
+   (
+      DYNAMIC_END_LABEL
+      | DYNAMIC_START_LABEL
+      | LABEL_LIMIT
+      | STATIC_END_LABEL
+      | STATIC_START_LABEL
+   ) dec
 ;
 
 mpls_admin_groups
@@ -344,6 +377,36 @@ mplslsp_optimize_timer_null
 mplslsp_primary
 :
    PRIMARY name = junos_name
+   (
+      apply
+      | mplslspp_admin_group
+   )
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/admin-group-edit-protocols-mpls-lsp.html
+mplslspp_admin_group
+:
+   ADMIN_GROUP
+   (
+      mplslsppag_exclude
+      | mplslsppag_include_all
+      | mplslsppag_include_any
+   )
+;
+
+mplslsppag_exclude
+:
+   EXCLUDE names = junos_name_list
+;
+
+mplslsppag_include_all
+:
+   INCLUDE_ALL names = junos_name_list
+;
+
+mplslsppag_include_any
+:
+   INCLUDE_ANY names = junos_name_list
 ;
 
 mplslsp_revert_timer_null
@@ -358,11 +421,18 @@ mplslsp_soft_preemption_null
 
 mplslsp_secondary
 :
+   // https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/secondary-edit-protocols-mpls.html
    SECONDARY name = junos_name
    (
       apply
+      // https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/exclude-srlg-edit-protocols-mpls.html
+      | exclude_srlg = EXCLUDE_SRLG
+      // https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/hop-limit-edit-protocols-mpls.html
+      | HOP_LIMIT hop_limit = uint8
       | mplslsps_admin_group
       | mplslsps_preference
+      // https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/standby-edit-protocols-mpls.html
+      | standby = STANDBY
    )
 ;
 
@@ -434,6 +504,12 @@ mpls_optimize_adaptive_teardown_null
 mpls_optimize_aggressive_null
 :
    OPTIMIZE_AGGRESSIVE null_filler
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/optimize-switchover-delay-edit-protocols-mpls.html
+mpls_optimize_switchover_delay_null
+:
+   OPTIMIZE_SWITCHOVER_DELAY uint16
 ;
 
 mpls_optimize_timer_null

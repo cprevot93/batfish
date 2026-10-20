@@ -14,13 +14,19 @@ public class IsisSettings implements Serializable {
 
   private boolean _noIpv4Routing;
 
+  private boolean _noIpv6Routing;
+
   private boolean _overload;
+
+  private boolean _overloadAllowRouteLeaking;
 
   private Integer _overloadTimeout;
 
   private Double _referenceBandwidth;
 
   private boolean _trafficEngineeringCredibilityProtocolPreference;
+
+  private boolean _trafficEngineeringIgnoreLspMetrics;
 
   private boolean _trafficEngineeringShortcuts;
 
@@ -46,8 +52,16 @@ public class IsisSettings implements Serializable {
     return _noIpv4Routing;
   }
 
+  public boolean getNoIpv6Routing() {
+    return _noIpv6Routing;
+  }
+
   public boolean getOverload() {
     return _overload;
+  }
+
+  public boolean getOverloadAllowRouteLeaking() {
+    return _overloadAllowRouteLeaking;
   }
 
   public Integer getOverloadTimeout() {
@@ -62,6 +76,10 @@ public class IsisSettings implements Serializable {
     return _trafficEngineeringCredibilityProtocolPreference;
   }
 
+  public boolean getTrafficEngineeringIgnoreLspMetrics() {
+    return _trafficEngineeringIgnoreLspMetrics;
+  }
+
   public boolean getTrafficEngineeringShortcuts() {
     return _trafficEngineeringShortcuts;
   }
@@ -70,8 +88,16 @@ public class IsisSettings implements Serializable {
     _noIpv4Routing = noIpv4Routing;
   }
 
+  public void setNoIpv6Routing(boolean noIpv6Routing) {
+    _noIpv6Routing = noIpv6Routing;
+  }
+
   public void setOverload(boolean overload) {
     _overload = overload;
+  }
+
+  public void setOverloadAllowRouteLeaking(boolean overloadAllowRouteLeaking) {
+    _overloadAllowRouteLeaking = overloadAllowRouteLeaking;
   }
 
   public void setOverloadTimeout(int overloadTimeout) {
@@ -86,6 +112,10 @@ public class IsisSettings implements Serializable {
       boolean trafficEngineeringCredibilityProtocolPreference) {
     _trafficEngineeringCredibilityProtocolPreference =
         trafficEngineeringCredibilityProtocolPreference;
+  }
+
+  public void setTrafficEngineeringIgnoreLspMetrics(boolean trafficEngineeringIgnoreLspMetrics) {
+    _trafficEngineeringIgnoreLspMetrics = trafficEngineeringIgnoreLspMetrics;
   }
 
   public void setTrafficEngineeringShortcuts(boolean trafficEngineeringShortcuts) {

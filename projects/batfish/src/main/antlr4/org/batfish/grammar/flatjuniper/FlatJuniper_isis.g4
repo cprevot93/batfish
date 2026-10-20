@@ -68,6 +68,7 @@ is_level
     isl_authentication_key_null
     | isl_authentication_type_null
     | isl_disable
+    | isl_flood_reflector
     | isl_prefix_export_limit_null
     | isl_wide_metrics_only
   )
@@ -76,6 +77,12 @@ is_level
 is_no_ipv4_routing
 :
   NO_IPV4_ROUTING
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/no-ipv6-routing-edit-protocols-isis.html
+is_no_ipv6_routing
+:
+  NO_IPV6_ROUTING
 ;
 
 is_lsp_lifetime_null
@@ -97,6 +104,7 @@ is_overload
   (
     apply
     | iso_advertise_high_metrics
+    | iso_allow_route_leaking
     | iso_timeout
   )
 ;
@@ -104,6 +112,12 @@ is_overload
 iso_advertise_high_metrics
 :
   ADVERTISE_HIGH_METRICS
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/overload-edit-protocols-isis.html
+iso_allow_route_leaking
+:
+  ALLOW_ROUTE_LEAKING
 ;
 
 is_reference_bandwidth
@@ -122,6 +136,7 @@ is_traffic_engineering
   (
     ist_credibility_protocol_preference
     | ist_family_shortcuts
+    | ist_ignore_lsp_metrics
     | ist_multipath
   )
 ;
@@ -145,6 +160,7 @@ isi_level
   LEVEL dec
   (
     isil_disable
+    | isil_flood_reflector
     | isil_hello_authentication_key
     | isil_hello_authentication_type
     | isil_hello_interval
@@ -157,6 +173,38 @@ isi_level
     | isil_priority
     | isil_te_metric
   )
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/flood-reflector-edit-protocols-isis.html
+isl_flood_reflector
+:
+  FLOOD_REFLECTOR
+  (
+    islfr_client
+    | islfr_reflector
+  )
+;
+
+islfr_client
+:
+  CLIENT
+;
+
+islfr_reflector
+:
+  REFLECTOR CLUSTER_ID
+  // 1-4294967295
+  id = uint32
+;
+
+isil_flood_reflector
+:
+  FLOOD_REFLECTOR
+  (
+    REFLECTOR? CLUSTER_ID
+    // 1-4294967295
+    id = uint32
+  )?
 ;
 
 isi_hello_padding_null
@@ -308,6 +356,12 @@ ist_family_shortcuts
   ) SHORTCUTS
 ;
 
+// https://www.juniper.net/documentation/en_US/junos/topics/reference/configuration-statement/ignore-lsp-metrics-edit-protocols-isis.html
+ist_ignore_lsp_metrics
+:
+  IGNORE_LSP_METRICS
+;
+
 ist_multipath
 :
   MULTIPATH LSP_EQUAL_COST
@@ -325,6 +379,7 @@ p_isis
     | is_level
     | is_lsp_lifetime_null
     | is_no_ipv4_routing
+    | is_no_ipv6_routing
     | is_overload
     | is_reference_bandwidth
     | is_rib_group

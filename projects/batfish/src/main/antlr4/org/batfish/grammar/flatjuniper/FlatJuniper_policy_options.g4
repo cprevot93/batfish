@@ -6,15 +6,21 @@ options {
    tokenVocab = FlatJuniperLexer;
 }
 
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/metric-edit-policy-options-policy-statement-then.html
+// https://www.juniper.net/documentation/en_US/junos13.2/topics/reference/statement-hierarchy/policy-options-ex-series.html
 metric_expression
 :
    (
       METRIC
       | METRIC2
-   ) MULTIPLIER multiplier = dec
+   )
    (
-      OFFSET offset = dec
-   )?
+      MULTIPLIER multiplier = dec
+      (
+         OFFSET DASH? offset = dec
+      )?
+      | OFFSET DASH? offset = dec
+   )
 ;
 
 po_as_path
@@ -44,6 +50,30 @@ po_condition
     | pocond_if_route_exists
   )
 ;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/damping-edit-policy-options.html
+po_damping
+:
+  DAMPING name = junos_name
+  (
+    apply
+    | pod_disable
+    | pod_half_life
+    | pod_max_suppress
+    | pod_reuse
+    | pod_suppress
+  )
+;
+
+pod_disable: DISABLE;
+
+pod_half_life: HALF_LIFE value = uint8;
+
+pod_max_suppress: MAX_SUPPRESS value = uint16;
+
+pod_reuse: REUSE value = uint16;
+
+pod_suppress: SUPPRESS value = uint16;
 
 pocond_if_route_exists
 :
@@ -190,6 +220,7 @@ pops_from
       | popsf_metric2
       | popsf_neighbor
       | popsf_next_hop
+      | popsf_nlri_route_type
       | popsf_origin
       | popsf_policy
       | popsf_prefix_list
@@ -200,6 +231,7 @@ pops_from
       | popsf_route_type
       | popsf_rtf_prefix_list
       | popsf_source_address_filter
+      | popsf_state
       | popsf_tag
       | popsf_tag2
       | popsf_validation_database
@@ -221,6 +253,7 @@ pops_to
    TO
    (
       popsto_level
+      | popsto_policy
       | popsto_protocol
       | popsto_rib
    )
@@ -284,9 +317,14 @@ popsf_instance
    INSTANCE name = junos_name
 ;
 
+// https://www.juniper.net/documentation/us/en/software/junos/routing-policy/topics/concept/policy-configuring-match-conditions-in-routing-policy-terms.html
 popsf_interface
 :
-   INTERFACE id = interface_id
+   INTERFACE
+   (
+      id = interface_id
+      | name = junos_name
+   )
 ;
 
 popsf_level
@@ -339,6 +377,12 @@ popsf_next_hop
       v4 = ip_address
       | v6 = ipv6_address
    )
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/routing-policy/bgp/topics/example/mbpg-mvpn-family-based-damping.html
+popsf_nlri_route_type
+:
+   NLRI_ROUTE_TYPE uint8
 ;
 
 popsf_origin
@@ -432,6 +476,12 @@ popsf_source_address_filter
       IP_PREFIX
       | IPV6_PREFIX
    ) popsfrf_common
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/bgp/topics/topic-map/basic-routing-policies.html
+popsf_state
+:
+   STATE (ACTIVE | INACTIVE)
 ;
 
 popsf_tag
@@ -538,6 +588,12 @@ popst_add_path
    ADD_PATH SEND_COUNT count = send_path_count
 ;
 
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/aigp-adjust-edit-policy-options.html
+popst_aigp_adjust
+:
+  AIGP_ADJUST (ADD | DIVIDE | MULTIPLY | SUBTRACT) (DISTANCE_TO_PROTOCOL_NEXTHOP | dec)
+;
+
 popst_aigp_originate: AIGP_ORIGINATE (distance = uint32)?;
 
 popst_as_path_expand
@@ -560,7 +616,8 @@ popst_as_path_prepend
    AS_PATH_PREPEND bgp_asn+
 ;
 
-popst_bgp_output_queue_priority
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/bgp-output-queue-priority.html
+popst_bgp_output_queue_priority_null
 :
   BGP_OUTPUT_QUEUE_PRIORITY bgp_priority_queue_id
 ;
@@ -587,21 +644,24 @@ popst_common
 :
    popst_accept
    | popst_add_path
+   | popst_aigp_adjust
    | popst_aigp_originate
    | popst_as_path_expand
    | popst_as_path_prepend
-   | popst_bgp_output_queue_priority
+   | popst_bgp_output_queue_priority_null
    | popst_color
    | popst_color2
    | popst_community_add
    | popst_community_delete
    | popst_community_set
    | popst_cos_next_hop_map
+   | popst_damping
    | popst_default_action_accept
    | popst_default_action_reject
    | popst_destination_class
    | popst_external
    | popst_forwarding_class
+   | popst_ignore_service_label_null
    | popst_install_nexthop
    | popst_local_preference
    | popst_metric
@@ -619,6 +679,7 @@ popst_common
    | popst_tag
    | popst_tag2
    | popst_tunnel_attribute
+   | popst_validation_state
 ;
 
 popst_community_add
@@ -651,6 +712,12 @@ popst_default_action_reject
    DEFAULT_ACTION REJECT
 ;
 
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/damping-edit-policy-options.html
+popst_damping
+:
+   DAMPING name = junos_name
+;
+
 popst_destination_class
 :
    DESTINATION_CLASS name = junos_name
@@ -664,6 +731,12 @@ popst_external
 popst_forwarding_class
 :
    FORWARDING_CLASS junos_name
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/interfaces-encryption/topics/concept/bgp-layer3-vpn-over-ipip-tunnels-overview.html
+popst_ignore_service_label_null
+:
+   IGNORE_SERVICE_LABEL
 ;
 
 popst_install_nexthop
@@ -883,6 +956,17 @@ popst_tunnel_attribute
    )
 ;
 
+// https://www.juniper.net/documentation/us/en/software/junos/bgp/topics/topic-map/bgp_origin_validation.html
+popst_validation_state
+:
+   VALIDATION_STATE
+   (
+      INVALID
+      | UNKNOWN
+      | VALID
+   )
+;
+
 popstta_remove: REMOVE (ALL | name = junos_name);
 
 popstta_set: SET name = junos_name;
@@ -890,6 +974,12 @@ popstta_set: SET name = junos_name;
 popsto_level
 :
    LEVEL dec
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/policy-statement-edit-policy-options.html
+popsto_policy
+:
+   POLICY expr = policy_expression
 ;
 
 popsto_protocol
@@ -925,6 +1015,7 @@ s_policy_options
       | po_as_path_group
       | po_community
       | po_condition
+      | po_damping
       | po_policy_statement
       | po_prefix_list
       | po_rtf_prefix_list

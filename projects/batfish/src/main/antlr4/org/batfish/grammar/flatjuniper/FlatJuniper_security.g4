@@ -71,11 +71,14 @@ hib_protocol
    | VRRP
 ;
 
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/security-edit-system-service-zone-host-inbound-traffic.html
 hib_system_service
 :
    ALL
    | ANY_SERVICE
+   | BOOTP
    | DHCP
+   | DHCPV6
    | DNS
    | FINGER
    | FTP
@@ -203,8 +206,15 @@ natp_port
    PORT
    (
       NO_TRANSLATION
+      | natpp_port_overloading_factor_null
       | RANGE from = port_number (TO to = port_number)?
    )
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/security-edit-nat-port-overloading-factor.html
+natpp_port_overloading_factor_null
+:
+   PORT_OVERLOADING_FACTOR uint8
 ;
 
 natp_description
@@ -408,10 +418,12 @@ rsrtnpp_permit
 
 rsrtst_prefix
 :
+   // https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/security-edit-prefix-static-nat.html
    PREFIX
    (
       rsrtstp_mapped_port
       | rsrtstp_prefix
+      | rsrtstp_routing_instance
    )
 ;
 
@@ -458,17 +470,130 @@ s_security
       | se_application_tracking_null
       | se_authentication_key_chain
       | se_certificates
+      | sem_connectivity_association
       | se_flow_null
+      | se_forwarding_options
       | se_ike
       | se_ipsec
       | se_key_chain
       | se_log_null
+      | se_macsec
       | se_nat
+      | se_pki
       | se_policies
       | se_screen
+      | se_traceoptions_null
+      | se_utm_null
       | se_zones
    )
 ;
+
+se_forwarding_options
+:
+   FORWARDING_OPTIONS
+   (
+      sef_family
+      | sef_services_offload_null
+   )
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/security-edit-mode-forwarding-options.html
+sef_family
+:
+   FAMILY family = (INET | INET6 | ISO | MPLS)
+   MODE processing_mode = (DROP | FLOW_BASED | PACKET_BASED)
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/idp-policy/topics/topic-map/serv-offload-sec-exp-path.html
+sef_services_offload_null
+:
+   SERVICES_OFFLOAD DISABLE
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/security-edit-traceoptions-security.html
+se_traceoptions_null
+:
+   TRACEOPTIONS
+   (
+      security_trace_file_null
+      | FLAG junos_name
+      | LEVEL junos_name
+      | NO_REMOTE_TRACE
+      | RATE_LIMIT dec
+   )
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/security-edit-mime-whitelist.html
+se_utm_null
+:
+   UTM FEATURE_PROFILE ANTI_VIRUS MIME_WHITELIST
+   (
+      EXCEPTION junos_name
+      | LIST junos_name
+      (
+         EXCEPTION junos_name
+      )?
+   )
+;
+
+se_macsec
+:
+   MACSEC
+   (
+      sem_connectivity_association
+      | sem_interfaces
+   )
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/connectivity-association-edit-security-macsec.html
+sem_connectivity_association
+:
+   CONNECTIVITY_ASSOCIATION name = junos_name macsec_connectivity_association_setting
+;
+
+sem_interfaces
+:
+   INTERFACES iface = interface_id CONNECTIVITY_ASSOCIATION name = junos_name
+;
+
+macsec_connectivity_association_setting
+:
+   semca_cak
+   | semca_cipher_suite
+   | semca_ckn
+   | semca_include_sci
+   | semca_mka
+   | semca_pre_shared_key
+   | semca_pre_shared_key_chain
+   | semca_security_mode
+;
+
+semca_cak: CAK value = secret_string;
+semca_cipher_suite
+:
+   CIPHER_SUITE value = (GCM_AES_128 | GCM_AES_256 | GCM_AES_XPN_128 | GCM_AES_XPN_256)
+;
+semca_ckn: CKN value = junos_name;
+semca_include_sci: INCLUDE_SCI;
+semca_mka
+:
+   MKA
+   (
+      KEY_SERVER_PRIORITY priority = uint8
+      | MUST_SECURE
+      | SHOULD_SECURE
+   )
+;
+semca_pre_shared_key
+:
+   PRE_SHARED_KEY
+   (
+      CAK cak = secret_string
+      | CKN ckn = junos_name
+   )
+;
+semca_pre_shared_key_chain: PRE_SHARED_KEY_CHAIN name = junos_name;
+semca_security_mode: SECURITY_MODE security_mode = (DYNAMIC | STATIC_CAK);
 
 se_address_book
 :
@@ -498,6 +623,38 @@ se_certificates
    (
       sec_local
    )
+;
+
+se_pki
+:
+   PKI sep_ca_profile
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/vpn-ipsec/topics/ref/statement/security-edit-ca-profile.html
+sep_ca_profile
+:
+   CA_PROFILE name = junos_name
+   (
+      apply
+      | sepc_ca_identity
+      | sepc_revocation_check
+      | sepc_routing_instance
+   )
+;
+
+sepc_ca_identity
+:
+   CA_IDENTITY name = junos_name
+;
+
+sepc_revocation_check
+:
+   REVOCATION_CHECK DISABLE
+;
+
+sepc_routing_instance
+:
+   ROUTING_INSTANCE name = junos_name
 ;
 
 // Legacy form of "security authentication-key-chains key-chain". Mirrors
@@ -532,6 +689,20 @@ se_ike
       seik_gateway
       | seik_policy
       | seik_proposal
+      | seik_traceoptions_null
+   )
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/security-edit-traceoptions-ike.html
+seik_traceoptions_null
+:
+   TRACEOPTIONS
+   (
+      security_trace_file_null
+      | FLAG junos_name
+      | LEVEL junos_name
+      | NO_REMOTE_TRACE
+      | RATE_LIMIT dec
    )
 ;
 
@@ -541,8 +712,33 @@ se_ipsec
    (
       seip_policy
       | seip_proposal
+      | seip_traceoptions_null
       | seip_vpn
    )
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/security-edit-traceoptions-ipsec.html
+seip_traceoptions_null
+:
+   TRACEOPTIONS FLAG junos_name
+;
+
+security_trace_file_null
+:
+   FILE security_trace_value
+   (
+      FILES dec
+      | MATCH security_trace_value
+      | NO_WORLD_READABLE
+      | SIZE security_trace_value
+      | WORLD_READABLE
+   )*
+;
+
+security_trace_value
+:
+   DOUBLE_QUOTED_STRING
+   | junos_name
 ;
 
 se_nat
@@ -612,6 +808,7 @@ sea_key
    KEY name = junos_name
    (
       seak_algorithm
+      | seak_key_name
       | seak_options
       | seak_secret
       | seak_start_time
@@ -682,6 +879,12 @@ seak_algorithm
    )
 ;
 
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/key-edit-security-authentication-key-chains.html
+seak_key_name
+:
+   KEY_NAME name = junos_name
+;
+
 seak_options
 :
    OPTIONS
@@ -722,12 +925,33 @@ seik_policy
 :
    POLICY name = junos_name
    (
-      seikp_description
+      seikp_certificate
+      | seikp_description
       | seikp_mode
       | seikp_pre_shared_key
       | seikp_proposal_set
       | seikp_proposals
    )
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/security-edit-certificate.html
+seikp_certificate
+:
+   CERTIFICATE
+   (
+      seikpc_local_certificate
+      | seikpc_peer_certificate_type
+   )
+;
+
+seikpc_local_certificate
+:
+   LOCAL_CERTIFICATE name = junos_name
+;
+
+seikpc_peer_certificate_type
+:
+   PEER_CERTIFICATE_TYPE type = (PKCS7 | X509_SIGNATURE)
 ;
 
 seik_proposal
@@ -782,6 +1006,7 @@ seikg_dynamic
    (
       apply
       | seikgd_connections_limit
+      | seikgd_general_ikeid
       | seikgd_hostname
       | seikgd_ike_user_type
    )
@@ -806,7 +1031,12 @@ seikg_local_identity
 :
    LOCAL_IDENTITY
    (
-      seikgl_inet
+      seikgl_distinguished_name
+      | seikgl_hostname
+      | seikgl_inet
+      | seikgl_inet6
+      | seikgl_key_id
+      | seikgl_user_at_hostname
    )
 ;
 
@@ -830,6 +1060,12 @@ seikgd_connections_limit
    CONNECTIONS_LIMIT limit = dec
 ;
 
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/general-ikeid.html
+seikgd_general_ikeid
+:
+   GENERAL_IKEID
+;
+
 seikgd_hostname
 :
    HOSTNAME name = junos_name
@@ -844,9 +1080,35 @@ seikgd_ike_user_type
    )
 ;
 
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/security-edit-local-identity.html
+seikgl_distinguished_name
+:
+   DISTINGUISHED_NAME
+;
+
+seikgl_hostname
+:
+   HOSTNAME name = junos_name
+;
+
 seikgl_inet
 :
    INET name = junos_name
+;
+
+seikgl_inet6
+:
+   INET6 address = ipv6_address
+;
+
+seikgl_key_id
+:
+   KEY_ID name = junos_name
+;
+
+seikgl_user_at_hostname
+:
+   USER_AT_HOSTNAME name = junos_name
 ;
 
 seikp_description
@@ -1117,7 +1379,14 @@ sen_source
       | nat_pool_utilization_alarm
       | nat_port_randomization
       | nat_pool_default_port_range
+      | sens_address_persistent_null
    )
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/security-edit-address-persistent.html
+sens_address_persistent_null
+:
+   ADDRESS_PERSISTENT
 ;
 
 sen_static
@@ -1281,6 +1550,7 @@ sepctxpt_permit
       apply
       | sepctxptp_application_services
       | sepctxptp_services_offload
+      | sepctxptp_tcp_options
       | sepctxptp_tunnel
    )
 ;
@@ -1298,6 +1568,44 @@ sepctxpt_trace
 sepctxptp_services_offload
 :
    SERVICES_OFFLOAD apply
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/security-edit-tcp-options.html
+sepctxptp_tcp_options
+:
+   TCP_OPTIONS
+   (
+      sepctxptpto_initial_tcp_mss
+      | sepctxptpto_reverse_tcp_mss
+      | sepctxptpto_sequence_check_required
+      | sepctxptpto_syn_check_required
+      | sepctxptpto_window_scale
+   )
+;
+
+sepctxptpto_initial_tcp_mss
+:
+   INITIAL_TCP_MSS mss = uint16
+;
+
+sepctxptpto_reverse_tcp_mss
+:
+   REVERSE_TCP_MSS mss = uint16
+;
+
+sepctxptpto_sequence_check_required
+:
+   SEQUENCE_CHECK_REQUIRED
+;
+
+sepctxptpto_syn_check_required
+:
+   SYN_CHECK_REQUIRED
+;
+
+sepctxptpto_window_scale
+:
+   WINDOW_SCALE
 ;
 
 sepctxptp_tunnel

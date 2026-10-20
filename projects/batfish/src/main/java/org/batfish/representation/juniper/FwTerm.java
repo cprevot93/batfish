@@ -22,6 +22,7 @@ public final class FwTerm implements Serializable {
     ICMP_CODE_EXCEPT,
     ICMP_TYPE,
     ICMP_TYPE_EXCEPT,
+    LEARN_VLAN_ID,
     PACKET_LENGTH,
     PACKET_LENGTH_EXCEPT,
     PORT,
@@ -44,11 +45,15 @@ public final class FwTerm implements Serializable {
 
   private final List<FwFrom> _froms;
 
+  private @Nullable String _filter;
+
   private @Nullable FwFromIpOptions _fromIpOptions;
 
   private boolean _ipv6;
 
   private final String _name;
+
+  private @Nullable SecurityPolicyTcpOptions _securityPolicyTcpOptions;
 
   private final List<FwThen> _thens;
 
@@ -88,6 +93,10 @@ public final class FwTerm implements Serializable {
     return _froms;
   }
 
+  public @Nullable String getFilter() {
+    return _filter;
+  }
+
   public boolean getIpv6() {
     return _ipv6;
   }
@@ -96,11 +105,26 @@ public final class FwTerm implements Serializable {
     return _name;
   }
 
+  public @Nonnull SecurityPolicyTcpOptions getOrCreateSecurityPolicyTcpOptions() {
+    if (_securityPolicyTcpOptions == null) {
+      _securityPolicyTcpOptions = new SecurityPolicyTcpOptions();
+    }
+    return _securityPolicyTcpOptions;
+  }
+
+  public @Nullable SecurityPolicyTcpOptions getSecurityPolicyTcpOptions() {
+    return _securityPolicyTcpOptions;
+  }
+
   public List<FwThen> getThens() {
     return _thens;
   }
 
   public void setIpv6(boolean ipv6) {
     _ipv6 = ipv6;
+  }
+
+  public void setFilter(String filter) {
+    _filter = filter;
   }
 }

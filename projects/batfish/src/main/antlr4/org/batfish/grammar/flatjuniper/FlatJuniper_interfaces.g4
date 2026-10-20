@@ -71,6 +71,7 @@ eo8023ad_interface
    interface_id
 ;
 
+// https://github.com/Juniper/yang/blob/master/20.3/20.3R1/junos/conf-with-extensions/junos-conf-interfaces%402019-01-01.yang
 eo8023ad_lacp
 :
    LACP FORCE_UP
@@ -97,7 +98,14 @@ filter
    FILTER
    (
       direction name = filter_name
+      | filter_group
    )?
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/routing-policy/topics/example/firewall-filter-option-received-on-interface-group-example.html
+filter_group
+:
+   GROUP group = uint8
 ;
 
 i_arp_resp
@@ -115,6 +123,7 @@ i_common
    apply
    | i_aggregated_ether_options_null
    | i_arp_resp
+   | i_connectivity_association
    | i_description
    | i_common_physical
    | i_disable
@@ -139,6 +148,12 @@ i_common
    | i_vlan_tagging
 ;
 
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/connectivity-association-edit-security-macsec.html
+i_connectivity_association
+:
+   CONNECTIVITY_ASSOCIATION name = junos_name
+;
+
 // configuration relevant for physical interfaces; there can be overlap with non-physical ones
 i_common_physical
 :
@@ -148,6 +163,7 @@ i_common_physical
     | i_description
     | i_disable
     | i_encapsulation_null
+    | i_esi
     | i_ether_options
     | i_fabric_options_null
     | i_fastether_options
@@ -224,6 +240,12 @@ i_disable
 i_enable
 :
    ENABLE
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/esi-edit-interfaces.html
+i_esi
+:
+   ESI (ALL_ACTIVE | identifier = ESI_IDENTIFIER | SINGLE_ACTIVE)
 ;
 
 i_ether_options
@@ -375,7 +397,23 @@ i_redundant_ether_options
 
 i_speed
 :
-   SPEED dec speed_abbreviation
+   SPEED
+   (
+      dec speed_abbreviation
+      | i_speed_auto
+      | i_speed_auto_10m_100m
+   )
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/speed-edit-interfaces-ethernet.html
+i_speed_auto
+:
+   AUTO
+;
+
+i_speed_auto_10m_100m
+:
+   AUTO_10M_100M
 ;
 
 i_unit
@@ -388,11 +426,32 @@ i_unit
    (
       i_common
       | i_bandwidth
+      | i_demux_options
       | i_input_vlan_map
+      | i_multipoint
       | i_output_vlan_map
       | i_peer_unit
-      | i_vlan_tags_null
+      | i_virtual_gateway_accept_data
+      | i_virtual_gateway_v4_mac
+      | i_vlan_tags
    )
+;
+
+i_demux_options
+:
+   DEMUX_OPTIONS id_underlying_interface
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/underlying-interface-edit-interfaces.html
+id_underlying_interface
+:
+   UNDERLYING_INTERFACE id = interface_id
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/multipoint-edit-interfaces.html
+i_multipoint
+:
+   MULTIPOINT
 ;
 
 i_vlan_action
@@ -415,10 +474,28 @@ i_vlan_tagging
    VLAN_TAGGING
 ;
 
-// Dual-tagged (Q-in-Q) outer/inner VLAN IDs. Not modeled.
-i_vlan_tags_null
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/virtual-gateway-address-edit-interfaces.html
+i_virtual_gateway_accept_data
 :
-   VLAN_TAGS OUTER outer = vlan_number (INNER inner = vlan_number)?
+   VIRTUAL_GATEWAY_ACCEPT_DATA
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/virtual-gateway-v4-mac-edit-interfaces.html
+i_virtual_gateway_v4_mac
+:
+   VIRTUAL_GATEWAY_V4_MAC mac = MAC_ADDRESS
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/vlan-tags-edit-interfaces.html
+i_vlan_tags
+:
+   VLAN_TAGS OUTER outer = interface_vlan_tag (INNER inner = interface_vlan_tag)?
+;
+
+interface_vlan_tag
+:
+   vlan_number
+   | TPID_VLAN_ID
 ;
 
 if_bridge
@@ -464,18 +541,20 @@ if_inet
    INET
    (
       apply
+      | ifi_accounting_null
       | ifi_address
       | ifi_destination_udp_port
       | ifi_dhcp_null
       | ifi_filter
       | ifi_mtu
       | ifi_no_redirects
-      | ifi_policer_null
+      | ifi_policer
       | ifi_rpf_check
       | ifi_sampling_null
       | ifi_service_null
       | ifi_targeted_broadcast_null
       | ifi_tcp_mss
+      | ifi_tunnel_termination
    )
 ;
 
@@ -484,11 +563,25 @@ if_inet6
    INET6
    (
       apply
+      | ifi_accounting_null
       | ifi6_address
+      | ifi6_dhcpv6_client
       | ifi6_destination_udp_port
       | ifi6_filter
       | ifi6_mtu
+      | ifi6_rpf_check
+      | ifi6_policer
       | ifi6_sampling_null
+   )
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/source-class-usage-edit-interfaces.html
+ifi_accounting_null
+:
+   ACCOUNTING SOURCE_CLASS_USAGE
+   (
+      INPUT
+      | OUTPUT
    )
 ;
 
@@ -501,16 +594,102 @@ ifi6_address
       | wildcard
    )
    (
-      ifi6a_ndp
+      ifi6a_destination
+      | ifi6a_ndp
       | ifi6a_preferred
       | ifi6a_primary
+      | ifi6a_vrrp_inet6_group
    )?
 ;
 
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/dhcpv6-client-edit-interfaces.html
+ifi6_dhcpv6_client
+:
+   DHCPV6_CLIENT
+   (
+      ifi6dc_client_ia_type_null
+      | ifi6dc_client_identifier_null
+      | ifi6dc_client_type_null
+      | ifi6dc_interface_identifier_null
+      | ifi6dc_rapid_commit_null
+      | ifi6dc_req_option_null
+      | ifi6dc_retransmission_attempt_null
+      | ifi6dc_update_router_advertisement_null
+      | ifi6dc_update_server_null
+      | ifi6dc_use_ra_prefix_null
+      | ifi6dc_vendor_id_null
+   )
+;
+
+ifi6dc_client_ia_type_null
+:
+   CLIENT_IA_TYPE null_filler
+;
+
+ifi6dc_client_identifier_null
+:
+   CLIENT_IDENTIFIER null_filler
+;
+
+ifi6dc_client_type_null
+:
+   CLIENT_TYPE null_filler
+;
+
+ifi6dc_interface_identifier_null
+:
+   INTERFACE_IDENTIFIER null_filler
+;
+
+ifi6dc_rapid_commit_null
+:
+   RAPID_COMMIT null_filler
+;
+
+ifi6dc_req_option_null
+:
+   REQ_OPTION null_filler
+;
+
+ifi6dc_retransmission_attempt_null
+:
+   RETRANSMISSION_ATTEMPT null_filler
+;
+
+ifi6dc_update_router_advertisement_null
+:
+   UPDATE_ROUTER_ADVERTISEMENT null_filler
+;
+
+ifi6dc_update_server_null
+:
+   UPDATE_SERVER null_filler
+;
+
+ifi6dc_use_ra_prefix_null
+:
+   USE_RA_PREFIX null_filler
+;
+
+ifi6dc_vendor_id_null
+:
+   VENDOR_ID null_filler
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/destination-edit-interfaces-cs.html
+ifi6a_destination
+:
+   DESTINATION address = ipv6_address
+;
+
 // Static NDP entry: ndp <ip> (mac | multicast-mac) <mac> [publish]. Mirrors v4 static arp.
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/dynamic-profiles-interfaces-unit-family-inet6-address-ndp.html
 ifi6a_ndp
 :
    NDP ip = ipv6_address
+   (
+      L2_INTERFACE interface_id
+   )?
    (
       MAC
       | MULTICAST_MAC
@@ -519,6 +698,46 @@ ifi6a_ndp
 
 ifi6a_preferred: PREFERRED;
 ifi6a_primary: PRIMARY;
+
+// VRRP for IPv6, the inet6 counterpart of ifia_vrrp_group. Not modeled.
+// See: https://www.juniper.net/documentation/us/en/software/junos/high-availability/topics/ref/statement/vrrp-inet6-group-edit-interfaces.html
+ifi6a_vrrp_inet6_group
+:
+   VRRP_INET6_GROUP (wildcard | number = uint8)
+   (
+      apply
+      | ifi6av_accept_data_null
+      | ifi6av_fast_interval_null
+      | ifi6av_inet6_advertise_interval_null
+      | ifi6av_no_accept_data_null
+      | ifi6av_no_preempt_null
+      | ifi6av_preempt_null
+      | ifi6av_priority_null
+      | ifi6av_track_null
+      | ifi6av_virtual_inet6_address_null
+      | ifi6av_virtual_link_local_address_null
+   )
+;
+
+ifi6av_accept_data_null: ACCEPT_DATA;
+
+ifi6av_fast_interval_null: FAST_INTERVAL milliseconds = uint16;
+
+ifi6av_inet6_advertise_interval_null: INET6_ADVERTISE_INTERVAL milliseconds = uint16;
+
+ifi6av_no_accept_data_null: NO_ACCEPT_DATA;
+
+ifi6av_no_preempt_null: NO_PREEMPT;
+
+ifi6av_preempt_null: PREEMPT (HOLD_TIME seconds = uint16)?;
+
+ifi6av_priority_null: PRIORITY priority = uint8;
+
+ifi6av_track_null: ifiav_track;
+
+ifi6av_virtual_inet6_address_null: VIRTUAL_INET6_ADDRESS ipv6_address;
+
+ifi6av_virtual_link_local_address_null: VIRTUAL_LINK_LOCAL_ADDRESS ipv6_address;
 
 ifi6_destination_udp_port: DESTINATION_UDP_PORT port_number;
 
@@ -639,12 +858,19 @@ ifi_address
    )
    (
       ifia_arp
+      | ifia_destination
       | ifia_master_only
       | ifia_preferred
       | ifia_primary
       | ifia_vrrp_group
       | ifia_virtual_gateway_address
    )?
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/destination-edit-interfaces-cs.html
+ifia_destination
+:
+   DESTINATION address = ip_address
 ;
 
 ifi_filter
@@ -668,9 +894,43 @@ ifi_dhcp_null
 :
    DHCP null_filler
 ;
-ifi_policer_null
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/policer-edit-interfaces.html
+ifi_policer
 :
-   POLICER null_filler
+   POLICER
+   (
+      ifip_arp
+      | ifip_input
+      | ifip_output
+   )
+;
+ifip_arp
+:
+   ARP name = junos_name
+;
+ifip_input
+:
+   INPUT name = junos_name
+;
+ifip_output
+:
+   OUTPUT name = junos_name
+;
+ifi6_policer
+:
+   POLICER
+   (
+      ifi6p_input
+      | ifi6p_output
+   )
+;
+ifi6p_input
+:
+   INPUT name = junos_name
+;
+ifi6p_output
+:
+   OUTPUT name = junos_name
 ;
 ifi_service_null
 :
@@ -686,14 +946,48 @@ ifi_sampling_null
    SAMPLING null_filler
 ;
 
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/rpf-check-edit-interfaces.html
 ifi_rpf_check
 :
-   RPF_CHECK FAIL_FILTER name = junos_name
+   RPF_CHECK
+   (
+      ifirpf_fail_filter
+      | ifirpf_mode
+   )?
+;
+
+ifi6_rpf_check
+:
+   RPF_CHECK
+   (
+      ifirpf_fail_filter
+      | ifirpf_mode
+   )?
+;
+
+ifirpf_fail_filter
+:
+   FAIL_FILTER name = junos_name
+;
+
+ifirpf_mode
+:
+   MODE
+   (
+      LOOSE
+      | STRICT
+   )
 ;
 
 ifi_tcp_mss
 :
   TCP_MSS size = dec
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/interfaces-unit-tunnel-encapsulation-gre-tunnel-termination.html
+ifi_tunnel_termination
+:
+   TUNNEL_TERMINATION
 ;
 
 ifia_arp
@@ -735,6 +1029,7 @@ ifia_vrrp_group
       apply
       | ifiav_accept_data_null
       | ifiav_advertise_interval_null
+      | ifiav_advertisements_threshold_null
       | ifiav_authentication_key_null
       | ifiav_authentication_type_null
       | ifiav_fast_interval_null
@@ -754,6 +1049,12 @@ ifiav_accept_data_null
 ifiav_advertise_interval_null
 :
    ADVERTISE_INTERVAL dec
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/security-interfaces-unit-family-inet-address-vrrp-group.html
+ifiav_advertisements_threshold_null
+:
+   ADVERTISEMENTS_THRESHOLD uint8
 ;
 
 ifiav_authentication_key_null
@@ -858,6 +1159,7 @@ int_interface_range
        i_common_physical
        | intir_member
        | intir_member_range
+       | intir_unit
    )
 ;
 
@@ -894,14 +1196,36 @@ intir_member
 :
    MEMBER
    (
-       DOUBLE_QUOTED_STRING
-       | interface_id
+       interface_id
+       | interface_wildcard
    )
 ;
 
 intir_member_range
 :
    MEMBER_RANGE from_i = interface_id TO to_i = interface_id
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/interface-range-edit-interfaces-qfx-series.html
+intir_unit
+:
+   UNIT unit = dec
+   (
+      i_description
+      | intiru_family
+   )
+;
+intiru_family
+:
+   FAMILY
+   (
+      if_ethernet_switching
+      | intiruf_inet
+   )
+;
+intiruf_inet
+:
+   INET
 ;
 
 s_interfaces

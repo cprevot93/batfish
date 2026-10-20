@@ -3,6 +3,7 @@ package org.batfish.dataplane.ibdp;
 import static com.google.common.base.MoreObjects.firstNonNull;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Predicates.alwaysFalse;
+import static java.util.Objects.requireNonNull;
 import static org.batfish.common.util.CollectionUtil.toImmutableSortedMap;
 import static org.batfish.common.util.CollectionUtil.toOrderedHashCode;
 import static org.batfish.datamodel.ResolutionRestriction.alwaysTrue;
@@ -11,6 +12,7 @@ import static org.batfish.dataplane.ibdp.DataplaneUtil.messageQueueStream;
 import static org.batfish.dataplane.protocols.IsisProtocolHelper.convertRouteLevel1ToLevel2;
 import static org.batfish.dataplane.protocols.IsisProtocolHelper.exportNonIsisRouteToIsis;
 import static org.batfish.dataplane.protocols.IsisProtocolHelper.setOverloadOnAllRoutes;
+import static org.batfish.dataplane.protocols.StaticRouteHelper.resolveStaticNextHopIp;
 import static org.batfish.dataplane.protocols.StaticRouteHelper.shouldActivateNextHopIpRoute;
 import static org.batfish.dataplane.rib.AbstractRib.importRib;
 import static org.batfish.dataplane.rib.RibDelta.importRibDelta;
@@ -38,6 +40,7 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.SortedSet;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -63,7 +66,6 @@ import org.batfish.datamodel.EvpnRoute;
 import org.batfish.datamodel.EvpnToBgpv4VrfLeakConfig;
 import org.batfish.datamodel.EvpnType3Route;
 import org.batfish.datamodel.Fib;
-import org.batfish.datamodel.FibImpl;
 import org.batfish.datamodel.GeneratedRoute;
 import org.batfish.datamodel.HmmRoute;
 import org.batfish.datamodel.Interface;
@@ -109,6 +111,7 @@ import org.batfish.datamodel.tracking.TrackMethodEvaluator;
 import org.batfish.datamodel.tracking.TrackMethodEvaluatorProvider;
 import org.batfish.datamodel.vxlan.Layer2Vni;
 import org.batfish.datamodel.vxlan.Layer3Vni;
+import org.batfish.dataplane.FibImpl;
 import org.batfish.dataplane.protocols.GeneratedRouteHelper;
 import org.batfish.dataplane.rib.AnnotatedRib;
 import org.batfish.dataplane.rib.ConnectedRib;
@@ -140,12 +143,6 @@ public final class VirtualRouter {
    */
   private SortedMap<CrossVrfEdgeId, Queue<RouteAdvertisement<AnnotatedRoute<AbstractRoute>>>>
       _crossVrfIncomingRoutes;
-
-  /**
-   * The independent RIB contains connected and static routes, which are unaffected by BDP
-   * iterations (hence, independent).
-   */
-  Rib _independentRib;
 
   /** Incoming messages into this router from each IS-IS circuit */
   SortedMap<IsisEdge, Queue<RouteAdvertisement<IsisRoute>>> _isisIncomingRoutes;
@@ -192,12 +189,31 @@ public final class VirtualRouter {
 
   /**
    * Static routes needing no activation, in {@link Vrf#getStaticRoutes} order. Merged into {@link
-   * #_independentRib} once, at init.
+   * #_mainRib} once, at init.
    */
   List<StaticRoute> _unconditionalStatics;
 
-  /** Static routes needing activation each iteration, in {@link Vrf#getStaticRoutes} order. */
-  List<StaticRoute> _conditionalStatics;
+  /**
+   * Static routes needing activation whose next hop is an IP, grouped by that IP. A group's
+   * activation can only change when a main RIB route whose network contains the IP is added or
+   * removed, so between rounds only groups touched by the previous round's main RIB delta are
+   * re-evaluated. Within a group, routes are in {@link Vrf#getStaticRoutes} order.
+   */
+  ImmutableSortedMap<Ip, ImmutableList<StaticRoute>> _conditionalStaticsByNextHopIp;
+
+  /**
+   * Static routes needing activation whose next hop is not an IP: interface next hops, and discard,
+   * VRF, or VTEP next hops with a track. Their activation depends on interface and track state,
+   * which only change between topology rounds, so they are evaluated once per round.
+   */
+  ImmutableList<StaticRoute> _conditionalStaticsWithoutNextHopIp;
+
+  /**
+   * Whether the next {@link #activateStaticRoutes} must evaluate every conditional static route:
+   * true at init and at the start of every topology round, when interface state, track state, or
+   * the main RIB may have changed without being reported in {@link #_mainRibDeltaPrevRound}.
+   */
+  private boolean _conditionalStaticsNeedFullPass = true;
 
   /** FIB (forwarding information base) built from the main RIB */
   private Fib _fib;
@@ -309,13 +325,11 @@ public final class VirtualRouter {
     initLocalRib();
     initStaticRibs();
     // Always import local and connected routes into your own rib
-    importRib(_independentRib, _connectedRib);
-    importRib(_independentRib, _localRib);
-    for (StaticRoute sr : _unconditionalStatics) {
-      _independentRib.mergeRoute(annotateRoute(sr));
-    }
-    importRib(_mainRib, _independentRib);
     importRib(_mainRib, _connectedRib);
+    importRib(_mainRib, _localRib);
+    for (StaticRoute sr : _unconditionalStatics) {
+      _mainRib.mergeRoute(annotateRoute(sr));
+    }
 
     _ospfProcesses =
         _vrf.getOspfProcesses().entrySet().stream()
@@ -453,6 +467,8 @@ public final class VirtualRouter {
       TopologyContext topologyContext, TrackMethodEvaluatorProvider trackMethodEvaluatorProvider) {
     assert _mainRibRouteDeltaBuilder.isEmpty(); // or else invariant is not maintained
 
+    // Interface state, track state, and the main RIB may have changed between rounds.
+    _conditionalStaticsNeedFullPass = true;
     initQueuesAndDeltaBuilders(topologyContext);
     if (_bgpRoutingProcess != null) {
       // If the process exists, update the topology and BGP track states
@@ -601,21 +617,86 @@ public final class VirtualRouter {
    * <p>Removes static route from the main RIB for which next-hop-ip has become unreachable.
    */
   void activateStaticRoutes(TrackMethodEvaluator trackMethodEvaluator) {
-    for (StaticRoute sr : _conditionalStatics) {
-      if (shouldActivateConditionalStaticRoute(trackMethodEvaluator, sr)) {
-        _mainRibRouteDeltaBuilder.from(_mainRib.mergeRouteGetDelta(annotateRoute(sr)));
+    if (_conditionalStaticsNeedFullPass) {
+      _conditionalStaticsNeedFullPass = false;
+      for (List<StaticRoute> group : _conditionalStaticsByNextHopIp.values()) {
+        activateStaticRoutesInNhipGroup(trackMethodEvaluator, group);
+      }
+      activateStaticRoutesInNhipGroup(trackMethodEvaluator, _conditionalStaticsWithoutNextHopIp);
+      return;
+    }
+    // Within a round, only a next hop IP's resolution can change, and only if a main RIB route
+    // whose network contains that IP was added or removed since the last activation. Every such
+    // change since then is in the previous round's main RIB delta.
+    if (_mainRibDeltaPrevRound.isEmpty() || _conditionalStaticsByNextHopIp.isEmpty()) {
+      return;
+    }
+    SortedSet<Ip> affectedNextHopIps = new TreeSet<>();
+    for (RouteAdvertisement<AnnotatedRoute<AbstractRoute>> action :
+        _mainRibDeltaPrevRound.getActions()) {
+      Prefix network = action.getRoute().getNetwork();
+      affectedNextHopIps.addAll(
+          _conditionalStaticsByNextHopIp
+              .subMap(network.getStartIp(), true, network.getEndIp(), true)
+              .keySet());
+      if (affectedNextHopIps.size() == _conditionalStaticsByNextHopIp.size()) {
+        break;
+      }
+    }
+    for (Ip nextHopIp : affectedNextHopIps) {
+      activateStaticRoutesInNhipGroup(
+          trackMethodEvaluator, _conditionalStaticsByNextHopIp.get(nextHopIp));
+    }
+  }
+
+  /**
+   * Activates or deactivates {@code conditionalStatics}, one group of {@link
+   * #_conditionalStaticsByNextHopIp} or the routes without a next hop IP. Routes with a next hop IP
+   * all share it, so it is resolved at most once per recursiveness rather than per route.
+   */
+  private void activateStaticRoutesInNhipGroup(
+      TrackMethodEvaluator trackMethodEvaluator, List<StaticRoute> conditionalStatics) {
+    Set<AnnotatedRoute<AbstractRoute>> resolvedRecursive = null;
+    Set<AnnotatedRoute<AbstractRoute>> resolvedNonRecursive = null;
+    for (StaticRoute sr : conditionalStatics) {
+      Set<AnnotatedRoute<AbstractRoute>> nextHopIpResolution = null;
+      if (sr.getNextHop() instanceof NextHopIp) {
+        if (sr.getRecursive()) {
+          if (resolvedRecursive == null) {
+            resolvedRecursive =
+                resolveStaticNextHopIp(sr.getNextHopIp(), true, _mainRib, _resolutionRestriction);
+          }
+          nextHopIpResolution = resolvedRecursive;
+        } else {
+          if (resolvedNonRecursive == null) {
+            resolvedNonRecursive =
+                resolveStaticNextHopIp(sr.getNextHopIp(), false, _mainRib, _resolutionRestriction);
+          }
+          nextHopIpResolution = resolvedNonRecursive;
+        }
+      }
+      AnnotatedRoute<AbstractRoute> route = annotateRoute(sr);
+      if (shouldActivateConditionalStaticRoute(trackMethodEvaluator, sr, nextHopIpResolution)) {
+        // Merging a route already present is a no-op; skip the work of finding that out.
+        if (!_mainRib.containsRoute(route)) {
+          _mainRibRouteDeltaBuilder.from(_mainRib.mergeRouteGetDelta(route));
+        }
       } else {
-        /*
-         * If the route is not in the RIB, this has no effect. But might add some overhead (TODO)
-         */
-        _mainRibRouteDeltaBuilder.from(_mainRib.removeRouteGetDelta(annotateRoute(sr)));
+        // No effect if the route is not in the RIB or its backups.
+        _mainRibRouteDeltaBuilder.from(_mainRib.removeRouteGetDelta(route));
       }
     }
   }
 
+  /**
+   * @param nextHopIpResolution the routes {@code sr}'s next hop IP resolves through, required when
+   *     {@code sr} has a next hop IP
+   */
   private boolean shouldActivateConditionalStaticRoute(
-      TrackMethodEvaluator trackMethodEvaluator, StaticRoute sr) {
-    if (!shouldActivateConditionalStaticRouteNextHop(sr)) {
+      TrackMethodEvaluator trackMethodEvaluator,
+      StaticRoute sr,
+      @Nullable Set<AnnotatedRoute<AbstractRoute>> nextHopIpResolution) {
+    if (!shouldActivateConditionalStaticRouteNextHop(sr, nextHopIpResolution)) {
       return false;
     }
     if (sr.getTrack() != null && !evaluateTrack(trackMethodEvaluator, sr.getTrack())) {
@@ -625,22 +706,27 @@ public final class VirtualRouter {
     return true;
   }
 
-  private boolean shouldActivateConditionalStaticRouteNextHop(StaticRoute sr) {
-    return new ShouldActivateConditionalStaticRouteNextHop(sr).visit(sr.getNextHop());
+  private boolean shouldActivateConditionalStaticRouteNextHop(
+      StaticRoute sr, @Nullable Set<AnnotatedRoute<AbstractRoute>> nextHopIpResolution) {
+    return new ShouldActivateConditionalStaticRouteNextHop(sr, nextHopIpResolution)
+        .visit(sr.getNextHop());
   }
 
   private final class ShouldActivateConditionalStaticRouteNextHop
       implements NextHopVisitor<Boolean> {
 
-    private ShouldActivateConditionalStaticRouteNextHop(StaticRoute sr) {
+    private ShouldActivateConditionalStaticRouteNextHop(
+        StaticRoute sr, @Nullable Set<AnnotatedRoute<AbstractRoute>> nextHopIpResolution) {
       _sr = sr;
+      _nextHopIpResolution = nextHopIpResolution;
     }
 
     private final @Nonnull StaticRoute _sr;
+    private final @Nullable Set<AnnotatedRoute<AbstractRoute>> _nextHopIpResolution;
 
     @Override
     public Boolean visitNextHopIp(NextHopIp nextHopIp) {
-      return shouldActivateNextHopIpRoute(_sr, _mainRib, _resolutionRestriction);
+      return shouldActivateNextHopIpRoute(_sr, requireNonNull(_nextHopIpResolution));
     }
 
     @Override
@@ -861,7 +947,7 @@ public final class VirtualRouter {
    * redistribution.
    *
    * <ul>
-   *   <li>Kernel routes with no dependencies are added to {@code _independentRib}.
+   *   <li>Kernel routes with no dependencies are added to {@code _mainRib}.
    *   <li>Kernel routes with dependencies are stored in {@code _kernelConditionalRoutes}, to be
    *       processed each data plane iteration.
    * </ul>
@@ -873,7 +959,7 @@ public final class VirtualRouter {
       if (kernelRoute.getRequiredOwnedIp() != null) {
         kernelConditionalRoutesBuilder.add(kernelRoute);
       } else {
-        _independentRib.mergeRoute(annotateRoute(kernelRoute));
+        _mainRib.mergeRoute(annotateRoute(kernelRoute));
       }
     }
     _kernelConditionalRoutes = kernelConditionalRoutesBuilder.build();
@@ -1130,7 +1216,6 @@ public final class VirtualRouter {
     _connectedRib = new ConnectedRib();
     _localRib = new LocalRib();
     _generatedRib = new Rib();
-    _independentRib = new Rib();
 
     // ISIS
     _isisRib = new IsisRib(isL1Only());
@@ -1145,7 +1230,9 @@ public final class VirtualRouter {
     _ripRib = new RipRib();
 
     // Static
-    _conditionalStatics = ImmutableList.of();
+    _conditionalStaticsByNextHopIp = ImmutableSortedMap.of();
+    _conditionalStaticsWithoutNextHopIp = ImmutableList.of();
+    _conditionalStaticsNeedFullPass = true;
     _unconditionalStatics = ImmutableList.of();
   }
 
@@ -1160,17 +1247,37 @@ public final class VirtualRouter {
   /** Initialize the static route RIBs from the VRF config. */
   @VisibleForTesting
   void initStaticRibs() {
-    ImmutableList.Builder<StaticRoute> conditional = ImmutableList.builder();
+    Map<Ip, ImmutableList.Builder<StaticRoute>> conditionalByNextHopIp = new HashMap<>();
+    ImmutableList.Builder<StaticRoute> conditionalWithoutNextHopIp = ImmutableList.builder();
     ImmutableList.Builder<StaticRoute> unconditional = ImmutableList.builder();
     for (StaticRoute sr : _vrf.getStaticRoutes()) {
-      if (isConditionalStaticRoute(sr)) {
-        conditional.add(sr);
-      } else {
+      if (!isConditionalStaticRoute(sr)) {
         unconditional.add(sr);
+      } else if (sr.getNextHop() instanceof NextHopIp) {
+        conditionalByNextHopIp
+            .computeIfAbsent(((NextHopIp) sr.getNextHop()).getIp(), ip -> ImmutableList.builder())
+            .add(sr);
+      } else {
+        conditionalWithoutNextHopIp.add(sr);
       }
     }
-    _conditionalStatics = conditional.build();
+    _conditionalStaticsByNextHopIp =
+        conditionalByNextHopIp.entrySet().stream()
+            .collect(
+                ImmutableSortedMap.toImmutableSortedMap(
+                    Ordering.natural(), Entry::getKey, e -> e.getValue().build()));
+    _conditionalStaticsWithoutNextHopIp = conditionalWithoutNextHopIp.build();
+    _conditionalStaticsNeedFullPass = true;
     _unconditionalStatics = unconditional.build();
+  }
+
+  /** All static routes needing activation. */
+  @VisibleForTesting
+  List<StaticRoute> getConditionalStatics() {
+    return Streams.concat(
+            _conditionalStaticsByNextHopIp.values().stream().flatMap(List::stream),
+            _conditionalStaticsWithoutNextHopIp.stream())
+        .collect(ImmutableList.toImmutableList());
   }
 
   @Nullable
@@ -1429,11 +1536,6 @@ public final class VirtualRouter {
     _ripRib = new RipRib();
 
     /*
-     * Add routes that cannot change (does not affect below computation)
-     */
-    _mainRibRouteDeltaBuilder.from(importRib(_mainRib, _independentRib));
-
-    /*
      * Re-add independent RIP routes to ripRib for tie-breaking
      */
     importRib(_ripRib, _ripInternalRib);
@@ -1449,6 +1551,15 @@ public final class VirtualRouter {
 
   public Fib getFib() {
     return _fib;
+  }
+
+  /**
+   * Drops the FIB computed at the end of the previous topology round. Nothing reads it until {@link
+   * #computeFib} rebuilds it, and on a large network the FIBs of all VRFs are a large share of the
+   * heap during route computation.
+   */
+  void clearFib() {
+    _fib = null;
   }
 
   Rib getMainRib() {
@@ -1501,8 +1612,8 @@ public final class VirtualRouter {
    */
   int computeIterationHashCode() {
     return Streams.concat(
-            // RIB State
-            Stream.of(_mainRib.getRoutes()),
+            // RIB State: Set.hashCode of the main RIB routes, without materializing the set
+            Stream.of(_mainRib.getRoutesHashCode()),
             // Message queues
             messageQueueStream(_isisIncomingRoutes),
             messageQueueStream(_crossVrfIncomingRoutes),
@@ -1626,6 +1737,46 @@ public final class VirtualRouter {
   }
 
   /** Check whether this virtual router has any remaining computation to do */
+  /** Describes what keeps this VR {@link #isDirty() dirty}: pending deltas and queued messages. */
+  String describeDirtyState(int max) {
+    StringBuilder sb = new StringBuilder();
+    if (!_mainRibDeltaPrevRound.isEmpty()) {
+      sb.append("  mainRibDeltaPrevRound (")
+          .append(_mainRibDeltaPrevRound.getActions().size())
+          .append("):\n");
+      _mainRibDeltaPrevRound.stream()
+          .limit(max)
+          .forEach(
+              a ->
+                  sb.append("    ")
+                      .append(a.isWithdrawn() ? "DEL " : "ADD ")
+                      .append(a.getRoute())
+                      .append('\n'));
+    }
+    // The queues are allocated with the first topology; before that there is nothing queued.
+    if (_isisIncomingRoutes != null
+        && !_isisIncomingRoutes.values().stream().allMatch(Queue::isEmpty)) {
+      sb.append("  isis incoming queue non-empty\n");
+    }
+    if (!_routesForIsisRedistribution.isEmpty()) {
+      sb.append("  routesForIsisRedistribution non-empty\n");
+    }
+    if (_crossVrfIncomingRoutes != null
+        && !_crossVrfIncomingRoutes.values().stream().allMatch(Queue::isEmpty)) {
+      sb.append("  crossVrfIncomingRoutes non-empty\n");
+    }
+    _ospfProcesses.values().stream()
+        .filter(OspfRoutingProcess::isDirty)
+        .forEach(p -> sb.append("  ospf process dirty\n"));
+    _eigrpProcesses.values().stream()
+        .filter(EigrpRoutingProcess::isDirty)
+        .forEach(p -> sb.append("  eigrp process dirty\n"));
+    if (_bgpRoutingProcess != null && _bgpRoutingProcess.isDirty()) {
+      sb.append(_bgpRoutingProcess.describeDirtyState(max));
+    }
+    return sb.toString();
+  }
+
   boolean isDirty() {
     return
     // Route Deltas
@@ -1640,26 +1791,27 @@ public final class VirtualRouter {
         || (_bgpRoutingProcess != null && _bgpRoutingProcess.isDirty());
   }
 
-  void eigrpIteration(Map<String, Node> allNodes) {
-    _eigrpProcesses.values().forEach(p -> p.executeIteration(allNodes));
+  void eigrpIteration(Map<String, Node> allNodes, NetworkConfigurations nc) {
+    _eigrpProcesses.values().forEach(p -> p.executeIteration(allNodes, nc));
   }
 
   /** Execute one OSPF iteration, for all processes */
-  void ospfIteration(Map<String, Node> allNodes) {
-    _ospfProcesses.values().forEach(p -> p.executeIteration(allNodes));
+  void ospfIteration(Map<String, Node> allNodes, NetworkConfigurations nc) {
+    _ospfProcesses.values().forEach(p -> p.executeIteration(allNodes, nc));
   }
 
   /** Execute one iteration of BGP route propagation. */
-  void bgpIteration(Map<String, Node> allNodes) {
+  void bgpIteration(Map<String, Node> allNodes, NetworkConfigurations nc) {
     if (_bgpRoutingProcess == null) {
       return;
     }
     _bgpRoutingProcess.startOfInnerRound();
-    _bgpRoutingProcess.executeIteration(allNodes);
+    _bgpRoutingProcess.executeIteration(allNodes, nc);
     // If we leak to or from EVPN or leak routes as BGP, do so here.
     if (_vrf.getVrfLeakConfig() != null) {
       bgpVrfLeak();
       evpnVrfLeak(allNodes);
+      _bgpRoutingProcess.stageCrossVrfImports();
     }
     updateFloodLists();
   }
@@ -1668,6 +1820,7 @@ public final class VirtualRouter {
   private void bgpVrfLeak() {
     // invariants of being called from bgpIteration
     assert _bgpRoutingProcess != null && _vrf.getVrfLeakConfig() != null;
+    boolean reevaluate = _bgpRoutingProcess.consumeLeakReevaluation();
     for (BgpVrfLeakConfig vrfLeakConfig : _vrf.getVrfLeakConfig().getBgpVrfLeakConfigs()) {
       LOGGER.debug("Leaking BGP routes from {} to {}", vrfLeakConfig.getImportFromVrf(), _name);
       Optional<BgpRoutingProcess> exportingBgpProc =
@@ -1677,6 +1830,9 @@ public final class VirtualRouter {
       if (exportingBgpProc.isPresent()) {
         _bgpRoutingProcess.importCrossVrfV4Routes(
             exportingBgpProc.get().getRoutesToLeak(), vrfLeakConfig);
+        if (reevaluate) {
+          _bgpRoutingProcess.reevaluateCrossVrfV4Routes(vrfLeakConfig);
+        }
       } else {
         LOGGER.error(
             "Leaking BGP routes from VRF {} to VRF {} on node {} failed. Exporting VRF has no BGP"

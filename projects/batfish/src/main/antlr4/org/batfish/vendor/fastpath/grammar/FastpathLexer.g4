@@ -8,6 +8,7 @@ tokens {
   DEFAULT,
   QUOTED_TEXT,
   REMAINDER,
+  SECRET,
   WORD
 }
 
@@ -15,15 +16,21 @@ AAA: 'aaa';
 
 ACCOUNTING: 'accounting';
 
+AGING: 'aging';
+
 ALERT: 'alert';
 
 AUTHENTICATION: 'authentication';
 
 AUTHORIZATION: 'authorization';
 
+BGP: 'bgp';
+
 BROADCAST: 'broadcast';
 
 BUFFERED: 'buffered';
+
+CHARACTER_CLASSES: 'character-classes';
 
 CLI_COMMAND: 'cli-command';
 
@@ -38,6 +45,8 @@ COMMANDS
     }
   }
 ;
+
+CONSECUTIVE_CHARACTERS: 'consecutive-characters';
 
 CONSOLE: 'console';
 
@@ -82,6 +91,8 @@ ENCRYPTED: 'encrypted';
 
 ERROR: 'error';
 
+EXCLUDE_KEYWORD: 'exclude-keyword' -> pushMode ( M_Word );
+
 EXEC
 :
   'exec'
@@ -92,7 +103,11 @@ EXEC
   }
 ;
 
+EXECUTE: 'execute';
+
 EXIT: 'exit';
+
+HISTORY: 'history';
 
 HOST
 :
@@ -130,11 +145,15 @@ KEY
 
 KEYSTRING: 'keystring';
 
+LEVEL: 'level';
+
 LINE: 'line';
 
 LIST: 'list';
 
 LOCAL: 'local';
+
+LOCK_OUT: 'lock-out';
 
 LOGGING: 'logging';
 
@@ -151,6 +170,14 @@ LOGIN
 LOOKUP: 'lookup';
 
 LOOPBACK: 'loopback';
+
+LOWERCASE_LETTERS: 'lowercase-letters';
+
+MAXIMUM: 'maximum';
+
+MIN_LENGTH: 'min-length';
+
+MINIMUM: 'minimum';
 
 MODE: 'mode';
 
@@ -170,12 +197,29 @@ NO: 'no';
 
 NONE: 'none';
 
+NOPASSWORD: 'nopassword';
+
 NOTICE: 'notice';
+
+NUMERIC_CHARACTERS: 'numeric-characters';
+
+OSPF: 'ospf';
+
+OVERRIDE_COMPLEXITY_CHECK: 'override-complexity-check';
 
 PASSWORD
 :
-  'password' -> pushMode ( M_Remainder )
+  'password'
+  {
+    if (lastTokenType() == NEWLINE) {
+      pushMode(M_Remainder);
+    } else {
+      pushMode(M_Secret);
+    }
+  }
 ;
+
+PASSWORDS: 'passwords';
 
 PERSISTENT: 'persistent';
 
@@ -194,9 +238,13 @@ PROMPT
 
 RADIUS: 'radius';
 
+READ: 'read';
+
 RECONFIGURE: 'reconfigure';
 
 REMOVE: 'remove';
+
+REPEATED_CHARACTERS: 'repeated-characters';
 
 RETRY: 'retry';
 
@@ -225,6 +273,8 @@ SNTP: 'sntp';
 
 SOURCE_INTERFACE: 'source-interface';
 
+SPECIAL_CHARACTERS: 'special-characters';
+
 START_STOP: 'start-stop';
 
 STATUS
@@ -234,11 +284,22 @@ STATUS
 
 STOP_ONLY: 'stop-only';
 
+STRENGTH: 'strength';
+
+STRENGTH_CHECK: 'strength-check';
+
 SYSLOG: 'syslog';
 
 TACACS: 'tacacs';
 
 TACACS_SERVER: 'tacacs-server';
+
+TASK: 'task';
+
+TASKGROUP
+:
+  'taskgroup' -> pushMode ( M_Word )
+;
 
 TIMEOUT: 'timeout';
 
@@ -247,6 +308,15 @@ TRAPS: 'traps';
 TUNNEL: 'tunnel';
 
 UNICAST: 'unicast';
+
+UNLOCK: 'unlock';
+
+UPPERCASE_LETTERS: 'uppercase-letters';
+
+USERGROUP
+:
+  'usergroup' -> pushMode ( M_Word )
+;
 
 USERNAME
 :
@@ -258,6 +328,8 @@ VLAN: 'vlan';
 WARNING: 'warning';
 
 WRAP: 'wrap';
+
+WRITE: 'write';
 
 // Other Tokens
 
@@ -397,6 +469,12 @@ fragment
 F_NonNewlineChar
 :
   ~[\r\n]
+;
+
+fragment
+F_NonWhitespaceChar
+:
+  ~[ \t\u000C\r\n]
 ;
 
 fragment
@@ -573,6 +651,23 @@ M_Key_WS
 ;
 
 M_Key_NEWLINE
+:
+  F_Newline -> type ( NEWLINE ) , popMode
+;
+
+mode M_Secret;
+
+M_Secret_SECRET
+:
+  F_NonWhitespaceChar+ -> type ( SECRET ) , popMode
+;
+
+M_Secret_WS
+:
+  F_Whitespace+ -> channel ( HIDDEN )
+;
+
+M_Secret_NEWLINE
 :
   F_Newline -> type ( NEWLINE ) , popMode
 ;

@@ -13,6 +13,12 @@ f_common
    | f_service_filter_null
 ;
 
+// https://www.juniper.net/documentation/us/en/software/junos/security-services/topics/topic-map/configuring-ddos-protection.html
+f_disable_arp_policers_null
+:
+   DISABLE_ARP_POLICER | DISABLE_ARP_POLICERS
+;
+
 f_family
 :
    FAMILY
@@ -52,6 +58,7 @@ f_policer
       fp_filter_specific
       | fp_if_exceeding
       | fp_logical_interface_policer
+      | fp_shared_bandwidth_policer
       | fp_then
    )
 ;
@@ -85,6 +92,12 @@ fp_logical_interface_policer
    LOGICAL_INTERFACE_POLICER
 ;
 
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/shared-bandwidth-policer-edit-firewall-cs.html
+fp_shared_bandwidth_policer
+:
+   SHARED_BANDWIDTH_POLICER
+;
+
 fp_then
 :
    THEN
@@ -112,9 +125,16 @@ ff_term
 :
    TERM name = junos_name
    (
-      fft_from
+      fft_filter
+      | fft_from
       | fft_then
    )?
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/term-edit-firewall.html
+fft_filter
+:
+   FILTER name = filter_name
 ;
 
 fft_from
@@ -143,11 +163,14 @@ fft_from
       | fftf_icmp_type
       | fftf_icmp_type_except
       | fftf_interface
+      | fftf_interface_group
+      | fftf_interface_group_except
       | fftf_interface_set
       | fftf_ip_options
       | fftf_ip_protocol
       | fftf_is_fragment
       | fftf_learn_vlan_1p_priority
+      | fftf_learn_vlan_id
       | fftf_next_header
       | fftf_packet_length
       | fftf_packet_length_except
@@ -324,10 +347,25 @@ fftf_icmp_type_except
    )
 ;
 
-// TODO This should also support interface wildcard
+// https://www.juniper.net/documentation/us/en/software/junos/routing-policy/topics/concept/firewall-filter-match-understanding.html
 fftf_interface
 :
-   INTERFACE iface_name = interface_id
+   INTERFACE
+   (
+      iface_name = interface_id
+      | iface_wildcard = interface_wildcard
+   )
+;
+
+// https://www.juniper.net/documentation/us/en/software/junos/routing-policy/topics/example/firewall-filter-option-received-on-interface-group-example.html
+fftf_interface_group
+:
+   INTERFACE_GROUP group = uint8_range
+;
+
+fftf_interface_group_except
+:
+   INTERFACE_GROUP_EXCEPT group = uint8_range
 ;
 
 fftf_interface_set
@@ -353,6 +391,12 @@ fftf_is_fragment
 fftf_learn_vlan_1p_priority
 :
    LEARN_VLAN_1P_PRIORITY dec
+;
+
+// https://www.juniper.net/documentation/en_US/junos/topics/task/configuration/vpls-l2-packet-filtering-solutions.html
+fftf_learn_vlan_id
+:
+   LEARN_VLAN_ID id = vlan_number
 ;
 
 fftf_next_header
@@ -436,6 +480,7 @@ fftf_tcp_established
    TCP_ESTABLISHED
 ;
 
+// https://www.juniper.net/documentation/us/en/software/junos/routing-policy/topics/concept/firewall-filter-stateless-match-conditions-bit-field-values.html
 fftf_tcp_flags
 :
    TCP_FLAGS tcp_flags
@@ -466,9 +511,16 @@ fftt_accept
    ACCEPT
 ;
 
+// https://www.juniper.net/documentation/us/en/software/junos/cli-reference/topics/ref/statement/decapsulate-l2tp-edit-firewall-filter-term-then.html
 fftt_decapsulate
 :
-   DECAPSULATE GRE
+   DECAPSULATE
+   (
+      GRE
+      | GRE_IN_UDP
+      | MPLS_IN_UDP
+   )
+   (ROUTING_INSTANCE name = junos_name)?
 ;
 
 fftt_discard
@@ -535,6 +587,7 @@ s_firewall
    FIREWALL
    (
       f_common
+      | f_disable_arp_policers_null
       | f_family
       | f_interface_set
    )
@@ -574,6 +627,7 @@ tcp_flags_atom
    | PSH
    | RST
    | SYN
+   | TCP_FLAGS_HEX
    | URG
 ;
 

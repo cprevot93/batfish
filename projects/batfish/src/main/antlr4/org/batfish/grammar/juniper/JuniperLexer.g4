@@ -7,6 +7,8 @@ options {
 ACTIVE: 'active:';
 DELETE: 'delete:';
 INACTIVE: 'inactive:';
+// https://www.juniper.net/documentation/us/en/software/junos/cli/topics/example/junos-cli-configuration-protecting.html
+PROTECT: 'protect:';
 REPLACE: 'replace:';
 
 CLOSE_BRACE: '}';
@@ -41,7 +43,8 @@ MULTILINE_COMMENT
   }
 ;
 
-PROMPT: '{master:0}' -> channel(HIDDEN);
+// https://www.juniper.net/documentation/en_US/junos13.2/topics/task/operational/issu-before-you-begin.html
+PROMPT: '{' ('master' | 'backup') (':' [0-9]+)? '}' -> channel(HIDDEN);
 
 SEMICOLON
 :
@@ -104,7 +107,8 @@ F_ParenString
 fragment
 F_QuotedString
 :
-   '"' ~["\r\n]* '"'
+   // https://www.juniper.net/documentation/us/en/software/junos/cli/topics/topic-map/cli-configuration.html#id-entering-configuration-statements-and-identifiers
+   '"' ('\\' F_NonNewlineChar | ~["\r\n])* '"'
 ;
 
 // This may appear before a semicolon if settings are present to hide certain secrets.

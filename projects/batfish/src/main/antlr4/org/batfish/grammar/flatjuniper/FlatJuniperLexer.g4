@@ -20,11 +20,26 @@ tokens {
    CERTIFICATE_STRING,
    CODE_POINT_3_BIT,
    CODE_POINT_6_BIT,
+   CONFIG_DATA,
+   CPU,
+   CUSTOM,
+   DEVICE_NAME,
+   DEVICE_TYPE,
+   DISABLE_SPOOF_CHECK,
    DOUBLE_QUOTED_NAME,
    DYNAMIC_DB,
-   SECRET_STRING,
+   EXCEPTION,
+   FEATURES,
    FIN,
+   FLAG,
+   FLEX,
+   GCM_AES_128,
+   GCM_AES_256,
+   GCM_AES_XPN_128,
+   GCM_AES_XPN_256,
+   HUGEPAGES,
    IGNORED_WORD,
+   IMAGE,
    INTERFACE_ID,
    INTERFACE_WILDCARD,
    INET_RIB_NAME,
@@ -32,16 +47,29 @@ tokens {
    ISO_RIB_NAME,
    ISO_ADDRESS,
    LAST_AS,
+   LAYER_3_INFRASTRUCTURE,
    LITERAL_OR_REGEX_COMMUNITY,
+   LIST,
+   MAPPING,
+   MEMORY,
    MPLS_RIB_NAME,
    NAME,
+   NFV_BACK_PLANE,
+   NO_REMOTE_TRACE,
+   PAGE_SIZE,
+   PHYSICAL_CPU,
    PIPE,
    POLICY_EXPRESSION,
    RST,
+   SECRET_STRING,
    SUB_RANGE,
    SYN,
+   TCP_FLAGS_HEX,
    UINT32L,
    VERSION_STRING,
+   VIRTUAL_CPU,
+   VIRTUAL_FUNCTION,
+   VIRTUALIZATION_OPTIONS,
    VXLAN_RIB_NAME,
    WILDCARD_ARTIFACT
 }
@@ -51,6 +79,8 @@ tokens {
 ACCEPT: 'accept';
 
 ACCEPT_DATA: 'accept-data';
+
+ACCEPT_REMOTE_NEXTHOP: 'accept-remote-nexthop';
 
 ACCEPTED_PREFIX_LIMIT: 'accepted-prefix-limit';
 
@@ -67,6 +97,10 @@ ACCESS_PROFILE: 'access-profile' -> pushMode(M_Name);
 ACCESS_START: 'access-start';
 
 ACCOUNTING: 'accounting';
+ACCOUNTING_PORT: 'accounting-port';
+ACCOUNTING_RETRY: 'accounting-retry';
+ACCOUNTING_TIMEOUT: 'accounting-timeout';
+ACTION_PRIORITY: 'action-priority';
 ACTIVATE: 'activate';
 ACTIVE: 'active';
 
@@ -100,6 +134,8 @@ ADDRESS
   }
 ;
 
+ADDRESS_ASSIGNMENT: 'address-assignment';
+
 ADDRESS_BOOK
 :
   'address-book'
@@ -113,6 +149,8 @@ ADDRESS_BOOK
 ADDRESS_FAMILY: 'address-family';
 
 ADDRESS_MASK: 'address-mask';
+
+ADDRESS_PERSISTENT: 'address-persistent';
 
 ADDRESS_SET: 'address-set' -> pushMode(M_Name);
 
@@ -140,7 +178,7 @@ ADVERTISE_HIGH_METRICS: 'advertise-high-metrics';
 ADVERTISE_INACTIVE: 'advertise-inactive';
 
 ADVERTISE_INTERVAL: 'advertise-interval';
-
+ADVERTISEMENTS_THRESHOLD: 'advertisements-threshold';
 ADVERTISE_PEER_AS: 'advertise-peer-as';
 
 AFS: 'afs';
@@ -174,7 +212,9 @@ AH: 'ah';
 
 AH_HEADER: 'AH-header';
 AGING_TIMER: 'aging-timer';
+AIGP_ADJUST: 'aigp-adjust';
 AIGP_ORIGINATE: 'aigp-originate';
+ALARM: 'alarm';
 ALARM_WITHOUT_DROP: 'alarm-without-drop';
 
 ALARM_THRESHOLD: 'alarm-threshold';
@@ -190,8 +230,9 @@ ALIAS: 'alias';
 ALIASES: 'aliases';
 
 ALL: 'all';
-ALL_PATHS: 'all-paths';
+ALL_ACTIVE: 'all-active';
 ALL_INTERNAL_INTERFACES: 'all-internal-interfaces';
+ALL_PATHS: 'all-paths';
 ALLOW: 'allow';
 
 ALLOW_COMMANDS: 'allow-commands';
@@ -209,6 +250,8 @@ ALLOW_DUPLICATES: 'allow-duplicates';
 ALLOW_GRPC_RPC_REGEXPS: 'allow-grpc-rpc-regexps';
 
 ALLOW_HIDDEN_COMMANDS: 'allow-hidden-commands';
+
+ALLOW_ROUTE_LEAKING: 'allow-route-leaking';
 
 ALLOW_SNOOPED_CLIENTS: 'allow-snooped-clients';
 
@@ -233,6 +276,7 @@ ALWAYS_WRITE_GIADDR: 'always-write-giaddr';
 ANALYZER: 'analyzer';
 
 ANNOUNCEMENT: 'announcement';
+ANTI_VIRUS: 'anti-virus';
 
 ANY: 'any';
 
@@ -272,11 +316,21 @@ AREA: 'area';
 
 AREA_RANGE: 'area-range';
 
-ARP: 'arp';
+ARP
+:
+  'arp'
+  {
+    if (lastTokenType() == POLICER) {
+      pushMode(M_Name);
+    }
+  }
+;
 
 ARP_RESP: 'arp-resp';
 
 AS_OVERRIDE: 'as-override';
+
+AS_PATH_COMPARE: 'as-path-compare';
 
 AS_PATH
 :
@@ -314,6 +368,7 @@ AS_PATH_PREPEND
    'as-path-prepend' -> pushMode ( M_AsPathPrepend )
 ;
 
+ASCII: 'ascii' -> pushMode(M_Name);
 ASCII_TEXT: 'ascii-text' -> pushMode(M_SecretString);
 
 ASDOT_NOTATION: 'asdot-notation';
@@ -337,30 +392,28 @@ AUTHENTICATION_KEY
 ;
 
 AUTHENTICATION_KEY_CHAIN: 'authentication-key-chain' -> pushMode(M_Name);
-
 AUTHENTICATION_KEY_CHAINS: 'authentication-key-chains';
-
 AUTHENTICATION_METHOD: 'authentication-method';
-
 AUTHENTICATION_ORDER: 'authentication-order';
-
+AUTHENTICATION_PROFILE_NAME: 'authentication-profile-name' -> pushMode(M_Name);
+AUTHENTICATION_PROTOCOL: 'authentication-protocol';
 AUTHENTICATION_TYPE: 'authentication-type';
-
+AUTHENTICATOR: 'authenticator';
 AUTHORIZATION: 'authorization';
-
 AUTHORIZED_KEYS_COMMAND: 'authorized-keys-command';
-
 AUTHORIZED_KEYS_COMMAND_USER: 'authorized-keys-command-user';
 
 AUTO: 'auto';
+
+AUTO_10M_100M: 'auto-10m-100m';
 
 AUTO_BANDWIDTH: 'auto-bandwidth';
 
 AUTO_EXPORT: 'auto-export';
 
 AUTO_NEGOTIATION: 'auto-negotiation';
-
 AUTO_SNAPSHOT: 'auto-snapshot';
+AUTO_SPEED_DETECTION: 'auto-speed-detection';
 
 AUTONOMOUS_SYSTEM: 'autonomous-system' -> pushMode(M_BgpAsn);
 
@@ -389,20 +442,18 @@ BFD_LIVENESS_DETECTION: 'bfd-liveness-detection';
 BGP: 'bgp';
 BGP_ERROR_TOLERANCE: 'bgp-error-tolerance';
 BGP_OUTPUT_QUEUE_PRIORITY: 'bgp-output-queue-priority';
+BGP_SIGNAL: 'bgp-signal';
 
 BIFF: 'biff';
-
 BINARY_DATA: 'binary-data';
-
 BIND_INTERFACE
 :
    'bind-interface' -> pushMode ( M_Interface )
 ;
-
 BLOCK_FRAG: 'block-frag';
-
 BMP: 'bmp';
-
+BMP_LOC_RIB_ADD_PATH: 'bmp-loc-rib-add-path';
+BOOT_FILE: 'boot-file' -> pushMode(M_Name);
 BOOT_SERVER: 'boot-server';
 BOOTP: 'bootp';
 BOOTP_SUPPORT: 'bootp-support';
@@ -411,6 +462,7 @@ BOOTPS: 'bootps';
 BOTH: 'both';
 BRIDGE: 'bridge';
 BRIDGE_DOMAINS: 'bridge-domains' -> pushMode(M_Name);
+BRIDGE_PRIORITY: 'bridge-priority' -> pushMode(M_Name);
 BROADCAST: 'broadcast';
 BROADCAST_CLIENT: 'broadcast-client';
 BUFFER_DYNAMIC_THRESHOLD: 'buffer-dynamic-threshold';
@@ -420,6 +472,11 @@ BURST_SIZE_LIMIT: 'burst-size-limit' -> pushMode(M_Bandwidth);
 C: 'c';
 
 CACHE: 'cache';
+CAK: 'cak' -> pushMode(M_SecretString);
+
+CA_IDENTITY: 'ca-identity' -> pushMode(M_Name);
+
+CA_PROFILE: 'ca-profile' -> pushMode(M_Name);
 
 CALIPSO_OPTION: 'CALIPSO-option';
 
@@ -427,7 +484,12 @@ CATEGORIES: 'categories';
 
 CCC: 'ccc';
 
+CERTIFICATE: 'certificate';
+
 CERTIFICATES: 'certificates';
+
+CHAINED_COMPOSITE_NEXT_HOP: 'chained-composite-next-hop';
+CHANNEL_SPEED: 'channel-speed' -> pushMode(M_ChannelSpeed);
 
 CHANGE_LOG: 'change-log';
 
@@ -438,6 +500,9 @@ CHARACTER_SETS: 'character-sets';
 CHASSIS: 'chassis';
 
 CIPHERS: 'ciphers';
+CIPHER_SUITE: 'cipher-suite' -> pushMode(M_CipherSuite);
+CIRCUIT_ID: 'circuit-id';
+CKN: 'ckn' -> pushMode(M_Name);
 
 CLASS
 :
@@ -445,6 +510,7 @@ CLASS
   {
     if (lastTokenType() == FORWARDING_CLASSES
         || lastTokenType() == LOGIN
+        || secondToLastTokenType() == FORWARDING_CLASS_SETS
         || secondToLastTokenType() == USER) {
       pushMode(M_Name);
     }
@@ -464,15 +530,16 @@ CLIENT: 'client';
 CLIENT_ALIVE_COUNT_MAX: 'client-alive-count-max';
 
 CLIENT_ALIVE_INTERVAL: 'client-alive-interval';
-
+CLIENT_IA_TYPE: 'client-ia-type';
+CLIENT_IDENTIFIER: 'client-identifier';
 CLIENT_LIST: 'client-list' -> pushMode(M_Name);
 
 CLIENT_LIST_NAME: 'client-list-name' -> pushMode(M_Name);
-
+CLIENT_TYPE: 'client-type';
 CLIENTS: 'clients';
 
 CLUSTER: 'cluster';
-
+CLUSTER_ID: 'cluster-id';
 CMD: 'cmd';
 CODE_POINT: 'code-point' -> pushMode(M_CodePointOrAlias);
 
@@ -505,6 +572,9 @@ COMMUNITY
 
 COMMUNITY_COUNT: 'community-count';
 
+COMPARE_CLUSTER_LENGTH_BEFORE_ORIGINATOR_ID:
+  'compare-cluster-length-before-originator-id';
+
 COMPATIBLE: 'compatible';
 
 COMPRESS_CONFIGURATION_FILES: 'compress-configuration-files';
@@ -531,6 +601,7 @@ CONNECTION_LIMIT: 'connection-limit';
 CONNECTIONS_LIMIT: 'connections-limit';
 
 CONNECTION_MODE: 'connection-mode';
+CONNECTIVITY_ASSOCIATION: 'connectivity-association' -> pushMode(M_Name);
 
 CONNECTIVITY_FAULT_MANAGEMENT: 'connectivity-fault-management';
 CONSISTENT_HASH: 'consistent-hash';
@@ -551,9 +622,30 @@ CWR: 'cwr';
 
 DAEMON: 'daemon';
 
-DAMPING: 'damping';
+DAMPING
+:
+  'damping'
+  {
+    switch (lastTokenType()) {
+      case EXACT:
+      case IP_ADDRESS:
+      case IP_PREFIX:
+      case IPV6_PREFIX:
+      case LONGER:
+      case ORLONGER:
+      case POLICY_OPTIONS:
+      case THEN:
+      case UINT8:
+        pushMode(M_Name);
+        break;
+      default:
+        break;
+    }
+  }
+;
 
 DATABASE_REPLICATION: 'database-replication';
+DEVICE: 'device';
 DEVICE_COUNT: 'device-count';
 DESTINATION_HEADER: 'destination-header';
 
@@ -569,7 +661,10 @@ DEAD_INTERVAL: 'dead-interval';
 
 DEAD_PEER_DETECTION: 'dead-peer-detection';
 
+DEAD_TIME: 'dead-time';
 DECAPSULATE: 'decapsulate';
+DEDICATED_BUFFER: 'dedicated-buffer';
+DEMUX_OPTIONS: 'demux-options';
 
 DEFAULT
 :
@@ -600,6 +695,7 @@ DEFAULT_POLICY: 'default-policy';
 
 DEFAULTS: 'defaults';
 DELAY: 'delay';
+DELAY_ROUTE_ADVERTISEMENTS: 'delay-route-advertisements';
 DELEGATE_PROCESSING: 'delegate-processing';
 DELETE
 :
@@ -676,6 +772,8 @@ DESTINATION_NETWORK_PROHIBITED: 'destination-network-prohibited';
 
 DESTINATION_NETWORK_UNKNOWN: 'destination-network-unknown';
 
+DESTINATION_NETWORKS: 'destination-networks';
+
 DESTINATION_PORT: 'destination-port' -> pushMode(M_Port);
 
 DESTINATION_PORT_EXCEPT: 'destination-port-except' -> pushMode(M_Port);
@@ -685,6 +783,8 @@ DESTINATION_PREFIX_LIST: 'destination-prefix-list' -> pushMode(M_Name);
 DESTINATION_UDP_PORT: 'destination-udp-port';
 DESTINATION_UNREACHABLE: 'destination-unreachable';
 
+DETECTION_TIME: 'detection-time';
+
 DF_BIT: 'df-bit';
 
 DFC: 'dfc';
@@ -693,6 +793,10 @@ DH_GROUP: 'dh-group';
 
 DHCP: 'dhcp';
 
+DHCPV6: 'dhcpv6';
+DHCPV6_CLIENT: 'dhcpv6-client';
+
+DHCP_ATTRIBUTES: 'dhcp-attributes';
 DHCP_LOCAL_SERVER: 'dhcp-local-server';
 
 DHCP_RELAY: 'dhcp-relay';
@@ -707,7 +811,21 @@ DISABLE: 'disable';
 
 DISABLE_4BYTE_AS: 'disable-4byte-as';
 
+DISABLE_ARP_POLICER: 'disable-arp-policer';
+
+DISABLE_ARP_POLICERS: 'disable-arp-policers';
+
+DISABLE_AUTO_SPEED_DETECTION: 'disable-auto-speed-detection';
+
+DISABLE_LINKLOCAL_ADDR: 'disable-linklocal-addr';
+
 DISCARD: 'discard';
+
+DISTANCE_TO_PROTOCOL_NEXTHOP: 'distance-to-protocol-nexthop';
+
+DISTINGUISHED_NAME: 'distinguished-name';
+
+DIVIDE: 'divide';
 
 DNS: 'dns';
 
@@ -719,8 +837,12 @@ DOMAIN: 'domain';
 
 DOMAIN_NAME: 'domain-name' -> pushMode(M_Name);
 
+DOMAIN_PATH_ID: 'domain-path-id';
+
 DOMAIN_SEARCH: 'domain-search';
 DOMAIN_TYPE: 'domain-type';
+DOMAIN_VPN_TAG: 'domain-vpn-tag';
+DOT1X: 'dot1x';
 DROP: 'drop';
 DROP_AND_LOG: 'drop-and-log';
 DROP_PATH_ATTRIBUTES: 'drop-path-attributes' -> pushMode(M_SubRange);
@@ -769,11 +891,25 @@ DYNAMIC: 'dynamic';
 
 DYNAMIC_DNS: 'dynamic-dns';
 
+DYNAMIC_END_LABEL: 'dynamic-end-label';
+
+DYNAMIC_NEIGHBOR: 'dynamic-neighbor' -> pushMode(M_Name);
+DYNAMIC_REQUEST_PORT: 'dynamic-request-port';
+DYNAMIC_REQUESTS: 'dynamic-requests';
+DYNAMIC_START_LABEL: 'dynamic-start-label';
+DYNAMIC_TUNNELS: 'dynamic-tunnels' -> pushMode(M_DynamicTunnels);
+
+ECDSA_SHA2_NISTP256: 'ecdsa-sha2-nistp256';
+ECDSA_SHA2_NISTP384: 'ecdsa-sha2-nistp384';
+ECDSA_SHA2_NISTP521: 'ecdsa-sha2-nistp521';
+
 ECE: 'ece';
 
 ECHO_REPLY: 'echo-reply';
 
 ECHO_REQUEST: 'echo-request';
+
+ED25519: 'ed25519';
 
 EDGE: 'edge';
 
@@ -781,7 +917,7 @@ EGP: 'egp';
 
 EGRESS: 'egress';
 
-EIGHT02_3AD: '802.3ad' -> pushMode(M_Interface);
+EIGHT02_3AD: '802.3ad' -> pushMode(M_8023ad);
 
 EKLOGIN: 'eklogin';
 
@@ -806,8 +942,14 @@ ENGINE_ID: 'engine-id';
 ENHANCED_AVS_MAX: 'enhanced-avs-max';
 
 ENHANCED_HASH_KEY: 'enhanced-hash-key';
+ENHANCED_IP: 'enhanced-ip';
+ENHANCED_MODE: 'enhanced-mode';
+ENHANCED_POLICER: 'enhanced-policer';
 
 EQUAL_COST_PATHS: 'equal-cost-paths';
+
+EQUAL_EXTERNAL_INTERNAL: 'equal-external-internal';
+EQUALS: 'equals';
 
 ERROR: 'error';
 
@@ -826,12 +968,13 @@ ETHERNET_SWITCHING: 'ethernet-switching';
 ETHERNET_SWITCH_PROFILE: 'ethernet-switch-profile';
 
 ETHERNET_SWITCHING_OPTIONS: 'ethernet-switching-options';
-
+ESI: 'esi';
 EVENT_OPTIONS: 'event-options';
 
 EVENTS: 'events';
 
 EVPN: 'evpn';
+EVPN_VXLAN: 'evpn-vxlan';
 
 EXACT: 'exact';
 EXCEPT: 'except';
@@ -840,6 +983,7 @@ EXCLUDE: 'exclude';
 EXCLUDE_HOSTNAME: 'exclude-hostname';
 EXCLUDE_NON_ELIGIBLE: 'exclude-non-eligible';
 EXCLUDE_NON_FEASIBLE: 'exclude-non-feasible';
+EXCLUDE_SRLG: 'exclude-srlg';
 EXEC: 'exec';
 EXP
 :
@@ -854,6 +998,7 @@ EXP
 ;
 EXPEDITED: 'expedited';
 EXPLICIT_NULL: 'explicit-null';
+EXPLICIT_NULL_COS: 'explicit-null-cos';
 EXPLICIT_PRIORITY: 'explicit-priority';
 EXPORT
 :
@@ -868,6 +1013,7 @@ EXPORT
 EXPORT_RIB: 'export-rib' -> pushMode(M_Name);
 EXPRESSION: 'expression';
 EXTENDED_NEXTHOP_TUNNEL: 'extended-nexthop-tunnel';
+EXTENDED_SPACE: 'extended-space';
 EXTENDED_VNI_LIST: 'extended-vni-list' -> pushMode(M_ExtendedVniList);
 EXTENSIBLE_SUBSCRIBER: 'extensible-subscriber';
 EXTENSION_SERVICE: 'extension-service';
@@ -897,6 +1043,9 @@ FAST_REROUTE: 'fast-reroute';
 
 FASTETHER_OPTIONS: 'fastether-options';
 
+FEATURE_PROFILE: 'feature-profile';
+FEC129_VPWS: 'fec129-vpws';
+
 FILE
 :
   'file'
@@ -925,8 +1074,10 @@ FLAPS: 'flaps';
 FLEXIBLE_VLAN_TAGGING: 'flexible-vlan-tagging';
 
 FLOOD: 'flood';
-
+FLOOD_REFLECTOR: 'flood-reflector';
 FLOW: 'flow';
+
+FLOW_BASED: 'flow-based';
 
 FLOW_CONTROL: 'flow-control';
 
@@ -939,27 +1090,27 @@ FORCE_UP: 'force-up';
 FOREVER: 'forever';
 
 FORMAT: 'format';
-
+FORWARD_ONLY: 'forward-only';
+FORWARD_ONLY_REPLIES: 'forward-only-replies';
 FORWARD_SNOOPED_CLIENTS: 'forward-snooped-clients';
-
 FORWARDERS: 'forwarders';
 
 FORWARDING: 'forwarding';
 
 FORWARDING_CLASS: 'forwarding-class' -> pushMode(M_Name);
-
 FORWARDING_CLASS_ACCOUNTING: 'forwarding-class-accounting';
-
 FORWARDING_CLASS_SET: 'forwarding-class-set' -> pushMode(M_Name);
-
+FORWARDING_CLASS_SETS: 'forwarding-class-sets' -> pushMode(M_Name);
 FORWARDING_CLASSES: 'forwarding-classes';
 FORWARDING_CONTEXT: 'forwarding-context' -> pushMode(M_Name);
 FORWARDING_OPTIONS: 'forwarding-options';
 
 FORWARDING_POLICY: 'forwarding-policy';
 
-FORWARDING_TABLE: 'forwarding-table';
+FORWARDING_RIB: 'forwarding-rib';
 
+FORWARDING_TABLE: 'forwarding-table';
+FPC: 'fpc';
 FRAGMENT: 'fragment';
 
 FRAGMENT_HEADER: 'fragment-header';
@@ -992,6 +1143,8 @@ GATEWAY: 'gateway' -> pushMode(M_Name);
 
 GATEWAY_ADDRESS: 'gateway-address';
 
+GENERAL_IKEID: 'general-ikeid';
+
 GENERATE: 'generate';
 
 GIGETHER_OPTIONS: 'gigether-options';
@@ -1009,6 +1162,8 @@ GRE_4IN6: 'gre-4in6';
 GRE_6IN4: 'gre-6in4';
 
 GRE_6IN6: 'gre-6in6';
+
+GRE_IN_UDP: 'gre-in-udp';
 
 GROUP: 'group' -> pushMode(M_Name);
 
@@ -1037,6 +1192,8 @@ GROUPS: 'groups' -> pushMode(M_Name);
 GRPC_REPLAY: 'grpc-replay';
 
 HALF_LIFE: 'half-life';
+
+HARDWARE_ADDRESS: 'hardware-address' -> pushMode(M_MacAddress);
 
 HASH_KEY: 'hash-key';
 
@@ -1074,6 +1231,10 @@ HMAC_SHA_256_128: 'hmac-sha-256-128';
 
 HOLD_DOWN: 'hold-down';
 
+HOLDDOWN_ALL_STALE_LABELS: 'holddown-all-stale-labels';
+
+HOLDDOWN_INTERVAL: 'holddown-interval';
+
 HOLD_TIME: 'hold-time';
 
 HOP_BY_HOP: 'hop-by-hop';
@@ -1092,11 +1253,15 @@ HOST_UNREACHABLE_FOR_TOS: 'host-unreachable-for-tos';
 
 HOSTKEY_ALGORITHM: 'hostkey-algorithm';
 
+HOSTKEY_ALGORITHM_LIST: 'hostkey-algorithm-list';
+
 HOSTNAME: 'hostname' -> pushMode(M_Name);
 
 HTTP: 'http';
 
 HTTPS: 'https';
+
+HUGEPAGES: 'hugepages';
 
 ICCP: 'iccp';
 
@@ -1116,6 +1281,7 @@ ICMP6_TYPE: 'icmp6-type';
 
 ICMPV6: 'icmpv6';
 
+ID_REUSE_TIMEOUT: 'id-reuse-timeout';
 IDENT: 'ident';
 
 IDENT_RESET: 'ident-reset';
@@ -1150,11 +1316,17 @@ IGNORE_ATTACHED_BIT: 'ignore-attached-bit';
 
 IGNORE_L3_INCOMPLETES: 'ignore-l3-incompletes';
 
+IGNORE_LSP_METRICS: 'ignore-lsp-metrics';
+
+IGNORE_SERVICE_LABEL: 'ignore-service-label';
+
 IGP: 'igp';
 
 IGP_METRIC: 'igp-metric';
 
 IGP_METRIC_THRESHOLD: 'igp-metric-threshold';
+
+IGP_MULTIPLIER: 'igp-multiplier';
 
 IKE: 'ike';
 
@@ -1194,10 +1366,14 @@ INACTIVITY_TIMEOUT: 'inactivity-timeout';
 INCLUDE_ALL: 'include-all';
 
 INCLUDE_ANY: 'include-any';
+INCLUDE_IRB_AND_L2: 'include-irb-and-l2';
 
 INCLUDE_MP_NEXT_HOP: 'include-mp-next-hop';
+INCLUDE_SCI: 'include-sci';
 
 INCOMPLETE: 'incomplete';
+
+INDEPENDENT_DOMAIN: 'independent-domain';
 
 INDIRECT_NEXT_HOP: 'indirect-next-hop';
 
@@ -1215,6 +1391,14 @@ INET
 
 INET6: 'inet6';
 
+INET6_IMPORT: 'inet6-import' -> pushMode(M_PolicyExpression);
+
+INET6_RESOLUTION_RIBS: 'inet6-resolution-ribs' -> pushMode(M_RibName);
+
+INET_IMPORT: 'inet-import' -> pushMode(M_PolicyExpression);
+
+INET_RESOLUTION_RIBS: 'inet-resolution-ribs' -> pushMode(M_RibName);
+
 INET_MDT: 'inet-mdt';
 
 INET_MVPN: 'inet-mvpn';
@@ -1231,11 +1415,15 @@ INET_PRECEDENCE
   }
 ;
 
+INET6_ADVERTISE_INTERVAL: 'inet6-advertise-interval';
+
 INET6_MVPN: 'inet6-mvpn';
 
 INET_VPN: 'inet-vpn';
 
 INET6_VPN: 'inet6-vpn';
+
+INFINITE: 'infinite';
 
 INFO: 'info';
 
@@ -1246,7 +1434,9 @@ INFO_REQUEST: 'info-request';
 INGRESS: 'ingress';
 
 INGRESS_REPLICATION: 'ingress-replication';
-
+INCREASED_BANDWIDTH: 'increased-bandwidth';
+INITIAL_TCP_MSS: 'initial-tcp-mss';
+INLINE_SERVICES: 'inline-services';
 INNER: 'inner';
 
 INPUT: 'input' -> pushMode(M_Name);
@@ -1265,6 +1455,8 @@ INSTALL_NEXTHOP: 'install-nexthop';
 
 INSTANCE: 'instance' -> pushMode(M_Name);
 
+INSTANCE_EXPORT: 'instance-export' -> pushMode(M_Name);
+
 INSTANCE_IMPORT: 'instance-import' -> pushMode(M_Name);
 
 INSTANCE_TYPE: 'instance-type';
@@ -1278,8 +1470,13 @@ INTERFACE
    'interface' -> pushMode ( M_Interface )
 ;
 
+INTERFACE_GROUP: 'interface-group' -> pushMode(M_SubRange);
+
+INTERFACE_GROUP_EXCEPT: 'interface-group-except' -> pushMode(M_SubRange);
+INTERFACE_IDENTIFIER: 'interface-identifier';
 INTERFACE_MAC_LIMIT: 'interface-mac-limit';
 INTERFACE_MODE: 'interface-mode';
+INTERFACE_NUM: 'interface-num';
 
 INTERFACE_RANGE: 'interface-range' -> pushMode(M_Name);
 
@@ -1318,6 +1515,7 @@ INVERT_MATCH: 'invert-match';
 INVALID: 'invalid';
 
 IP: 'ip';
+IP_ADDRESS_LITERAL: 'ip-address';
 
 IP_DESTINATION_ADDRESS: 'ip-destination-address';
 
@@ -1376,10 +1574,17 @@ ISIS: 'isis';
 
 ISIS_ENHANCED: 'isis-enhanced';
 
+ISOLATED: 'isolated';
+ISOLATED_VLAN: 'isolated-vlan' -> pushMode(M_Name);
+
 ISO
 :
    'iso' -> pushMode ( M_ISO )
 ;
+
+ISO_IMPORT: 'iso-import' -> pushMode(M_PolicyExpression);
+
+ISO_RESOLUTION_RIBS: 'iso-resolution-ribs' -> pushMode(M_RibName);
 
 ISO_VPN: 'iso-vpn';
 
@@ -1792,6 +1997,8 @@ JUNOS_YMSG: 'junos-ymsg';
 K: 'k';
 
 KEEP: 'keep';
+KEEP_INCOMING_CIRCUIT_ID: 'keep-incoming-circuit-id';
+KEEP_INCOMING_REMOTE_ID: 'keep-incoming-remote-id';
 
 KERBEROS_SEC: 'kerberos-sec';
 
@@ -1812,11 +2019,16 @@ KEY
   }
 ;
 
-KEYS: 'keys';
-
 KEY_CHAIN: 'key-chain' -> pushMode(M_Name);
 
 KEY_EXCHANGE: 'key-exchange';
+
+KEY_ID: 'key-id' -> pushMode(M_Name);
+KEY_NAME: 'key-name' -> pushMode(M_Name);
+
+KEY_SERVER_PRIORITY: 'key-server-priority';
+
+KEYS: 'keys';
 
 KLOGIN: 'klogin';
 
@@ -1825,12 +2037,13 @@ KPASSWD: 'kpasswd';
 KRB_PROP: 'krb-prop';
 
 KRBUPDATE: 'krbupdate';
-
+KRT_NEXTHOP_ACK_TIMEOUT: 'krt-nexthop-ack-timeout';
 KSHELL: 'kshell';
 
 L: 'L';
 
 L2CIRCUIT: 'l2circuit';
+L2CKT: 'l2ckt';
 
 L2VPN: 'l2vpn';
 
@@ -1852,6 +2065,12 @@ L3_INTERFACE
 
 LABEL_SWITCHED_PATH: 'label-switched-path' -> pushMode(M_Name);
 
+LABEL_LIMIT: 'label-limit';
+
+LABEL_SPACE: 'label-space';
+
+LABELED_BGP: 'labeled-bgp';
+
 LABELED_UNICAST: 'labeled-unicast';
 
 LACP: 'lacp';
@@ -1872,11 +2091,15 @@ LINE_IDENTIFICATION_OPTION: 'line-identification-option';
 
 LINK_MODE: 'link-mode';
 LINK_SPEED: 'link-speed';
+LITE_MODE: 'lite-mode';
 LDAP: 'ldap';
 
 LDP: 'ldp';
+LDP_P2MP: 'ldp-p2mp';
 
 LEARN_VLAN_1P_PRIORITY: 'learn-vlan-1p-priority';
+
+LEARN_VLAN_ID: 'learn-vlan-id';
 
 LEVEL: 'level';
 
@@ -1887,12 +2110,15 @@ LIFETIME_SECONDS: 'lifetime-seconds';
 LIMIT_SESSION: 'limit-session';
 
 LINK_PROTECTION: 'link-protection';
+LINK_SELECTION: 'link-selection';
 
 LLDP: 'lldp';
 
 LLDP_MED: 'lldp-med';
 
 LOAD_BALANCE: 'load-balance';
+
+LOAD_BALANCE_LABEL_CAPABILITY: 'load-balance-label-capability';
 
 LOAD_KEY_FILE: 'load-key-file';
 
@@ -1912,11 +2138,14 @@ LOCAL_ADDRESS: 'local-address';
 
 LOCAL_AS: 'local-as' -> pushMode(M_BgpAsn);
 
+LOCAL_CERTIFICATE: 'local-certificate' -> pushMode(M_Name);
+
 LOCAL_IDENTITY: 'local-identity';
 
 LOCAL_PORT: 'local-port';
 
 LOCAL_PREFERENCE: 'local-preference';
+LOCAL_SERVER_GROUP: 'local-server-group' -> pushMode(M_Name);
 
 LOCATION: 'location';
 
@@ -1928,6 +2157,7 @@ LOG_OUT_ON_DISCONNECT: 'log-out-on-disconnect';
 LOG_PREFIX: 'log-prefix';
 LOG_ROTATE_FREQUENCY: 'log-rotate-frequency';
 LOG_UPDOWN: 'log-updown';
+LOGICAL: 'logical';
 LOGICAL_INTERFACE_POLICER: 'logical-interface-policer';
 LOGICAL_SYSTEM: 'logical-system' -> pushMode(M_Name);
 
@@ -1966,6 +2196,8 @@ LSP_INTERVAL: 'lsp-interval';
 
 LSP_LIFETIME: 'lsp-lifetime';
 
+LSP_STATISTICS_FROM_ROUTE: 'lsp-statistics-from-route';
+
 LSP_TELEMETRY: 'lsp-telemetry';
 
 LSPING: 'lsping';
@@ -1977,10 +2209,17 @@ MAC
    'mac' -> pushMode ( M_MacAddress )
 ;
 
+MAC_MOVE_LIMIT: 'mac-move-limit';
+MAC_RADIUS: 'mac-radius';
+MAC_VRF: 'mac-vrf';
 MACS: 'macs';
+MACSEC: 'macsec';
 
 MAIN: 'main';
 MAINTENANCE_DOMAIN: 'maintenance-domain' -> pushMode(M_Name);
+MALFORMED_ROUTE_LIMIT: 'malformed-route-limit';
+MALFORMED_UPDATE_LOG_INTERVAL: 'malformed-update-log-interval';
+MANAGEMENT_INSTANCE: 'management-instance';
 MAPPED_PORT: 'mapped-port';
 
 MARTIANS: 'martians';
@@ -2003,6 +2242,7 @@ MAX_CONFIGURATION_ROLLBACKS: 'max-configuration-rollbacks';
 
 MAX_NCACHE_TTL: 'max-ncache-ttl';
 
+MAX_OUTSTANDING_REQUESTS: 'max-outstanding-requests';
 MAX_PRE_AUTHENTICATION_PACKETS: 'max-pre-authentication-packets';
 
 MAX_SESSION_NUMBER: 'max-session-number';
@@ -2012,11 +2252,14 @@ MAX_SESSIONS_PER_CONNECTION: 'max-sessions-per-connection';
 
 MAX_SUPPRESS: 'max-suppress';
 
+MAX_TX_BUFFERS: 'max-tx-buffers';
 MAXIMUM: 'maximum';
 
 MAXIMUM_BANDWIDTH: 'maximum-bandwidth';
-
+MAXIMUM_ECMP: 'maximum-ecmp';
+MAXIMUM_HOP_COUNT: 'maximum-hop-count';
 MAXIMUM_LABELS: 'maximum-labels';
+MAXIMUM_LEASE_TIME: 'maximum-lease-time';
 
 MAXIMUM_LENGTH: 'maximum-length';
 
@@ -2033,6 +2276,10 @@ MEDIUM: 'medium';
 MEDIUM_HIGH: 'medium-high';
 
 MEDIUM_LOW: 'medium-low';
+
+MED_PLUS_IGP: 'med-plus-igp';
+
+MED_MULTIPLIER: 'med-multiplier';
 
 MEMBER
 :
@@ -2064,14 +2311,19 @@ MEMBERS
 MEMBERSHIP_REPORT: 'membership-report';
 
 MEMBERSHIP_QUERY: 'membership-query';
+MEMORY: 'memory';
 
 MESSAGE: 'message';
 
+MESSAGE_AUTHENTICATOR: 'message-authenticator';
 METRIC: 'metric';
 
 METRIC2: 'metric2';
 
-METRIC_OUT: 'metric-out';
+METRIC_OUT
+:
+   'metric-out' -> pushMode ( M_MetricOut )
+;
 
 METRIC_TYPE
 :
@@ -2081,6 +2333,7 @@ METRIC_TYPE
 MGCP_CA: 'mgcp-ca';
 
 MGCP_UA: 'mgcp-ua';
+MIME_WHITELIST: 'mime-whitelist' -> pushMode(M_MimeWhitelist);
 
 MINIMUM_BANDWIDTH: 'minimum-bandwidth';
 
@@ -2100,13 +2353,15 @@ MINIMUM_NUMERICS: 'minimum-numerics';
 
 MINIMUM_PUNCTUATIONS: 'minimum-punctuations';
 
+MINIMUM_RECEIVE_INTERVAL: 'minimum-receive-interval';
+
 MINIMUM_REUSE: 'minimum-reuse';
 
 MINIMUM_TIME: 'minimum-time';
 
 MINIMUM_UPPER_CASES: 'minimum-upper-cases';
 
-MS_RPC: 'ms-rpc';
+MKA: 'mka';
 
 MLD: 'mld';
 
@@ -2126,6 +2381,10 @@ MPLS_INET_BOTH: 'mpls-inet-both';
 
 MPLS_INET_BOTH_NON_VPN: 'mpls-inet-both-non-vpn';
 
+MPLS_IN_UDP: 'mpls-in-udp';
+
+MS_RPC: 'ms-rpc';
+
 MSDP: 'msdp';
 
 MSTP: 'mstp';
@@ -2144,20 +2403,17 @@ MULTICAST_MAC
 ;
 
 MULTICAST_CLIENT: 'multicast-client';
-
 MULTICAST_MODE: 'multicast-mode';
-
 MULTIHOP: 'multihop';
-
 MULTIPATH: 'multipath';
-
 MULTIPATH_RESOLVE: 'multipath-resolve';
-
+MULTIPLE: 'multiple';
 MULTIPLE_AS: 'multiple-as';
-
 MULTIPLIER: 'multiplier';
-
+MULTIPLY: 'multiply';
+MULTIPOINT: 'multipoint';
 MULTISERVICE_OPTIONS: 'multiservice-options';
+MUST_SECURE: 'must-secure';
 
 MVPN: 'mvpn';
 
@@ -2193,7 +2449,9 @@ NETBIOS_SSN: 'netbios-ssn';
 
 NETCONF: 'netconf';
 
+NETWORK: 'network';
 NETWORK_DOMAIN: 'network-domain';
+NETWORK_SERVICES: 'network-services';
 
 NETWORK_SUMMARY_EXPORT: 'network-summary-export';
 
@@ -2219,6 +2477,7 @@ NEXT_HOP
        case EXACT:
        case LONGER:
        case ORLONGER:
+       case VXLAN_ROUTING:
          break;
        default:
          pushMode(M_Interface);
@@ -2236,15 +2495,21 @@ NFSD: 'nfsd';
 
 NHRP: 'nhrp';
 
+NLRI_ROUTE_TYPE: 'nlri-route-type';
+
 NNTP: 'nntp';
 
 NTALK: 'ntalk';
 
+NO_ACCEPT_DATA: 'no-accept-data';
 NO_ACTIVE_BACKBONE: 'no-active-backbone';
+NO_ADAPTATION: 'no-adaptation';
 NO_ADJACENCY_DOWN_NOTIFICATION: 'no-adjacency-down-notification';
+NO_ALL: 'no-all';
 NO_ADVERTISE: 'no-advertise';
 NO_ANTI_REPLAY: 'no-anti-replay';
 NO_ARP: 'no-arp';
+NO_ATTRSET: 'no-attrset';
 NO_AUTO_NEGOTIATION: 'no-auto-negotiation';
 NO_AUTO_POLICING: 'no-auto-policing';
 NO_BINARY_DATA: 'no-binary-data';
@@ -2253,13 +2518,26 @@ NO_CLIENT_REFLECT: 'no-client-reflect';
 NO_CSPF: 'no-cspf';
 NO_DECREMENT_TTL: 'no-decrement-ttl';
 NO_ECMP_FAST_REROUTE: 'no-ecmp-fast-reroute';
+NO_EVPN: 'no-evpn';
 NO_EXPORT: 'no-export';
 NO_EXPORT_SUBCONFED: 'no-export-subconfed';
+NO_FEC129_VPWS: 'no-fec129-vpws';
 NO_FLOW_CONTROL: 'no-flow-control';
 NO_GATEWAY_COMMUNITY: 'no-gateway-community';
+NO_HIERARCHICAL_ECMP: 'no-hierarchical-ecmp';
 NO_HIDDEN_COMMANDS: 'no-hidden-commands';
 NO_INSTALL: 'no-install';
 NO_IPV4_ROUTING: 'no-ipv4-routing';
+NO_IPV6_ROUTING: 'no-ipv6-routing';
+NO_L2CKT: 'no-l2ckt';
+NO_L2VPN: 'no-l2vpn';
+NO_L3VPN: 'no-l3vpn';
+NO_LABELED_BGP: 'no-labeled-bgp';
+NO_LDP: 'no-ldp';
+NO_LDP_P2MP: 'no-ldp-p2mp';
+NO_LOAD_BALANCE_LABEL_CAPABILITY: 'no-load-balance-label-capability';
+NO_MALFORMED_ROUTE_LIMIT: 'no-malformed-route-limit';
+NO_MESSAGE_AUTHENTICATOR: 'no-message-authenticator';
 NO_NAT_TRAVERSAL: 'no-nat-traversal';
 NO_NEIGHBOR_DOWN_NOTIFICATION: 'no-neighbor-down-notification';
 NO_NEIGHBOR_LEARN: 'no-neighbor-learn';
@@ -2270,6 +2548,7 @@ NO_PASSWORDS: 'no-passwords';
 NO_PEER_LOOP_CHECK: 'no-peer-loop-check';
 NO_PING_RECORD_ROUTE: 'no-ping-record-route';
 NO_PING_TIME_STAMP: 'no-ping-time-stamp';
+NO_PROPAGATE_TTL: 'no-propagate-ttl';
 NO_PREEMPT: 'no-preempt';
 NO_PREPEND_GLOBAL_AS: 'no-prepend-global-as';
 NO_PUBLIC_KEYS: 'no-public-keys';
@@ -2281,13 +2560,19 @@ NO_RESOLVE: 'no-resolve';
 NO_RETAIN: 'no-retain';
 NO_RFC_1583: 'no-rfc-1583';
 NO_ROOT_PORT: 'no-root-port';
+NO_RSVP: 'no-rsvp';
+NO_RSVP_P2MP: 'no-rsvp-p2mp';
 NO_SCP_SERVER: 'no-scp-server';
 NO_SELF_PING: 'no-self-ping';
 NO_SFTP_SERVER: 'no-sftp-server';
+NO_SNOOP: 'no-snoop';
+NO_STATIC: 'no-static';
 NO_SUMMARIES: 'no-summaries';
 NO_TCP_FORWARDING: 'no-tcp-forwarding';
 NO_TRANSLATION: 'no-translation';
 NO_TRAPS: 'no-traps';
+NO_VLAN_INTERFACE_NAME: 'no-vlan-interface-name';
+NO_VRF_PROPAGATE_TTL: 'no-vrf-propagate-ttl';
 NO_WORLD_READABLE: 'no-world-readable';
 
 NODE_DEVICE: 'node-device' -> pushMode(M_FabricDevice);
@@ -2301,6 +2586,9 @@ NON_STRICT_PRIORITY_SCHEDULING: 'non-strict-priority-scheduling';
 NOTICE: 'notice';
 NOTIFICATION_RIB: 'notification-rib' -> pushMode(M_Name);
 
+NUMBER_OF_PORTS: 'number-of-ports';
+NUMBER_OF_SUB_PORTS: 'number-of-sub-ports';
+
 NSSA: 'nssa';
 
 NTP: 'ntp';
@@ -2311,12 +2599,25 @@ OAM: 'oam';
 
 OFF: 'off';
 
-OFFSET: 'offset';
+OFFSET
+:
+  'offset'
+  {
+    if (secondToLastTokenType() == MULTIPLIER
+        || (secondToLastTokenType() == EXPRESSION
+            && (lastTokenType() == METRIC || lastTokenType() == METRIC2))) {
+      pushMode(M_MetricExpressionOffset);
+    }
+  }
+;
 OPTIMIZE_ADAPTIVE_TEARDOWN: 'optimize-adaptive-teardown';
 OPTIMIZE_AGGRESSIVE: 'optimize-aggressive';
 OPTIMIZE_HOLD_DEAD_DELAY: 'optimize-hold-dead-delay';
+OPTIMIZE_SWITCHOVER_DELAY: 'optimize-switchover-delay';
 OPTIMIZE_TIMER: 'optimize-timer';
 OPTIMIZED: 'optimized';
+OPTION: 'option';
+OPTION_NUMBER: 'option-number';
 OPTIONS: 'options';
 ORIGIN: 'origin';
 ORHIGHER: 'orhigher';
@@ -2341,15 +2642,16 @@ P2MP: 'p2mp';
 P2MP_OVER_LAN: 'p2mp-over-lan';
 P2P: 'p2p';
 PACKET_ACTION: 'packet-action';
+PACKET_BASED: 'packet-based';
 PACKET_LENGTH: 'packet-length' -> pushMode(M_SubRange);
 PACKET_LENGTH_EXCEPT: 'packet-length-except' -> pushMode(M_SubRange);
 
 PACKET_TOO_BIG: 'packet-too-big';
-
+PAGE_COUNT: 'page-count';
+PAGE_SIZE: 'page-size';
 PARAMETER_PROBLEM: 'parameter-problem';
-
+PAP: 'pap';
 PASSIVE: 'passive';
-
 PASSWORD: 'password';
 
 PATH
@@ -2372,9 +2674,11 @@ PATH_MTU: 'path-mtu';
 PATH_SELECTION: 'path-selection';
 PATH_SELECTION_MODE: 'path-selection-mode';
 PAYLOAD_PROTOCOL: 'payload-protocol';
+PE_PE_CONNECTION: 'pe-pe-connection';
 PEER: 'peer';
 PEER_ADDRESS: 'peer-address';
 PEER_AS: 'peer-as' -> pushMode(M_BgpAsn);
+PEER_CERTIFICATE_TYPE: 'peer-certificate-type';
 PEER_UNIT: 'peer-unit';
 PER_FLOW: 'per-flow';
 PER_PACKET: 'per-packet';
@@ -2392,19 +2696,33 @@ PERSISTENT_NAT: 'persistent-nat';
 PFE: 'pfe';
 
 PGM: 'pgm';
-
+PHONE_HOME: 'phone-home';
+PIC: 'pic';
+PIC_MODE: 'pic-mode' -> pushMode(M_ChannelSpeed);
 PIM: 'pim';
 
 PING: 'ping';
 
 PING_DEATH: 'ping-death';
 
+PKCS7: 'pkcs7';
+
+PKI: 'pki';
+
 PLAIN_TEXT_PASSWORD: 'plain-text-password';
 
 POE: 'poe';
 
 POINT_TO_POINT: 'point-to-point';
-POLICER: 'policer' -> pushMode(M_Name);
+POLICER
+:
+  'policer'
+  {
+    if (lastTokenType() != INET && lastTokenType() != INET6) {
+      pushMode(M_Name);
+    }
+  }
+;
 POLICIES: 'policies';
 POLICING: 'policing';
 POLICY
@@ -2466,6 +2784,8 @@ PORT_OVERLOADING: 'port-overloading';
 
 PORT_OVERLOADING_FACTOR: 'port-overloading-factor';
 
+PORT_RANGE: 'port-range';
+
 PORT_RANDOMIZATION: 'port-randomization';
 
 PORT_SCAN: 'port-scan';
@@ -2483,13 +2803,14 @@ PPTP: 'pptp';
 PRE_POLICY: 'pre-policy';
 
 PRE_SHARED_KEY: 'pre-shared-key';
+PRE_SHARED_KEY_CHAIN: 'pre-shared-key-chain' -> pushMode(M_Name);
 
 PRE_SHARED_KEYS: 'pre-shared-keys';
 
+PREAUTHENTICATION_PORT: 'preauthentication-port';
+PREAUTHENTICATION_SECRET: 'preauthentication-secret' -> pushMode(M_SecretString);
 PRECEDENCE: 'precedence';
-
 PRECEDENCE_CUTOFF_IN_EFFECT: 'precedence-cutoff-in-effect';
-
 PRECISION_TIMERS: 'precision-timers';
 
 PREEMPT: 'preempt';
@@ -2500,7 +2821,15 @@ PREFERENCE: 'preference';
 
 PREFERRED: 'preferred';
 
-PREFIX: 'prefix';
+PREFIX
+:
+  'prefix'
+  {
+    if (lastTokenType() == CIRCUIT_ID || lastTokenType() == REMOTE_ID) {
+      pushMode(M_Name);
+    }
+  }
+;
 
 PREFIX_NAME: 'prefix-name' -> pushMode(M_PrefixName);
 
@@ -2515,6 +2844,8 @@ PREFIX_LIST: 'prefix-list' -> pushMode(M_Name);
 PREFIX_LIST_FILTER: 'prefix-list-filter' -> pushMode(M_Name);
 
 PREFIX_POLICY: 'prefix-policy' -> pushMode(M_Name);
+
+PRESERVE_NEXTHOP_HIERARCHY: 'preserve-nexthop-hierarchy';
 
 PRIMARY
 :
@@ -2537,11 +2868,15 @@ PRIORITY: 'priority';
 PRIORITY_COST: 'priority-cost';
 
 PRIVATE: 'private';
+PRIVATE_VLAN: 'private-vlan';
 
 PROBE_IDLE_TUNNEL: 'probe-idle-tunnel';
 PROCESSES: 'processes';
+PROFILE: 'profile' -> pushMode(M_Name);
 PROFILE1: 'profile1';
 PROFILE2: 'profile2';
+
+PROPAGATE_SETTINGS: 'propagate-settings' -> pushMode(M_Interface);
 
 PROPOGATE_SETTING: 'propogate-setting';
 
@@ -2600,12 +2935,22 @@ RADIUS_OPTIONS: 'radius-options';
 
 RADIUS_SERVER: 'radius-server';
 
-RANGE: 'range';
+RADSEC: 'radsec';
+RADSEC_DESTINATION: 'radsec-destination';
+RANGE
+:
+  'range'
+  {
+    if (lastTokenType() == INET || lastTokenType() == INET6) {
+      pushMode(M_Name);
+    }
+  }
+;
 
 RANGE_ADDRESS: 'range-address';
 
 RANDOM: 'random';
-
+RAPID_COMMIT: 'rapid-commit';
 RAS: 'ras';
 
 RATE_LIMIT: 'rate-limit';
@@ -2613,12 +2958,11 @@ RATE_LIMIT: 'rate-limit';
 REALAUDIO: 'realaudio';
 
 READ_ONLY: 'read-only';
-
 READ_WRITE: 'read-write';
-
 READVERTISE: 'readvertise';
-
+REAUTHENTICATION: 'reauthentication';
 RECEIVE: 'receive';
+RECEIVE_BUFFER: 'receive-buffer' -> pushMode(M_Bandwidth);
 RECORD: 'record';
 
 RECORD_LIFETIME: 'record-lifetime';
@@ -2636,9 +2980,12 @@ REDIRECT_FOR_TOS_AND_HOST: 'redirect-for-tos-and-host';
 
 REDIRECT_FOR_TOS_AND_NET: 'redirect-for-tos-and-net';
 
+REDUNDANCY: 'redundancy';
 // TODO: should this just allow a number afterward?
 REDUNDANCY_GROUP: 'redundancy-group' -> pushMode(M_Name);
+REDUNDANCY_MODE: 'redundancy-mode';
 
+REDUNDANT: 'redundant';
 REDUNDANT_ETHER_OPTIONS: 'redundant-ether-options';
 
 REDUNDANT_PARENT: 'redundant-parent' -> pushMode(M_Interface);
@@ -2647,7 +2994,7 @@ REFERENCE_BANDWIDTH
 :
    'reference-bandwidth' -> pushMode ( M_Bandwidth )
 ;
-
+REFLECTOR: 'reflector';
 REFRESH_TIME: 'refresh-time';
 REJECT: 'reject';
 
@@ -2655,9 +3002,15 @@ REKEY: 'rekey';
 
 RELAY_AGENT_OPTION: 'relay-agent-option';
 
+RELAY_OPTION: 'relay-option';
+
+RELAY_OPTION_82: 'relay-option-82';
+RELAY_SERVER_GROUP: 'relay-server-group' -> pushMode(M_Name);
+
 REMOTE: 'remote';
 
 REMOTE_END_POINT: 'remote-end-point';
+REMOTE_ID: 'remote-id';
 
 REMAINDER: 'remainder';
 
@@ -2666,12 +3019,13 @@ REMOVE: 'remove' -> pushMode(M_Remove);
 REMOVE_PRIVATE: 'remove-private';
 
 REMOVED: 'Removed';
-
 REPLACE: 'replace';
-
+REQ_OPTION: 'req-option';
 REQUIRED_OPTION_MISSING: 'required-option-missing';
 
 RESOLUTION: 'resolution';
+
+RESOLUTION_RIBS: 'resolution-ribs' -> pushMode(M_RibName);
 
 RESOLVE: 'resolve';
 
@@ -2684,15 +3038,20 @@ RESTRICT: 'restrict';
 RESTRICTED_QUEUES: 'restricted-queues';
 
 RETAIN: 'retain';
+RETRANSMISSION_ATTEMPT: 'retransmission-attempt';
 RETRANSMIT_INTERVAL: 'retransmit-interval';
+RETRY: 'retry';
 RETRY_OPTIONS: 'retry-options';
 RETRY_TIMER: 'retry-timer';
 REUSE: 'reuse';
 REVERSE: 'reverse';
 REVERSE_SSH: 'reverse-ssh';
+REVERSE_TCP_MSS: 'reverse-tcp-mss';
 REVERSE_TELNET: 'reverse-telnet';
 REVERT_TIMER: 'revert-timer';
+REVOCATION_CHECK: 'revocation-check';
 REWRITE_RULES: 'rewrite-rules';
+RFC_COMPLIANT: 'rfc-compliant';
 
 RIB: 'rib' -> pushMode(M_RibName);
 
@@ -2714,7 +3073,17 @@ RIB_GROUP
    }
 ;
 
-RIB_GROUPS: 'rib-groups' -> pushMode(M_Name);
+RIB_GROUPS
+:
+  'rib-groups'
+  {
+    if (lastTokenType() == OSPF || lastTokenType() == OSPF3) {
+      pushMode(M_OspfRibGroups);
+    } else {
+      pushMode(M_Name);
+    }
+  }
+;
 
 RIB_OUT: 'rib-out';
 
@@ -2742,13 +3111,12 @@ ROUTE_DISTINGUISHER_ID: 'route-distinguisher-id';
 ROUTE_FILTER: 'route-filter';
 
 ROUTE_MONITORING: 'route-monitoring';
-
 ROUTE_RECORD: 'route-record';
-
+ROUTE_SUPPRESSION: 'route-suppression';
 ROUTE_TARGET: 'route-target';
-
 ROUTE_TYPE: 'route-type';
 
+ROUTER: 'router';
 ROUTER_ADVERTISEMENT: 'router-advertisement';
 
 ROUTER_ALERT: 'router-alert';
@@ -2771,7 +3139,6 @@ ROUTING_INSTANCE_NAME: 'routing-instance-name' -> pushMode(M_RoutingInstanceName
 ROUTING_INSTANCES: 'routing-instances' -> pushMode(M_Routing_Instances);
 ROUTING_INTERFACE: 'routing-interface' -> pushMode(M_Interface);
 ROUTING_OPTIONS: 'routing-options';
-
 RPC_PROGRAM_NUMBER: 'rpc-program-number';
 
 RPF_CHECK: 'rpf-check';
@@ -2780,6 +3147,9 @@ RPL_OPTION: 'RPL-option';
 
 RPM: 'rpm';
 
+RSA: 'rsa';
+RSA_SHA2_256: 'rsa-sha2-256';
+RSA_SHA2_512: 'rsa-sha2-512';
 RSA_SIGNATURES: 'rsa-signatures';
 
 RSH: 'rsh';
@@ -2787,6 +3157,7 @@ RSH: 'rsh';
 RSTP: 'rstp';
 
 RSVP: 'rsvp';
+RSVP_P2MP: 'rsvp-p2mp';
 
 RTF_PREFIX_LIST
 :
@@ -2809,6 +3180,7 @@ RULE_SET: 'rule-set' -> pushMode(M_Name);
 SAMPLE: 'sample';
 
 SAMPLING: 'sampling';
+SAMPLING_INSTANCE: 'sampling-instance';
 
 SAP: 'sap';
 
@@ -2874,6 +3246,7 @@ SECRET: 'secret' -> pushMode(M_SecretString);
 SECONDARY: 'secondary' -> pushMode(M_Name);
 
 SECURITY: 'security';
+SECURITY_MODE: 'security-mode';
 
 SECURITY_OPTION: 'security-option';
 
@@ -2882,6 +3255,7 @@ SECURITY_PROFILE: 'security-profile' -> pushMode(M_Name);
 SECURITY_ROLE: 'security-role';
 
 SECURITY_ZONE: 'security-zone' -> pushMode(M_Zone);
+SEQUENCE_CHECK_REQUIRED: 'sequence-check-required';
 
 SELF: 'self';
 
@@ -2889,11 +3263,19 @@ SELF_PING_DURATION: 'self-ping-duration';
 
 SEND: 'send';
 
+SEND_ADDPATH_OPTIMIZATION: 'send-addpath-optimization';
+
+SEND_BUFFER: 'send-buffer' -> pushMode(M_Bandwidth);
+
 SEND_COUNT: 'send-count';
 
 SERVER: 'server' -> pushMode(M_NameOrIp);
-
+SERVER_FAIL: 'server-fail';
 SERVER_GROUP: 'server-group' -> pushMode(M_Name);
+SERVER_ID_OVERRIDE: 'server-id-override';
+SERVER_IDENTIFIER: 'server-identifier';
+SERVER_REJECT_VLAN: 'server-reject-vlan' -> pushMode(M_Name);
+SERVER_TIMEOUT: 'server-timeout';
 
 SERVICE
 :
@@ -2906,11 +3288,9 @@ SERVICE
 ;
 
 SERVICE_DEPLOYMENT: 'service-deployment';
-
 SERVICE_FILTER: 'service-filter';
-
+SERVICE_TYPE: 'service-type';
 SERVICES: 'services';
-
 SERVICES_OFFLOAD: 'services-offload';
 SESSION: 'session';
 
@@ -2937,13 +3317,17 @@ SHA_384: 'sha-384';
 SHA1: 'sha1';
 SHA512: 'sha512';
 SHAPING_RATE: 'shaping-rate';
+SHARED_BANDWIDTH_POLICER: 'shared-bandwidth-policer';
 SHARED_BUFFER: 'shared-buffer';
 SHARED_IKE_ID: 'shared-ike-id';
+SHARED_TUNNELS: 'shared-tunnels';
 SHIM6_HEADER: 'shim6-header';
 SHORTCUTS: 'shortcuts';
+SHOULD_SECURE: 'should-secure';
 SHUTDOWN: 'shutdown';
 SIGNALING: 'signaling';
 SIMPLE: 'simple';
+SINGLE_ACTIVE: 'single-active';
 SINGLE_CONNECTION: 'single-connection';
 SIP: 'sip';
 
@@ -2988,6 +3372,7 @@ SOURCE_ADDRESS_EXCLUDED: 'source-address-excluded';
 SOURCE_ADDRESS_FILTER: 'source-address-filter';
 SOURCE_ADDRESS_NAME: 'source-address-name' -> pushMode(M_Name);
 SOURCE_CLASS: 'source-class' -> pushMode(M_Name);
+SOURCE_CLASS_USAGE: 'source-class-usage';
 SOURCE_HOST_ISOLATED: 'source-host-isolated';
 SOURCE_IDENTITY: 'source-identity' -> pushMode(M_SourceIdentity);
 SOURCE_INTERFACE: 'source-interface' -> pushMode(M_Interface);
@@ -3033,26 +3418,25 @@ SSH_ED25519: 'ssh-ed25519';
 
 SSH_RSA: 'ssh-rsa';
 
+STALE_LABELS_HOLDDOWN_PERIOD: 'stale-labels-holddown-period';
 STANDARD: 'standard';
-
+STANDBY: 'standby';
 START_TIME: 'start-time' -> pushMode(M_RestOfLine);
-
+STARTS_WITH: 'starts-with';
+STATE: 'state';
 STATIC: 'static';
+STATIC_CAK: 'static-cak';
+
+STATIC_END_LABEL: 'static-end-label';
 
 STATIC_HOST_MAPPING: 'static-host-mapping' -> pushMode(M_RestOfLine);
-
 STATIC_NAT: 'static-nat';
-
+STATIC_START_LABEL: 'static-start-label';
 STATION: 'station' -> pushMode(M_Name);
-
 STATION_ADDRESS: 'station-address';
-
 STATION_PORT: 'station-port';
-
 STATISTICS: 'statistics';
-
 STATISTICS_TIMEOUT: 'statistics-timeout';
-
 STATS_CACHE_LIFETIME: 'stats-cache-lifetime';
 
 STORM_CONTROL: 'storm-control' -> pushMode(M_Name);
@@ -3067,6 +3451,7 @@ STRICT: 'strict';
 STRICT_HIGH: 'strict-high';
 STRICT_SOURCE_ROUTE: 'strict-source-route';
 STRICT_SOURCE_ROUTE_OPTION: 'strict-source-route-option';
+STRING: 'string' -> pushMode(M_Name);
 STRUCTURED_DATA: 'structured-data';
 
 STUB: 'stub';
@@ -3076,9 +3461,8 @@ SUBSCRIBER_MANAGEMENT: 'subscriber-management';
 SUBTRACT: 'subtract';
 
 SUN_RPC: 'sun-rpc';
-
 SUNRPC: 'sunrpc';
-
+SUPPLICANT: 'supplicant';
 SUPPRESS: 'suppress';
 
 SWAP: 'swap';
@@ -3094,6 +3478,7 @@ SWITCHOVER_ON_ROUTING_CRASH: 'switchover-on-routing-crash';
 SYMMETRIC_CONSISTENT_HASH: 'symmetric-consistent-hash';
 
 SYN_ACK_ACK_PROXY: 'syn-ack-ack-proxy';
+SYN_CHECK_REQUIRED: 'syn-check-required';
 
 SYN_FIN: 'syn-fin';
 
@@ -3102,9 +3487,8 @@ SYN_FLOOD: 'syn-flood';
 SYN_FRAG: 'syn-frag';
 
 SYSLOG: 'syslog';
-
 SYSTEM: 'system';
-
+SYSTEM_DEFAULTS: 'system-defaults';
 SYSTEM_SERVICES: 'system-services';
 
 TABLE: 'table' -> pushMode(M_Name);
@@ -3143,6 +3527,7 @@ TCP_FORWARDING: 'tcp-forwarding';
 TCP_INITIAL: 'tcp-initial';
 TCP_MSS: 'tcp-mss';
 TCP_NO_FLAG: 'tcp-no-flag';
+TCP_OPTIONS: 'tcp-options';
 TCP_RST: 'tcp-rst';
 TCP_SWEEP: 'tcp-sweep';
 
@@ -3151,6 +3536,7 @@ TEAR_DROP: 'tear-drop';
 TEARDOWN: 'teardown';
 TELNET: 'telnet';
 TEMPORAL: 'temporal' -> pushMode(M_Bandwidth);
+TEMPERATURE_THRESHOLD: 'temperature-threshold';
 TENANT: 'tenant';
 TEREDO: 'teredo';
 TERM: 'term' -> pushMode(M_Name);
@@ -3174,22 +3560,43 @@ TIMESTAMP_OPTION: 'timestamp-option';
 TIMESTAMP_REPLY: 'timestamp-reply';
 
 TLS: 'tls';
+TLS_CERTIFICATE: 'tls-certificate' -> pushMode(M_Name);
+TLS_FORCE_CIPHERS: 'tls-force-ciphers';
+TLS_MIN_VERSION: 'tls-min-version' -> pushMode(M_Name);
+TLS_PEER_NAME: 'tls-peer-name' -> pushMode(M_Name);
+TLS_TIMEOUT: 'tls-timeout';
 TLSDETAILS: 'tlsdetails';
 
 TO: 'to';
 TO_ZONE: 'to-zone' -> pushMode(M_Zone);
 TOLERANCE: 'tolerance';
+TOPOLOGY: 'topology' -> pushMode(M_Name);
 TRACE: 'trace';
 TRACE_OPTIONS: 'trace-options';
-TRACEOPTIONS: 'traceoptions';
+TRACEOPTIONS
+:
+  'traceoptions'
+  {
+    if (lastTokenType() == SECURITY) {
+      pushMode(M_SecurityTraceoptions);
+    } else if (lastTokenType() == IKE) {
+      pushMode(M_IkeTraceoptions);
+    } else if (lastTokenType() == IPSEC) {
+      pushMode(M_IpsecTraceoptions);
+    }
+  }
+;
 TRACEROUTE: 'traceroute';
 TRACK: 'track';
 TRAFFIC_CONTROL_PROFILES: 'traffic-control-profiles' -> pushMode(M_Name);
 TRAFFIC_ENGINEERING: 'traffic-engineering';
 TRANSFER_INTERVAL: 'transfer-interval';
 TRANSLATION_TABLE: 'translation-table';
+TRANSMIT_INTERVAL: 'transmit-interval';
+TRANSMIT_PERIOD: 'transmit-period';
 TRANSMIT_RATE: 'transmit-rate' -> pushMode(M_TransmitRate);
 TRANSPORT: 'transport';
+TRANSIT: 'transit';
 TRAP: 'trap';
 TRAP_DESTINATIONS: 'trap-destinations';
 TRAP_GROUP: 'trap-group' -> pushMode(M_Name);
@@ -3225,6 +3632,8 @@ TUNNEL_ATTRIBUTE
 ;
 
 TUNNEL_ENCAPSULATION_LIMIT_OPTION: 'tunnel-encapsulation-limit-option';
+TUNNEL_SERVICES: 'tunnel-services';
+TUNNEL_TERMINATION: 'tunnel-termination';
 
 TUNNEL_TYPE: 'tunnel-type';
 
@@ -3242,6 +3651,8 @@ UNICAST: 'unicast';
 
 UNIT: 'unit';
 
+UNDERLYING_INTERFACE: 'underlying-interface' -> pushMode(M_Interface);
+
 UNKNOWN: 'unknown';
 
 UNKNOWN_PROTOCOL: 'unknown-protocol';
@@ -3251,7 +3662,8 @@ UNREACHABLE: 'unreachable';
 UNTRUST: 'untrust';
 
 UNTRUST_SCREEN: 'untrust-screen';
-
+UPDATE_ROUTER_ADVERTISEMENT: 'update-router-advertisement';
+UPDATE_SERVER: 'update-server';
 UPLINK_FAILURE_DETECTION: 'uplink-failure-detection';
 
 UPTO: 'upto' -> pushMode(M_PrefixLength);
@@ -3259,7 +3671,9 @@ UPTO: 'upto' -> pushMode(M_PrefixLength);
 URG: 'urg';
 
 URPF_LOGGING: 'urpf-logging';
-
+USE_INTERFACE_DESCRIPTION: 'use-interface-description';
+USE_RA_PREFIX: 'use-ra-prefix';
+USE_VLAN_ID: 'use-vlan-id';
 USER
 :
   'user'
@@ -3270,7 +3684,10 @@ USER
   }
 ;
 
+USER_AT_HOSTNAME: 'user-at-hostname' -> pushMode(M_EmailAddress);
+
 USER_DEFINED_OPTION_TYPE: 'user-defined-option-type';
+UTM: 'utm';
 
 UUID: 'uuid';
 
@@ -3283,7 +3700,9 @@ VALIDATION: 'validation';
 VALUE: 'value' -> pushMode(M_SecretString);
 
 VALIDATION_DATABASE: 'validation-database';
-
+VALIDATION_STATE: 'validation-state';
+VENDOR_ID: 'vendor-id';
+VENDOR_SPECIFIC: 'vendor-specific';
 VERSION
 :
    'version' -> pushMode ( M_Version )
@@ -3298,6 +3717,16 @@ VIRTUAL_CHANNEL: 'virtual-channel';
 VIRTUAL_CHASSIS: 'virtual-chassis';
 
 VIRTUAL_GATEWAY_ADDRESS: 'virtual-gateway-address';
+
+VIRTUAL_GATEWAY_ACCEPT_DATA: 'virtual-gateway-accept-data';
+
+VIRTUAL_GATEWAY_V4_MAC: 'virtual-gateway-v4-mac' -> pushMode(M_MacAddress);
+
+VIRTUAL_INET6_ADDRESS: 'virtual-inet6-address';
+
+VIRTUAL_LINK_LOCAL_ADDRESS: 'virtual-link-local-address';
+
+VIRTUAL_NETWORK_FUNCTIONS: 'virtual-network-functions' -> pushMode(M_VirtualNetworkFunctionName);
 
 VIRTUAL_ROUTER: 'virtual-router';
 
@@ -3314,14 +3743,15 @@ VLAN
 ;
 
 VLANS: 'vlans' -> pushMode(M_Name);
-
+VLAN_AWARE: 'vlan-aware';
+VLAN_BASED: 'vlan-based';
+VLAN_BUNDLE: 'vlan-bundle';
 VLAN_ID: 'vlan-id';
-
 VLAN_ID_LIST: 'vlan-id-list' -> pushMode(M_VlanIdList);
-
+VLAN_NAME: 'vlan-name' -> pushMode(M_Name);
 VLAN_TAGS: 'vlan-tags';
-
 VLAN_TAGGING: 'vlan-tagging';
+VMHOST: 'vmhost' -> pushMode(M_Vmhost);
 
 VNI: 'vni';
 
@@ -3331,13 +3761,19 @@ VPLS: 'vpls';
 
 VPN: 'vpn' -> pushMode(M_Name);
 
+VPN_APPLY_EXPORT: 'vpn-apply-export';
+
 VPN_MONITOR: 'vpn-monitor';
+
+VPN_UNEQUAL_COST: 'vpn-unequal-cost';
 
 VRF: 'vrf';
 
 VRF_EXPORT: 'vrf-export' -> pushMode(M_NameList);
 
 VRF_IMPORT: 'vrf-import' -> pushMode(M_NameList);
+
+VRF_PROPAGATE_TTL: 'vrf-propagate-ttl';
 
 VRF_TABLE_LABEL: 'vrf-table-label';
 
@@ -3349,6 +3785,8 @@ VRF_TARGET
 VRRP: 'vrrp';
 
 VRRP_GROUP: 'vrrp-group';
+
+VRRP_INET6_GROUP: 'vrrp-inet6-group';
 
 VSTP: 'vstp';
 
@@ -3378,6 +3816,7 @@ WHO: 'who';
 WIDE_METRICS_ONLY: 'wide-metrics-only';
 
 WILDCARD_ADDRESS: 'wildcard-address';
+WINDOW_SCALE: 'window-scale';
 
 WINNUKE: 'winnuke';
 WITHDRAW_PRIORITY: 'withdraw-priority';
@@ -3389,6 +3828,8 @@ XDMCP: 'xdmcp';
 XNM_CLEAR_TEXT: 'xnm-clear-text';
 
 XNM_SSL: 'xnm-ssl';
+
+X509_SIGNATURE: 'x509-signature';
 
 ZONE: 'zone' -> pushMode(M_Name);
 
@@ -3404,9 +3845,10 @@ COMMENT_LINE
   F_NonNewlineChar* (F_NewlineChar+ | EOF) -> channel(HIDDEN)
 ;
 
-WILDCARD: F_Wildcard {setWildcard();};
-
+ESI_IDENTIFIER: F_EsiIdentifier;
+LARGE_COMMUNITY: F_LargeCommunity;
 STANDARD_COMMUNITY: F_StandardCommunity;
+WILDCARD: F_Wildcard {setWildcard();};
 
 AMPERSAND
 :
@@ -3472,7 +3914,7 @@ DOUBLE_PIPE
 
 DOUBLE_QUOTED_STRING
 :
-   '"' ~'"'* '"'
+   F_DoubleQuotedString
 ;
 
 /*
@@ -3548,6 +3990,11 @@ SINGLE_QUOTE
    '\''
 ;
 
+TPID_VLAN_ID
+:
+  '0x' F_HexDigit+ PERIOD F_Digit+
+;
+
 UNDERSCORE: '_';
 
 V3: 'v3';
@@ -3604,6 +4051,21 @@ fragment
 F_Digit
 :
   [0-9]
+;
+
+fragment
+F_EsiIdentifier
+:
+  F_HexDigit F_HexDigit ':'
+  F_HexDigit F_HexDigit ':'
+  F_HexDigit F_HexDigit ':'
+  F_HexDigit F_HexDigit ':'
+  F_HexDigit F_HexDigit ':'
+  F_HexDigit F_HexDigit ':'
+  F_HexDigit F_HexDigit ':'
+  F_HexDigit F_HexDigit ':'
+  F_HexDigit F_HexDigit ':'
+  F_HexDigit F_HexDigit
 ;
 
 fragment
@@ -3793,6 +4255,10 @@ F_InterfaceMediaType
    'lsi' |
    'lt' |
    'me' |
+   // https://www.juniper.net/documentation/us/en/hardware/srx4300/topics/concept/srx4300-ports.html
+   'mge' |
+   // https://www.juniper.net/documentation/us/en/software/junos/junos-getting-started/topics/concept/interfaces-understanding-management-ethernet-interfaces.html
+   'mgmt' |
    'mo' |
    'ms' |
    'mt' |
@@ -3800,6 +4266,8 @@ F_InterfaceMediaType
    'oc3' |
    'pd' |
    'pe' |
+   // https://www.juniper.net/documentation/en_US/junos12.1x46/topics/example/pppoe-security-interface-configuring.html
+   'pp' |
    'pimd' |
    'pime' |
    'reth' |
@@ -3814,6 +4282,8 @@ F_InterfaceMediaType
    'stm1' |
    'stm4' |
    'stm16' |
+   // https://www.juniper.net/documentation/us/en/software/junos/nfx250-getting-started/topics/example/service-chaining-virtio-configuring-nfx250-ng.html
+   'sxe' |
    't1' |
    't3' |
    'tap' |
@@ -3891,7 +4361,8 @@ F_Letter
 fragment
 F_DoubleQuotedString
 :
-  '"' F_NonNewlineChar* '"'
+  // https://www.juniper.net/documentation/us/en/software/junos/cli/topics/topic-map/cli-configuration.html#id-entering-configuration-statements-and-identifiers
+  '"' ('\\' F_NonNewlineChar | ~["\r\n])* '"'
 ;
 
 fragment
@@ -4014,6 +4485,12 @@ fragment
 F_Variable_RequiredVarChar
 :
    ~[ 0-9\t\n\r/.,\-;{}<>[\]&|()"']
+;
+
+fragment
+F_LargeCommunity
+:
+  'large:' F_Uint32 ':' F_Uint32 ':' F_Uint32
 ;
 
 fragment
@@ -4298,6 +4775,21 @@ M_Description_WS
    F_WhitespaceChar+ -> channel ( HIDDEN )
 ;
 
+mode M_8023ad;
+
+M_8023ad_LACP: 'lacp' -> type(LACP), popMode;
+M_8023ad_INTERFACE_ID: F_InterfaceId -> type(INTERFACE_ID), popMode;
+M_8023ad_WS: F_WhitespaceChar+ -> skip;
+M_8023ad_NEWLINE: F_Newline -> type(NEWLINE), popMode;
+
+mode M_DynamicTunnels;
+
+M_DynamicTunnels_FORWARDING_RIB:
+  'forwarding-rib' -> type(FORWARDING_RIB), mode(M_Name);
+M_DynamicTunnels_NAME: F_Name -> type(NAME), popMode;
+M_DynamicTunnels_WS: F_WhitespaceChar+ -> skip;
+M_DynamicTunnels_NEWLINE: F_Newline -> type(NEWLINE), popMode;
+
 mode M_Interface;
 
 M_Interface_ALL: 'all' -> type(ALL), popMode;
@@ -4329,7 +4821,15 @@ M_Interface_INTERFACE: 'interface' -> type(INTERFACE);
 
 M_Interface_WS: F_WhitespaceChar+ -> skip;
 
+M_Interface_INTERFACE_WILDCARD
+:
+  F_NonWhitespaceChar* ('*' | '?' | '[') F_NonWhitespaceChar*
+  -> type(INTERFACE_WILDCARD), popMode
+;
+
 M_Interface_INTERFACE_ID: F_InterfaceId -> type(INTERFACE_ID), popMode;
+
+M_Interface_NAME: F_Name -> type(NAME), popMode;
 
 // for interface-range member
 M_Interface_DOUBLE_QUOTED_STRING: F_DoubleQuotedString -> type(DOUBLE_QUOTED_STRING), popMode;
@@ -4386,6 +4886,11 @@ M_ISO_DESTINATION_UDP_PORT
 M_ISO_MTU
 :
    'mtu' -> type ( MTU ) , popMode
+;
+
+M_ISO_MODE
+:
+   'mode' -> type(MODE), popMode
 ;
 
 M_ISO_Newline
@@ -4486,6 +4991,31 @@ M_Name_NEWLINE: F_Newline -> type(NEWLINE), popMode;
 M_Name_SCRUBBED: F_Scrubbed -> type(NAME), popMode;
 M_Name_WILDCARD: F_Wildcard {setWildcard();} -> popMode;
 M_Name_NAME: F_Name -> type(NAME), popMode;
+
+mode M_EmailAddress;
+
+M_EmailAddress_WS: F_WhitespaceChar+ -> skip;
+M_EmailAddress_NEWLINE: F_Newline -> type(NEWLINE), popMode;
+M_EmailAddress_NAME: F_NonWhitespaceChar+ -> type(NAME), popMode;
+
+mode M_MimeWhitelist;
+
+M_MimeWhitelist_EXCEPTION: 'exception' -> type(EXCEPTION), mode(M_Name);
+M_MimeWhitelist_LIST: 'list' -> type(LIST), mode(M_MimeWhitelistListName);
+M_MimeWhitelist_WS: F_WhitespaceChar+ -> skip;
+M_MimeWhitelist_NEWLINE: F_Newline -> type(NEWLINE), popMode;
+
+mode M_MimeWhitelistListName;
+
+M_MimeWhitelistListName_NAME: F_Name -> type(NAME), mode(M_MimeWhitelistAfterList);
+M_MimeWhitelistListName_WS: F_WhitespaceChar+ -> skip;
+M_MimeWhitelistListName_NEWLINE: F_Newline -> type(NEWLINE), popMode;
+
+mode M_MimeWhitelistAfterList;
+
+M_MimeWhitelistAfterList_EXCEPTION: 'exception' -> type(EXCEPTION), mode(M_Name);
+M_MimeWhitelistAfterList_WS: F_WhitespaceChar+ -> skip;
+M_MimeWhitelistAfterList_NEWLINE: F_Newline -> type(NEWLINE), popMode;
 
 mode M_SyslogFileName;
 
@@ -4646,9 +5176,19 @@ M_TcpFlags_FIN
    'fin' -> type ( FIN )
 ;
 
+M_TcpFlags_HEX
+:
+   '0x' [0-9A-Fa-f] [0-9A-Fa-f]? -> type(TCP_FLAGS_HEX)
+;
+
 M_TcpFlags_NEWLINE
 :
    F_NewlineChar+ -> type ( NEWLINE ) , popMode
+;
+
+M_TcpFlags_PSH
+:
+   ('psh' | 'push') -> type ( PSH )
 ;
 
 M_TcpFlags_RST
@@ -4708,6 +5248,11 @@ M_TcpFlags2_FIN
    'fin' -> type ( FIN )
 ;
 
+M_TcpFlags2_HEX
+:
+   '0x' [0-9A-Fa-f] [0-9A-Fa-f]? -> type(TCP_FLAGS_HEX)
+;
+
 M_TcpFlags2_OPEN_PAREN
 :
    '(' -> type ( OPEN_PAREN )
@@ -4716,6 +5261,11 @@ M_TcpFlags2_OPEN_PAREN
 M_TcpFlags2_PIPE
 :
    '|' -> type ( PIPE )
+;
+
+M_TcpFlags2_PSH
+:
+   ('psh' | 'push') -> type ( PSH )
 ;
 
 M_TcpFlags2_RST
@@ -4742,6 +5292,29 @@ M_TcpFlags2_WS
 :
    F_WhitespaceChar+ -> channel ( HIDDEN )
 ;
+
+// The offset may be negative, so '-' must lex as DASH rather than as part of an
+// UNRECOGNIZED_WORD.
+mode M_MetricOut;
+DELAY_MED_UPDATE: 'delay-med-update';
+MINIMUM_IGP: 'minimum-igp';
+M_MetricOut_DASH: '-' -> type(DASH);
+M_MetricOut_IGP: 'igp' -> type(IGP);
+M_MetricOut_UINT8: F_Uint8 -> type(UINT8);
+M_MetricOut_UINT16: F_Uint16 -> type(UINT16);
+M_MetricOut_UINT32: F_Uint32 -> type(UINT32);
+M_MetricOut_NEWLINE: F_Newline -> type(NEWLINE), popMode;
+M_MetricOut_WS: F_WhitespaceChar+ -> channel ( HIDDEN );
+// Anything else, e.g. apply-groups, is lexed in the default mode.
+M_MetricOut_OTHER: F_Alpha F_NonWhitespaceChar* { less(); } -> popMode;
+
+mode M_MetricExpressionOffset;
+M_MetricExpressionOffset_DASH: '-' -> type(DASH);
+M_MetricExpressionOffset_UINT8: F_Uint8 -> type(UINT8), popMode;
+M_MetricExpressionOffset_UINT16: F_Uint16 -> type(UINT16), popMode;
+M_MetricExpressionOffset_UINT32: F_Uint32 -> type(UINT32), popMode;
+M_MetricExpressionOffset_NEWLINE: F_Newline -> type(NEWLINE), popMode;
+M_MetricExpressionOffset_WS: F_WhitespaceChar+ -> channel(HIDDEN);
 
 mode M_MetricType;
 
@@ -4785,7 +5358,49 @@ M_Routing_Instances_WILDCARD: F_Wildcard {setWildcard();} -> popMode;
 M_Routing_Instances_APPLY_GROUPS: 'apply-groups' -> type(APPLY_GROUPS), mode(M_ApplyGroups);
 M_Routing_Instances_NAME: F_RoutingInstanceName -> type(NAME), popMode;
 
+mode M_ChannelSpeed;
+
+M_ChannelSpeed_DISABLE_AUTO_SPEED_DETECTION
+:
+   'disable-auto-speed-detection' -> type(DISABLE_AUTO_SPEED_DETECTION), popMode
+;
+
+M_ChannelSpeed_UINT16
+:
+   F_Uint16 -> type(UINT16)
+;
+
+M_ChannelSpeed_G
+:
+   [gG] -> type(G), popMode
+;
+
+M_ChannelSpeed_M
+:
+   [mM] -> type(M), popMode
+;
+
+M_ChannelSpeed_NEWLINE
+:
+   F_Newline -> type(NEWLINE), popMode
+;
+
+M_ChannelSpeed_WS
+:
+   F_WhitespaceChar+ -> channel(HIDDEN)
+;
+
 mode M_Speed;
+
+M_Speed_AUTO_10M_100M
+:
+   'auto-10m-100m' -> type(AUTO_10M_100M), popMode
+;
+
+M_Speed_AUTO
+:
+   'auto' -> type(AUTO), popMode
+;
 
 M_Speed_DEC
 :
@@ -4794,12 +5409,17 @@ M_Speed_DEC
 
 M_Speed_G
 :
-   'g' -> type ( G ) , popMode
+   [gG] -> type ( G ) , popMode
 ;
 
 M_Speed_M
 :
-   'm' -> type ( M ) , popMode
+   [mM] -> type ( M ) , popMode
+;
+
+M_Speed_NEWLINE
+:
+   F_Newline -> type(NEWLINE), popMode
 ;
 
 M_Speed_WS
@@ -4834,6 +5454,41 @@ M_Version_WS
    F_WhitespaceChar+ -> channel ( HIDDEN )
 ;
 
+mode M_VirtualNetworkFunctionName;
+M_VirtualNetworkFunctionName_NAME:
+  F_Name -> type(NAME), mode(M_VirtualNetworkFunction);
+M_VirtualNetworkFunctionName_WS: F_WhitespaceChar+ -> skip;
+M_VirtualNetworkFunctionName_NEWLINE: F_Newline -> type(NEWLINE), popMode;
+
+mode M_VirtualNetworkFunction;
+M_VirtualNetworkFunction_CONFIG_DATA: 'config-data' -> type(CONFIG_DATA);
+M_VirtualNetworkFunction_COUNT: 'count' -> type(COUNT);
+M_VirtualNetworkFunction_DEVICE_NAME: 'device-name' -> type(DEVICE_NAME);
+M_VirtualNetworkFunction_DEVICE_TYPE: 'device-type' -> type(DEVICE_TYPE);
+M_VirtualNetworkFunction_DISABLE_SPOOF_CHECK:
+  'disable-spoof-check' -> type(DISABLE_SPOOF_CHECK);
+M_VirtualNetworkFunction_FEATURES: 'features' -> type(FEATURES);
+M_VirtualNetworkFunction_FILE: 'file' -> type(FILE);
+M_VirtualNetworkFunction_HUGEPAGES: 'hugepages' -> type(HUGEPAGES);
+M_VirtualNetworkFunction_IMAGE: 'image' -> type(IMAGE);
+M_VirtualNetworkFunction_INTERFACE:
+  'interface' -> type(INTERFACE);
+M_VirtualNetworkFunction_INTERFACES: 'interfaces' -> type(INTERFACES);
+M_VirtualNetworkFunction_MAPPING: 'mapping' -> type(MAPPING);
+M_VirtualNetworkFunction_MEMORY: 'memory' -> type(MEMORY);
+M_VirtualNetworkFunction_PAGE_SIZE: 'page-size' -> type(PAGE_SIZE);
+M_VirtualNetworkFunction_PHYSICAL_CPU: 'physical-cpu' -> type(PHYSICAL_CPU);
+M_VirtualNetworkFunction_SIZE: 'size' -> type(SIZE);
+M_VirtualNetworkFunction_SOURCE: 'source' -> type(SOURCE);
+M_VirtualNetworkFunction_TARGET: 'target' -> type(TARGET);
+M_VirtualNetworkFunction_TRUST: 'trust' -> type(TRUST);
+M_VirtualNetworkFunction_VIRTUAL_CPU: 'virtual-cpu' -> type(VIRTUAL_CPU);
+M_VirtualNetworkFunction_VIRTUAL_FUNCTION: 'virtual-function' -> type(VIRTUAL_FUNCTION);
+M_VirtualNetworkFunction_UINT32: F_Uint32 -> type(UINT32);
+M_VirtualNetworkFunction_NAME: F_Name -> type(NAME);
+M_VirtualNetworkFunction_WS: F_WhitespaceChar+ -> skip;
+M_VirtualNetworkFunction_NEWLINE: F_Newline -> type(NEWLINE), popMode;
+
 mode M_VlanMembers;
 
 M_VlanMembers_ALL: 'all' -> type(ALL), popMode;
@@ -4855,6 +5510,28 @@ M_VlanMembers_RANGE
 ;
 
 M_VlanMembers_NAME: F_Name -> type(NAME), popMode;
+
+mode M_Vmhost;
+M_Vmhost_COUNT: 'count' -> type(COUNT);
+M_Vmhost_CPU: 'cpu' -> type(CPU);
+M_Vmhost_CUSTOM: 'custom' -> type(CUSTOM);
+M_Vmhost_FLEX: 'flex' -> type(FLEX);
+M_Vmhost_INTERFACES: 'interfaces' -> type(INTERFACES);
+M_Vmhost_LAYER_3_INFRASTRUCTURE:
+  'layer-3-infrastructure' -> type(LAYER_3_INFRASTRUCTURE);
+M_Vmhost_MEMORY: 'memory' -> type(MEMORY);
+M_Vmhost_MODE: 'mode' -> type(MODE);
+M_Vmhost_NFV_BACK_PLANE: 'nfv-back-plane' -> type(NFV_BACK_PLANE);
+M_Vmhost_SIZE: 'size' -> type(SIZE);
+M_Vmhost_VIRTUALIZATION_OPTIONS:
+  'virtualization-options' -> type(VIRTUALIZATION_OPTIONS);
+M_Vmhost_VLAN_ID: 'vlan-id' -> type(VLAN_ID);
+M_Vmhost_VLANS: 'vlans' -> type(VLANS);
+M_Vmhost_INTERFACE_ID: F_InterfaceId -> type(INTERFACE_ID);
+M_Vmhost_UINT16: F_Uint16 -> type(UINT16);
+M_Vmhost_NAME: F_Name -> type(NAME);
+M_Vmhost_WS: F_WhitespaceChar+ -> skip;
+M_Vmhost_NEWLINE: F_Newline -> type(NEWLINE), popMode;
 
 mode M_VrfTarget;
 
@@ -4915,6 +5592,10 @@ M_PolicyExpression_CLOSE_PAREN: ')' -> type(CLOSE_PAREN);
 M_PolicyExpression_DOUBLE_AMPERSAND: '&&' -> type(DOUBLE_AMPERSAND);
 M_PolicyExpression_DOUBLE_PIPE: '||' -> type(DOUBLE_PIPE);
 M_PolicyExpression_BANG: '!' -> type(BANG);
+// https://www.juniper.net/documentation/us/en/software/junos/cli/topics/topic-map/cli-configuration.html#id-entering-configuration-statements-and-identifiers
+M_PolicyExpression_DOUBLE_QUOTED_STRING:
+  F_DoubleQuotedString -> type(DOUBLE_QUOTED_STRING)
+;
 M_PolicyExpression_NAME: F_Name -> type(NAME);
 
 M_PolicyExpression_NEWLINE: F_Newline -> type(NEWLINE), popMode;
@@ -5207,6 +5888,14 @@ M_Certificate_SCRUBBED: F_Scrubbed -> type(SCRUBBED), popMode;
 M_Certificate_WS: F_WhitespaceChar+ -> skip;
 M_Certificate_NEWLINE: F_Newline -> type(NEWLINE), popMode;
 
+mode M_CipherSuite;
+M_CipherSuite_GCM_AES_128: 'gcm-aes-128' -> type(GCM_AES_128), popMode;
+M_CipherSuite_GCM_AES_256: 'gcm-aes-256' -> type(GCM_AES_256), popMode;
+M_CipherSuite_GCM_AES_XPN_128: 'gcm-aes-xpn-128' -> type(GCM_AES_XPN_128), popMode;
+M_CipherSuite_GCM_AES_XPN_256: 'gcm-aes-xpn-256' -> type(GCM_AES_XPN_256), popMode;
+M_CipherSuite_WS: F_WhitespaceChar+ -> skip;
+M_CipherSuite_NEWLINE: F_Newline -> type(NEWLINE), popMode;
+
 mode M_RestOfLine;
 M_RestOfLine_WS: F_WhitespaceChar+ -> skip;
 M_RestOfLine_QUOTED_STRING: F_DoubleQuotedString -> type(IGNORED_WORD);
@@ -5226,6 +5915,47 @@ M_Screen_WILDCARD: F_Wildcard {setWildcard();} -> popMode;
 M_Screen_NAME: F_Name -> type(NAME), popMode;
 M_Screen_WS: F_WhitespaceChar+ -> skip;
 M_Screen_NEWLINE: F_Newline -> type(NEWLINE), popMode;
+
+mode M_SecurityTraceoptions;
+M_SecurityTraceoptions_FILE: 'file' -> type(FILE), mode(M_SecurityTraceFile);
+M_SecurityTraceoptions_FLAG: 'flag' -> type(FLAG), mode(M_Name);
+M_SecurityTraceoptions_LEVEL: 'level' -> type(LEVEL), mode(M_Name);
+M_SecurityTraceoptions_NO_REMOTE_TRACE: 'no-remote-trace' -> type(NO_REMOTE_TRACE);
+M_SecurityTraceoptions_RATE_LIMIT: 'rate-limit' -> type(RATE_LIMIT), mode(M_SecurityTraceRate);
+M_SecurityTraceoptions_WS: F_WhitespaceChar+ -> skip;
+M_SecurityTraceoptions_NEWLINE: F_Newline -> type(NEWLINE), popMode;
+
+mode M_IkeTraceoptions;
+M_IkeTraceoptions_FILE: 'file' -> type(FILE), mode(M_SecurityTraceFile);
+M_IkeTraceoptions_FLAG: 'flag' -> type(FLAG), mode(M_Name);
+M_IkeTraceoptions_LEVEL: 'level' -> type(LEVEL), mode(M_Name);
+M_IkeTraceoptions_NO_REMOTE_TRACE: 'no-remote-trace' -> type(NO_REMOTE_TRACE);
+M_IkeTraceoptions_RATE_LIMIT: 'rate-limit' -> type(RATE_LIMIT), mode(M_SecurityTraceRate);
+M_IkeTraceoptions_WS: F_WhitespaceChar+ -> skip;
+M_IkeTraceoptions_NEWLINE: F_Newline -> type(NEWLINE), popMode;
+
+mode M_IpsecTraceoptions;
+M_IpsecTraceoptions_FLAG: 'flag' -> type(FLAG), mode(M_Name);
+M_IpsecTraceoptions_WS: F_WhitespaceChar+ -> skip;
+M_IpsecTraceoptions_NEWLINE: F_Newline -> type(NEWLINE), popMode;
+
+mode M_SecurityTraceFile;
+M_SecurityTraceFile_FILES: 'files' -> type(FILES);
+M_SecurityTraceFile_MATCH: 'match' -> type(MATCH);
+M_SecurityTraceFile_NO_WORLD_READABLE: 'no-world-readable' -> type(NO_WORLD_READABLE);
+M_SecurityTraceFile_SIZE: 'size' -> type(SIZE);
+M_SecurityTraceFile_WORLD_READABLE: 'world-readable' -> type(WORLD_READABLE);
+M_SecurityTraceFile_DOUBLE_QUOTED_STRING:
+  F_DoubleQuotedString -> type(DOUBLE_QUOTED_STRING);
+M_SecurityTraceFile_UINT32: F_Uint32 -> type(UINT32);
+M_SecurityTraceFile_NAME: F_Name -> type(NAME);
+M_SecurityTraceFile_WS: F_WhitespaceChar+ -> skip;
+M_SecurityTraceFile_NEWLINE: F_Newline -> type(NEWLINE), popMode;
+
+mode M_SecurityTraceRate;
+M_SecurityTraceRate_UINT32: F_Uint32 -> type(UINT32);
+M_SecurityTraceRate_WS: F_WhitespaceChar+ -> skip;
+M_SecurityTraceRate_NEWLINE: F_Newline -> type(NEWLINE), popMode;
 
 mode M_Zone;
 M_Zone_JUNOS_HOST: 'junos-host' -> type(JUNOS_HOST), popMode;
@@ -5264,8 +5994,14 @@ M_IsisRibGroup_INET: 'inet' -> type(INET), mode(M_Name);
 M_IsisRibGroup_WS: F_WhitespaceChar+ -> skip;
 M_IsisRibGroup_NEWLINE: F_Newline -> type(NEWLINE), popMode;
 
+mode M_OspfRibGroups;
+M_OspfRibGroups_FAMILY: ('inet' | 'inet3') -> type(NAME), mode(M_Name);
+M_OspfRibGroups_WS: F_WhitespaceChar+ -> skip;
+M_OspfRibGroups_NEWLINE: F_Newline -> type(NEWLINE), popMode;
+
 mode M_Filter;
 M_Filter_WILDCARD: F_Wildcard {setWildcard();};
+M_Filter_GROUP: 'group' -> type(GROUP), popMode;
 M_Filter_INPUT: 'input' -> type(INPUT);
 M_Filter_INPUT_LIST: 'input-list' -> type(INPUT_LIST);
 M_Filter_OUTPUT: 'output' -> type(OUTPUT);
@@ -5460,9 +6196,9 @@ M_RibName_WS: F_WhitespaceChar+ -> skip;
 M_RibName_NEWLINE: F_Newline -> type(NEWLINE), popMode;
 
 mode M_AdminGroup;
-M_AdminGroup_EXCLUDE: 'exclude' -> type(EXCLUDE), mode(M_Name);
-M_AdminGroup_INCLUDE_ALL: 'include-all' -> type(INCLUDE_ALL), mode(M_Name);
-M_AdminGroup_INCLUDE_ANY: 'include-any' -> type(INCLUDE_ANY), mode(M_Name);
+M_AdminGroup_EXCLUDE: 'exclude' -> type(EXCLUDE), mode(M_NameList);
+M_AdminGroup_INCLUDE_ALL: 'include-all' -> type(INCLUDE_ALL), mode(M_NameList);
+M_AdminGroup_INCLUDE_ANY: 'include-any' -> type(INCLUDE_ANY), mode(M_NameList);
 M_AdminGroup_WILDCARD: F_Wildcard {setWildcard();} -> popMode;
 M_AdminGroup_NAME: F_Name -> type(NAME), popMode;
 M_AdminGroup_WS: F_WhitespaceChar+ -> skip;

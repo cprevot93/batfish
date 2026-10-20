@@ -3,7 +3,7 @@ package org.batfish.grammar.flatjuniper;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.batfish.common.matchers.ParseWarningMatchers.hasComment;
-import static org.batfish.common.matchers.ParseWarningMatchers.hasText;
+import static org.batfish.common.matchers.ParseWarningMatchers.isTodo;
 import static org.batfish.common.matchers.WarningsMatchers.hasRedFlag;
 import static org.batfish.common.matchers.WarningsMatchers.hasRedFlags;
 import static org.batfish.common.util.Resources.readResource;
@@ -151,6 +151,7 @@ import static org.batfish.datamodel.transformation.TransformationStep.assignSour
 import static org.batfish.datamodel.transformation.TransformationStep.assignSourcePort;
 import static org.batfish.datamodel.vendor_family.juniper.JuniperFamily.AUXILIARY_LINE_NAME;
 import static org.batfish.datamodel.vendor_family.juniper.JuniperFamily.CONSOLE_LINE_NAME;
+import static org.batfish.grammar.JunosGrammarTestUtils.getBatfish;
 import static org.batfish.representation.juniper.JuniperConfiguration.ACL_NAME_GLOBAL_POLICY;
 import static org.batfish.representation.juniper.JuniperConfiguration.ACL_NAME_SECURITY_POLICY;
 import static org.batfish.representation.juniper.JuniperConfiguration.DEFAULT_ISIS_COST;
@@ -167,6 +168,7 @@ import static org.batfish.representation.juniper.JuniperConfiguration.securityPo
 import static org.batfish.representation.juniper.JuniperStructureType.APPLICATION;
 import static org.batfish.representation.juniper.JuniperStructureType.APPLICATION_OR_APPLICATION_SET;
 import static org.batfish.representation.juniper.JuniperStructureType.APPLICATION_SET;
+import static org.batfish.representation.juniper.JuniperStructureType.APPLY_GROUP;
 import static org.batfish.representation.juniper.JuniperStructureType.AUTHENTICATION_KEY_CHAIN;
 import static org.batfish.representation.juniper.JuniperStructureType.BGP_GROUP;
 import static org.batfish.representation.juniper.JuniperStructureType.BGP_NEIGHBOR;
@@ -193,6 +195,8 @@ import static org.batfish.representation.juniper.JuniperStructureType.TUNNEL_ATT
 import static org.batfish.representation.juniper.JuniperStructureType.VLAN;
 import static org.batfish.representation.juniper.JuniperStructureUsage.APPLICATION_SET_MEMBER_APPLICATION;
 import static org.batfish.representation.juniper.JuniperStructureUsage.APPLICATION_SET_MEMBER_APPLICATION_SET;
+import static org.batfish.representation.juniper.JuniperStructureUsage.APPLY_GROUPS;
+import static org.batfish.representation.juniper.JuniperStructureUsage.APPLY_GROUPS_EXCEPT;
 import static org.batfish.representation.juniper.JuniperStructureUsage.INTERFACE_VLAN;
 import static org.batfish.representation.juniper.JuniperStructureUsage.MPLS_INTERFACE_SRLG;
 import static org.batfish.representation.juniper.JuniperStructureUsage.OSPF_AREA_INTERFACE;
@@ -276,6 +280,7 @@ import org.batfish.datamodel.BgpActivePeerConfig;
 import org.batfish.datamodel.BgpPeerConfig;
 import org.batfish.datamodel.BgpProcess;
 import org.batfish.datamodel.BgpSessionProperties;
+import org.batfish.datamodel.BgpSessionProperties.SessionType;
 import org.batfish.datamodel.Bgpv4Route;
 import org.batfish.datamodel.Bgpv4Route.Builder;
 import org.batfish.datamodel.ConcreteInterfaceAddress;
@@ -417,6 +422,7 @@ import org.batfish.datamodel.vxlan.Layer2Vni;
 import org.batfish.datamodel.vxlan.Layer3Vni;
 import org.batfish.dataplane.ibdp.IncrementalDataPlane;
 import org.batfish.grammar.BatfishParseTreeWalker;
+import org.batfish.grammar.JunosGrammarTestUtils;
 import org.batfish.grammar.flatjuniper.FlatJuniperParser.Flat_juniper_configurationContext;
 import org.batfish.main.Batfish;
 import org.batfish.main.BatfishTestUtils;
@@ -560,7 +566,6 @@ import org.batfish.representation.juniper.VlanReference;
 import org.batfish.representation.juniper.VniOptions;
 import org.batfish.representation.juniper.VrrpGroup;
 import org.batfish.representation.juniper.Zone;
-import org.batfish.vendor.VendorConfiguration;
 import org.hamcrest.Matchers;
 import org.junit.Rule;
 import org.junit.Test;
@@ -569,8 +574,6 @@ import org.junit.rules.TemporaryFolder;
 
 /** Tests for {@link FlatJuniperParser} and {@link FlatJuniperControlPlaneExtractor}. */
 public final class FlatJuniperGrammarTest {
-
-  private static final String TESTCONFIGS_PREFIX = "org/batfish/grammar/juniper/testconfigs/";
 
   private static final String TESTRIGS_PREFIX = "org/batfish/grammar/juniper/testrigs/";
 
@@ -602,61 +605,24 @@ public final class FlatJuniperGrammarTest {
   }
 
   private Batfish getBatfishForConfigurationNames(String... configurationNames) throws IOException {
-    String[] names =
-        Arrays.stream(configurationNames).map(s -> TESTCONFIGS_PREFIX + s).toArray(String[]::new);
-    return BatfishTestUtils.getBatfishForTextConfigs(_folder, names);
+    return getBatfish(_folder, configurationNames);
   }
 
   private Configuration parseConfig(String hostname) {
-    try {
-      Map<String, Configuration> configs = parseTextConfigs(hostname);
-      assertThat(configs, hasKey(hostname.toLowerCase()));
-      return configs.get(hostname.toLowerCase());
-    } catch (IOException e) {
-      throw new AssertionError("Failed to parse " + hostname, e);
-    }
+    return JunosGrammarTestUtils.parseConfig(_folder, hostname);
   }
 
   private JuniperConfiguration parseJuniperConfig(String hostname) {
-    return parseJuniperConfig(hostname, false);
+    return JunosGrammarTestUtils.parseJuniperConfig(_folder, hostname);
   }
 
-  /** Parse a Juniper config with optional error recovery. */
   private JuniperConfiguration parseJuniperConfig(String hostname, boolean allowErrors) {
-    try {
-      Batfish batfish = getBatfishForConfigurationNames(hostname);
-      Settings settings = batfish.getSettings();
-      if (allowErrors) {
-        settings.setDisableUnrecognized(false);
-        settings.setHaltOnConvertError(false);
-        settings.setHaltOnParseError(false);
-        settings.setThrowOnLexerError(false);
-        settings.setThrowOnParserError(false);
-      }
-      Map<String, VendorConfiguration> vendorConfigs =
-          batfish.loadVendorConfigurations(batfish.getSnapshot());
-      assertThat(vendorConfigs, hasKey(hostname));
-      String filename = "configs/" + hostname;
-      Warnings w =
-          batfish
-              .loadParseVendorConfigurationAnswerElement(batfish.getSnapshot())
-              .getWarnings()
-              .get(filename);
-      if (w == null) {
-        w = new Warnings(Warnings.Settings.fromLogger(batfish.getLogger()));
-      }
-      JuniperConfiguration ret = (JuniperConfiguration) vendorConfigs.get(hostname);
-      ret.setWarnings(w);
-      return ret;
-    } catch (IOException e) {
-      throw new AssertionError("Failed to parse " + hostname, e);
-    }
+    return JunosGrammarTestUtils.parseJuniperConfig(_folder, hostname, allowErrors);
   }
 
   private Map<String, Configuration> parseTextConfigs(String... configurationNames)
       throws IOException {
-    IBatfish iBatfish = getBatfishForConfigurationNames(configurationNames);
-    return iBatfish.loadConfigurations(iBatfish.getSnapshot());
+    return JunosGrammarTestUtils.parseTextConfigs(_folder, configurationNames);
   }
 
   @Test
@@ -1621,6 +1587,15 @@ public final class FlatJuniperGrammarTest {
     assertThat(
         bgpProcess.getActiveNeighbors().get(Ip.parse("1.1.1.1")).getConfederationAsn(),
         equalTo(7L));
+    // A group local-as outside the confederation leaves it: eBGP to the confederation AS.
+    BgpActivePeerConfig external = bgpProcess.getActiveNeighbors().get(Ip.parse("2.2.2.2"));
+    assertThat(external.getConfederationAsn(), nullValue());
+    assertThat(external.getLocalAs(), equalTo(65100L));
+    assertThat(BgpSessionProperties.getSessionType(external), equalTo(SessionType.EBGP_SINGLEHOP));
+    // A member AS as local-as stays in it: iBGP across the confederation boundary.
+    BgpActivePeerConfig member = bgpProcess.getActiveNeighbors().get(Ip.parse("3.3.3.3"));
+    assertThat(member.getConfederationAsn(), equalTo(7L));
+    assertThat(BgpSessionProperties.getSessionType(member), equalTo(SessionType.IBGP));
   }
 
   @Test
@@ -1821,6 +1796,13 @@ public final class FlatJuniperGrammarTest {
     assertEquals(n2.getKeep(), BgpGroup.BgpKeepType.NONE); // inherit from routing instance
   }
 
+  /** Every form of {@code metric-out}, at every level where it is allowed, parses. */
+  @Test
+  public void testBgpMetricOut() {
+    // The MED is not modeled, so this only checks that nothing is unrecognized.
+    parseConfig("bgp-metric-out");
+  }
+
   @Test
   public void testBgpMultipath() {
     assertThat(
@@ -1869,8 +1851,8 @@ public final class FlatJuniperGrammarTest {
 
   @Test
   public void testBgpPriority() {
-    // Just don't crash.
-    parseJuniperConfig("bgp-output-queue-priority");
+    assertThat(
+        parseJuniperConfig("bgp-output-queue-priority").getWarnings().getParseWarnings(), empty());
   }
 
   @Test
@@ -1933,9 +1915,7 @@ public final class FlatJuniperGrammarTest {
             .getWarnings()
             .get(filename)
             .getParseWarnings();
-    assertThat(
-        parseWarnings,
-        hasItem(allOf(hasComment("This feature is not currently supported"), hasText("private"))));
+    assertThat(parseWarnings, hasItem(isTodo("private")));
     SortedMap<String, Warnings> convertWarnings =
         batfish.loadConvertConfigurationAnswerElementOrReparse(batfish.getSnapshot()).getWarnings();
     assertThat(
@@ -5600,6 +5580,55 @@ public final class FlatJuniperGrammarTest {
   }
 
   @Test
+  public void testApplyGroupsReferences() throws IOException {
+    String hostname = "juniper-apply-groups-references";
+    String filename = "configs/" + hostname;
+    Batfish batfish = getBatfishForConfigurationNames(hostname);
+    ConvertConfigurationAnswerElement ccae =
+        batfish.loadConvertConfigurationAnswerElementOrReparse(batfish.getSnapshot());
+
+    assertThat(
+        ccae,
+        hasDefinedStructureWithDefinitionLines(
+            filename, APPLY_GROUP, "G_APPLIED", containsInAnyOrder(4, 5)));
+    assertThat(
+        ccae,
+        hasDefinedStructureWithDefinitionLines(filename, APPLY_GROUP, "G_UNUSED", contains(6)));
+    // one apply-groups and one apply-groups-except
+    assertThat(ccae, hasNumReferrers(filename, APPLY_GROUP, "G_APPLIED", 2));
+    assertThat(ccae, hasNumReferrers(filename, APPLY_GROUP, "G_UNUSED", 0));
+    assertThat(
+        ccae,
+        hasUndefinedReferenceWithReferenceLines(
+            filename, APPLY_GROUP, "G_UNDEFINED", APPLY_GROUPS, contains(9)));
+    assertThat(
+        ccae,
+        hasUndefinedReferenceWithReferenceLines(
+            filename, APPLY_GROUP, "G_UNDEFINED_EXCEPT", APPLY_GROUPS_EXCEPT, contains(11)));
+  }
+
+  /**
+   * A group whose only statement is inactive still exists, so applying it is not an undefined
+   * reference.
+   */
+  @Test
+  public void testApplyGroupsInactiveOnlyGroup() throws IOException {
+    String hostname = "juniper-group-inactive-only";
+    String filename = "configs/" + hostname;
+    Batfish batfish = getBatfishForConfigurationNames(hostname);
+    ConvertConfigurationAnswerElement ccae =
+        batfish.loadConvertConfigurationAnswerElementOrReparse(batfish.getSnapshot());
+
+    // The whole group block, whose sole statement is inactive.
+    assertThat(
+        ccae,
+        hasDefinedStructureWithDefinitionLines(
+            filename, APPLY_GROUP, "G_INACTIVE_ONLY", contains(5, 6, 7, 8, 9, 10, 11, 12)));
+    assertThat(ccae, hasNumReferrers(filename, APPLY_GROUP, "G_INACTIVE_ONLY", 1));
+    assertThat(ccae, hasNoUndefinedReferences());
+  }
+
+  @Test
   public void testJuniperApplyGroupsChain() {
     Configuration c = parseConfig("apply-groups-chain");
     assertThat(
@@ -5627,6 +5656,14 @@ public final class FlatJuniperGrammarTest {
         c,
         hasInterface(
             "lo0.2", hasAllAddresses(contains(ConcreteInterfaceAddress.parse("2.2.2.2/32")))));
+
+    /* ${node} is not a group name: it should be counted as a reference to node0 and node1. */
+    ConvertConfigurationAnswerElement ccae =
+        batfish.loadConvertConfigurationAnswerElementOrReparse(batfish.getSnapshot());
+    String configFile = "configs/" + filename;
+    assertThat(ccae, hasNumReferrers(configFile, APPLY_GROUP, "node0", 1));
+    assertThat(ccae, hasNumReferrers(configFile, APPLY_GROUP, "node1", 1));
+    assertThat(ccae, hasNoUndefinedReferences());
   }
 
   @Test
@@ -6671,11 +6708,7 @@ public final class FlatJuniperGrammarTest {
 
     // Verify that the configuration generates expected unsupported warnings
     List<ParseWarning> parseWarnings = vc.getWarnings().getParseWarnings();
-    assertThat(
-        parseWarnings,
-        contains(
-            allOf(hasComment("This feature is not currently supported"), hasText("metric2 0")),
-            allOf(hasComment("This feature is not currently supported"), hasText("metric2 100"))));
+    assertThat(parseWarnings, contains(isTodo("metric2 0"), isTodo("metric2 100")));
 
     // Verify that the METRIC2_POLICY was parsed into the policy statement map
     assertThat(vc.getMasterLogicalSystem().getPolicyStatements(), hasKey("METRIC2_POLICY"));
@@ -7627,12 +7660,7 @@ public final class FlatJuniperGrammarTest {
             .getWarnings()
             .get("configs/" + hostname)
             .getParseWarnings();
-    assertThat(
-        parseWarnings,
-        hasItem(
-            allOf(
-                hasComment("This feature is not currently supported"),
-                hasText("vxlan-routing overlay-ecmp"))));
+    assertThat(parseWarnings, hasItem(isTodo("vxlan-routing overlay-ecmp")));
   }
 
   @Test
@@ -8711,6 +8739,138 @@ public final class FlatJuniperGrammarTest {
     assertThat(ccae, hasReferencedStructure(filename, SRLG, "srlg-a", MPLS_INTERFACE_SRLG));
   }
 
+  /**
+   * An srlg container with no entries, or an srlg with neither cost nor value, is valid config.
+   * Flattening a group whose only statement is such a container must still define the group.
+   */
+  @Test
+  public void testSrlgEmpty() throws IOException {
+    String hostname = "junos-srlg-empty";
+    String filename = "configs/" + hostname;
+    JuniperConfiguration jc = parseJuniperConfig(hostname);
+    assertThat(jc.getMasterLogicalSystem().getSrlgs(), hasKeys("srlg-empty"));
+    Srlg srlg = jc.getMasterLogicalSystem().getSrlgs().get("srlg-empty");
+    assertThat(srlg.getCost(), nullValue());
+    assertThat(srlg.getValue(), nullValue());
+
+    Batfish batfish = getBatfishForConfigurationNames(hostname);
+    ConvertConfigurationAnswerElement ccae =
+        batfish.loadConvertConfigurationAnswerElementOrReparse(batfish.getSnapshot());
+    assertThat(ccae, hasNumReferrers(filename, APPLY_GROUP, "G_SRLG", 1));
+    assertThat(ccae, hasNoUndefinedReferences());
+  }
+
+  /**
+   * The BGP domain path attribute is not modeled, but the statements that control it must parse.
+   */
+  @Test
+  public void testBgpDomainPathId() {
+    parseJuniperConfig("junos-bgp-domain-path-id");
+  }
+
+  /** A filter group number is not modeled, and must not displace an input or output filter. */
+  @Test
+  public void testFilterGroup() {
+    Configuration c = parseConfig("junos-filter-group");
+    assertThat(c, hasInterface("ge-0/0/0.0", hasIncomingFilter(hasName("FILTER"))));
+    // 'group' is still usable as a filter name.
+    assertThat(c, hasInterface("ge-0/0/1.0", hasIncomingFilter(hasName("group"))));
+  }
+
+  /** class-of-service interfaces, and an interface within it, may be empty containers. */
+  @Test
+  public void testCosInterfacesEmpty() throws IOException {
+    String hostname = "junos-cos-interfaces-empty";
+    Batfish batfish = getBatfishForConfigurationNames(hostname);
+    ConvertConfigurationAnswerElement ccae =
+        batfish.loadConvertConfigurationAnswerElementOrReparse(batfish.getSnapshot());
+    assertThat(ccae, hasNoUndefinedReferences());
+  }
+
+  /**
+   * A group wildcard whose pattern is quoted, as in {@code <"ae[0-9][0-9]">}, applies to the
+   * interfaces it matches. Flattening such a wildcard leaves whitespace inside the angle brackets.
+   */
+  @Test
+  public void testGroupWildcardQuotedPattern() {
+    Configuration c = parseConfig("junos-group-wildcard-quoted");
+    assertThat(c, hasInterface("ae10.0", hasIncomingFilter(hasName("FILTER"))));
+    assertThat(c, hasInterface("ae100.0", hasIncomingFilter(nullValue())));
+  }
+
+  /**
+   * A filter applied to a VLAN under {@code forwarding-options} is not modeled, but must parse so
+   * that a group whose only statement is such a filter is still defined.
+   */
+  @Test
+  public void testVlansForwardingOptionsFilter() throws IOException {
+    String hostname = "junos-vlans-forwarding-options-filter";
+    String filename = "configs/" + hostname;
+    parseJuniperConfig(hostname);
+
+    Batfish batfish = getBatfishForConfigurationNames(hostname);
+    ConvertConfigurationAnswerElement ccae =
+        batfish.loadConvertConfigurationAnswerElementOrReparse(batfish.getSnapshot());
+    assertThat(ccae, hasNumReferrers(filename, APPLY_GROUP, "G_VLAN_FILTER_WILDCARD", 2));
+    assertThat(ccae, hasNumReferrers(filename, APPLY_GROUP, "G_VLAN_FILTER_NAMED", 1));
+    assertThat(ccae, hasNoUndefinedReferences());
+  }
+
+  /**
+   * A VLAN mac-move-limit, including its packet-action and per-interface action-priority, is not
+   * modeled, but must parse so that a group whose only statement is one is still defined.
+   */
+  @Test
+  public void testVlansMacMoveLimit() throws IOException {
+    String hostname = "junos-vlans-mac-move-limit";
+    String filename = "configs/" + hostname;
+    parseJuniperConfig(hostname);
+
+    Batfish batfish = getBatfishForConfigurationNames(hostname);
+    ConvertConfigurationAnswerElement ccae =
+        batfish.loadConvertConfigurationAnswerElementOrReparse(batfish.getSnapshot());
+    assertThat(ccae, hasNumReferrers(filename, APPLY_GROUP, "G_MAC_MOVE", 1));
+    assertThat(ccae, hasNoUndefinedReferences());
+  }
+
+  /**
+   * VRRP for IPv6 is not modeled, but {@code vrrp-inet6-group} and its statements must parse so
+   * that a group containing them is still defined.
+   */
+  @Test
+  public void testVrrpInet6Group() throws IOException {
+    String hostname = "junos-vrrp-inet6-group";
+    String filename = "configs/" + hostname;
+    parseJuniperConfig(hostname);
+
+    Batfish batfish = getBatfishForConfigurationNames(hostname);
+    ConvertConfigurationAnswerElement ccae =
+        batfish.loadConvertConfigurationAnswerElementOrReparse(batfish.getSnapshot());
+    assertThat(ccae, hasNumReferrers(filename, APPLY_GROUP, "G_VRRP_INET6", 1));
+    assertThat(ccae, hasNoUndefinedReferences());
+  }
+
+  /**
+   * xSTP on a tagged interface names the physical interface, which need not have a unit 0 at all.
+   * The nonexistent unit must not be reported as not enabled for Ethernet switching, while an
+   * untagged interface whose unit 0 lacks ethernet-switching still is.
+   */
+  @Test
+  public void testXstpTaggedInterface() throws IOException {
+    String hostname = "junos-xstp-tagged-interface";
+    Batfish batfish = getBatfishForConfigurationNames(hostname);
+    ConvertConfigurationAnswerElement ccae =
+        batfish.loadConvertConfigurationAnswerElementOrReparse(batfish.getSnapshot());
+
+    // Nothing is reported for tagged xe-0/0/11, which has no unit 0.
+    assertThat(
+        ccae.getWarnings().get(hostname).getFatalRedFlagWarnings(),
+        contains(
+            WarningMatchers.hasText(
+                containsString(
+                    "XSTP : Interface xe-0/0/12.0 is not enabled for Ethernet Switching"))));
+  }
+
   @Test
   public void testScreenOptions() {
     JuniperConfiguration juniperConfiguration = parseJuniperConfig("screen-options");
@@ -9678,6 +9838,24 @@ public final class FlatJuniperGrammarTest {
   }
 
   @Test
+  public void testVxlanL2vniConversionMissingSourceAddress() throws IOException {
+    String hostname = "juniper-vxlan-l2vni-missing-source-address";
+    Batfish batfish = getBatfishForConfigurationNames(hostname);
+    Configuration c = batfish.loadConfigurations(batfish.getSnapshot()).get(hostname);
+    ConvertConfigurationAnswerElement ccae =
+        batfish.loadConvertConfigurationAnswerElementOrReparse(batfish.getSnapshot());
+
+    assertThat(c.getDefaultVrf().getLayer2Vnis(), anEmptyMap());
+    assertThat(
+        ccae,
+        hasRedFlagWarning(
+            hostname,
+            equalTo(
+                "Cannot create VXLAN VNIs because VTEP source interface 'lo0.1' has no primary"
+                    + " address")));
+  }
+
+  @Test
   public void testVxlanL3vniConversion() {
     Configuration c = parseConfig("juniper-evpn-vxlan");
     Layer3Vni vrf10 = c.getVrfs().get("l3vni_vrf").getLayer3Vnis().get(50010);
@@ -9922,7 +10100,7 @@ public final class FlatJuniperGrammarTest {
 
     assertNotNull(r);
 
-    ResolutionRib rr = r.getRib();
+    ResolutionRib rr = r.getRibs().get(RoutingInformationBase.RIB_IPV4_UNICAST);
 
     assertNotNull(rr);
     assertThat(rr.getName(), equalTo(RoutingInformationBase.RIB_IPV4_UNICAST));
@@ -10047,7 +10225,12 @@ public final class FlatJuniperGrammarTest {
   @Test
   public void testXstpInterfaceExtraction() {
     JuniperConfiguration jc = parseJuniperConfig("xstp-interface-validation");
-    assertThat(jc.getWarnings().getParseWarnings(), empty());
+    assertThat(
+        jc.getWarnings().getParseWarnings(),
+        contains(
+            isTodo("interface all mode point-to-point"),
+            isTodo("interface ge-0/0/0 edge"),
+            isTodo("interface ge-0/0/0 no-root-port")));
     Set<String> xstpInterfaces = jc.getMasterLogicalSystem().getXstpInterfaceNames();
     // Should contain the specific interfaces but not "all"
     assertThat(xstpInterfaces, containsInAnyOrder("xe-0/0/1.0", "xe-0/0/2.0", "ge-0/0/0.0"));
@@ -11626,9 +11809,7 @@ public final class FlatJuniperGrammarTest {
     }
 
     // Verify that parse-time todo warnings are generated for all to conditions
-    assertThat(
-        vc.getWarnings().getParseWarnings(),
-        hasItem(hasComment("This feature is not currently supported")));
+    assertThat(vc.getWarnings().getParseWarnings(), hasItem(isTodo()));
   }
 
   @Test
@@ -11667,9 +11848,7 @@ public final class FlatJuniperGrammarTest {
     }
 
     // Verify that parse-time todo warnings are generated
-    assertThat(
-        vc.getWarnings().getParseWarnings(),
-        hasItem(hasComment("This feature is not currently supported")));
+    assertThat(vc.getWarnings().getParseWarnings(), hasItem(isTodo()));
   }
 
   @Test

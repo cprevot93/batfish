@@ -22,6 +22,7 @@ import org.batfish.representation.juniper.Nat.Type;
 public class LogicalSystem implements Serializable {
 
   public static final String GLOBAL_ADDRESS_BOOK_NAME = "global";
+  public static final String MANAGEMENT_ROUTING_INSTANCE_NAME = "mgmt_junos";
 
   private final Map<String, AddressBook> _addressBooks;
 
@@ -39,9 +40,29 @@ public class LogicalSystem implements Serializable {
 
   private @Nullable Accounting _accounting;
 
+  private final Map<Integer, Boolean> _chassisFpcAutoSpeedDetection;
+
+  private final Map<String, Integer> _chassisPicPortCounts;
+
+  private final Map<String, Double> _chassisPicSpeeds;
+
+  private final Map<String, Double> _chassisPicTunnelServiceBandwidths;
+
+  private final Map<String, Integer> _chassisPortSubPortCounts;
+
+  private final Map<String, Double> _chassisPortSpeeds;
+
   private final Login _login;
 
+  private boolean _managementInstance;
+  private final Map<String, MacsecConnectivityAssociation> _macsecConnectivityAssociations;
+  private final Map<String, String> _macsecInterfaceConnectivityAssociations;
+
+  private @Nullable Integer _maximumEcmp;
+
   private final Map<String, NamedCommunity> _namedCommunities;
+
+  private final Map<String, ClassOfServiceInterface> _classOfServiceInterfaces;
 
   private boolean _defaultAddressSelection;
 
@@ -61,6 +82,10 @@ public class LogicalSystem implements Serializable {
 
   private final Map<String, Integer> _expAliases;
 
+  private final Map<String, ForwardingClassSet> _forwardingClassSets;
+
+  private @Nullable String _systemDefaultExpClassifier;
+
   private final Map<String, Integer> _ieee8021pAliases;
 
   private final Map<String, Integer> _inetPrecedenceAliases;
@@ -71,7 +96,11 @@ public class LogicalSystem implements Serializable {
 
   private final Map<String, Policer> _policers;
 
+  private final Map<String, PkiCaProfile> _pkiCaProfiles;
+
   private final Map<String, ConcreteFirewallFilter> _securityPolicies;
+
+  private final SecurityForwardingOptions _securityForwardingOptions;
 
   private final Map<String, IkeGateway> _ikeGateways;
 
@@ -95,6 +124,10 @@ public class LogicalSystem implements Serializable {
 
   private final JuniperFamily _jf;
 
+  private boolean _mplsDisabled;
+
+  private boolean _mplsNoPropagateTtl;
+
   private final String _name;
 
   private @Nullable Nat _natDestination;
@@ -111,11 +144,15 @@ public class LogicalSystem implements Serializable {
 
   private final Map<String, Condition> _conditions;
 
+  private final Map<String, DampingProfile> _dampingProfiles;
+
   private final Map<String, PolicyStatement> _policyStatements;
 
   private final Map<String, PrefixList> _prefixLists;
 
   private final @Nonnull Map<String, RibGroup> _ribGroups;
+
+  private @Nullable Integer _rstpBridgePriority;
 
   private final Map<String, RouteFilter> _routeFilters;
 
@@ -139,6 +176,7 @@ public class LogicalSystem implements Serializable {
   private @Nullable SwitchOptions _switchOptions;
 
   private final Set<String> _xstpInterfaceNames;
+  private final Set<String> _vstpVlans;
 
   private final Map<String, Zone> _zones;
 
@@ -153,8 +191,17 @@ public class LogicalSystem implements Serializable {
     _asPaths = new TreeMap<>();
     _asPathGroups = new TreeMap<>();
     _authenticationKeyChains = new TreeMap<>();
+    _chassisFpcAutoSpeedDetection = new TreeMap<>();
+    _chassisPicPortCounts = new TreeMap<>();
+    _chassisPicSpeeds = new TreeMap<>();
+    _chassisPicTunnelServiceBandwidths = new TreeMap<>();
+    _chassisPortSubPortCounts = new TreeMap<>();
+    _chassisPortSpeeds = new TreeMap<>();
     _login = new Login();
+    _macsecConnectivityAssociations = new TreeMap<>();
+    _macsecInterfaceConnectivityAssociations = new TreeMap<>();
     _namedCommunities = new TreeMap<>();
+    _classOfServiceInterfaces = new TreeMap<>();
     _defaultCrossZoneAction = LineAction.PERMIT;
     _defaultRoutingInstance = new RoutingInstance(Configuration.DEFAULT_VRF_NAME);
     _dnsServers = new TreeSet<>();
@@ -162,10 +209,12 @@ public class LogicalSystem implements Serializable {
     _dnsProxyInterfaces = new TreeSet<>();
     _dscpAliases = new TreeMap<>();
     _expAliases = new TreeMap<>();
+    _forwardingClassSets = new TreeMap<>();
     _ieee8021pAliases = new TreeMap<>();
     _inetPrecedenceAliases = new TreeMap<>();
     _filters = new TreeMap<>();
     _policers = new TreeMap<>();
+    _pkiCaProfiles = new TreeMap<>();
     _screens = new TreeMap<>();
     _ikeGateways = new TreeMap<>();
     _ikePolicies = new TreeMap<>();
@@ -183,12 +232,14 @@ public class LogicalSystem implements Serializable {
     _ntpTrustedKeys = new TreeSet<>();
     _prefixLists = new TreeMap<>();
     _conditions = new TreeMap<>();
+    _dampingProfiles = new TreeMap<>();
     _policyStatements = new TreeMap<>();
     _ribGroups = new HashMap<>();
     _routeFilters = new TreeMap<>();
     _routingInstances = new TreeMap<>();
     _routingInstances.put(Configuration.DEFAULT_VRF_NAME, _defaultRoutingInstance);
     _securityPolicies = new TreeMap<>();
+    _securityForwardingOptions = new SecurityForwardingOptions();
     _snmpClientLists = new TreeMap<>();
     _srlgs = new HashMap<>();
     _syslogFiles = new TreeMap<>();
@@ -199,24 +250,34 @@ public class LogicalSystem implements Serializable {
     _vniOptions = new TreeMap<>();
     _switchOptions = new SwitchOptions();
     _xstpInterfaceNames = new TreeSet<>();
+    _vstpVlans = new TreeSet<>();
     _zones = new TreeMap<>();
   }
 
   private void expandInterfaceRange(InterfaceRange interfaceRange) {
-    interfaceRange.getAllMembers().stream()
-        .forEach(
-            iname -> {
-              Interface iface = _interfaces.computeIfAbsent(iname, Interface::new);
-              iface.inheritUnsetPhysicalFields(interfaceRange);
-              iface.setDefined(interfaceRange.isDefined());
-              iface.setRoutingInstance(interfaceRange.getRoutingInstance());
-              iface.setParent(interfaceRange.getParent());
-            });
+    for (String interfaceName : interfaceRange.getAllMembers()) {
+      Interface iface = _interfaces.computeIfAbsent(interfaceName, Interface::new);
+      iface.inheritUnsetPhysicalFields(interfaceRange);
+      iface.setDefined(interfaceRange.isDefined());
+      iface.setRoutingInstance(interfaceRange.getRoutingInstance());
+      iface.setParent(interfaceRange.getParent());
+      for (Interface rangeUnit : interfaceRange.getUnits().values()) {
+        String unitName =
+            interfaceName + rangeUnit.getName().substring(interfaceRange.getName().length());
+        Interface unit = iface.getUnits().computeIfAbsent(unitName, Interface::new);
+        unit.inheritUnsetUnitFields(rangeUnit);
+        unit.setDefined(rangeUnit.isDefined());
+        unit.setRoutingInstance(rangeUnit.getRoutingInstance());
+        unit.setParent(iface);
+      }
+    }
   }
 
   /** Inserts members of interface ranges into the interfaces */
   public void expandInterfaceRanges() {
-    _interfaceRanges.values().stream().forEach(this::expandInterfaceRange);
+    for (InterfaceRange interfaceRange : _interfaceRanges.values()) {
+      expandInterfaceRange(interfaceRange);
+    }
   }
 
   public Map<String, AddressBook> getAddressBooks() {
@@ -255,12 +316,56 @@ public class LogicalSystem implements Serializable {
     _accounting = accounting;
   }
 
+  public Map<Integer, Boolean> getChassisFpcAutoSpeedDetection() {
+    return _chassisFpcAutoSpeedDetection;
+  }
+
+  public Map<String, Integer> getChassisPicPortCounts() {
+    return _chassisPicPortCounts;
+  }
+
+  public Map<String, Double> getChassisPicSpeeds() {
+    return _chassisPicSpeeds;
+  }
+
+  public Map<String, Double> getChassisPicTunnelServiceBandwidths() {
+    return _chassisPicTunnelServiceBandwidths;
+  }
+
+  public Map<String, Integer> getChassisPortSubPortCounts() {
+    return _chassisPortSubPortCounts;
+  }
+
+  public Map<String, Double> getChassisPortSpeeds() {
+    return _chassisPortSpeeds;
+  }
+
   public Login getLogin() {
     return _login;
   }
 
+  public Map<String, MacsecConnectivityAssociation> getMacsecConnectivityAssociations() {
+    return _macsecConnectivityAssociations;
+  }
+
+  public Map<String, String> getMacsecInterfaceConnectivityAssociations() {
+    return _macsecInterfaceConnectivityAssociations;
+  }
+
+  public @Nullable Integer getMaximumEcmp() {
+    return _maximumEcmp;
+  }
+
+  public boolean getManagementInstance() {
+    return _managementInstance;
+  }
+
   public Map<String, NamedCommunity> getNamedCommunities() {
     return _namedCommunities;
+  }
+
+  public Map<String, ClassOfServiceInterface> getClassOfServiceInterfaces() {
+    return _classOfServiceInterfaces;
   }
 
   public boolean getDefaultAddressSelection() {
@@ -299,6 +404,14 @@ public class LogicalSystem implements Serializable {
     return _expAliases;
   }
 
+  public Map<String, ForwardingClassSet> getForwardingClassSets() {
+    return _forwardingClassSets;
+  }
+
+  public @Nullable String getSystemDefaultExpClassifier() {
+    return _systemDefaultExpClassifier;
+  }
+
   public Map<String, Integer> getIeee8021pAliases() {
     return _ieee8021pAliases;
   }
@@ -319,8 +432,16 @@ public class LogicalSystem implements Serializable {
     return _policers;
   }
 
+  public Map<String, PkiCaProfile> getPkiCaProfiles() {
+    return _pkiCaProfiles;
+  }
+
   public Map<String, ConcreteFirewallFilter> getSecurityPolicies() {
     return _securityPolicies;
+  }
+
+  public SecurityForwardingOptions getSecurityForwardingOptions() {
+    return _securityForwardingOptions;
   }
 
   public @Nonnull AddressBook getGlobalAddressBook() {
@@ -381,6 +502,14 @@ public class LogicalSystem implements Serializable {
 
   public JuniperFamily getJf() {
     return _jf;
+  }
+
+  public boolean getMplsDisabled() {
+    return _mplsDisabled;
+  }
+
+  public boolean getMplsNoPropagateTtl() {
+    return _mplsNoPropagateTtl;
   }
 
   public @Nonnull String getName() {
@@ -462,6 +591,10 @@ public class LogicalSystem implements Serializable {
     return _conditions;
   }
 
+  public @Nonnull Map<String, DampingProfile> getDampingProfiles() {
+    return _dampingProfiles;
+  }
+
   public Map<String, PolicyStatement> getPolicyStatements() {
     return _policyStatements;
   }
@@ -472,6 +605,10 @@ public class LogicalSystem implements Serializable {
 
   public @Nonnull Map<String, RibGroup> getRibGroups() {
     return _ribGroups;
+  }
+
+  public @Nullable Integer getRstpBridgePriority() {
+    return _rstpBridgePriority;
   }
 
   public Map<String, RouteFilter> getRouteFilters() {
@@ -518,6 +655,10 @@ public class LogicalSystem implements Serializable {
     return _xstpInterfaceNames;
   }
 
+  public @Nonnull Set<String> getVstpVlans() {
+    return _vstpVlans;
+  }
+
   public Map<String, Zone> getZones() {
     return _zones;
   }
@@ -534,6 +675,14 @@ public class LogicalSystem implements Serializable {
     _defaultInboundAction = defaultInboundAction;
   }
 
+  public void setManagementInstance(boolean managementInstance) {
+    _managementInstance = managementInstance;
+  }
+
+  public void setMaximumEcmp(@Nullable Integer maximumEcmp) {
+    _maximumEcmp = maximumEcmp;
+  }
+
   public void setDefaultRoutingInstance(RoutingInstance defaultRoutingInstance) {
     _defaultRoutingInstance = defaultRoutingInstance;
   }
@@ -542,8 +691,20 @@ public class LogicalSystem implements Serializable {
     _evpn = evpn;
   }
 
+  public void setMplsDisabled(boolean mplsDisabled) {
+    _mplsDisabled = mplsDisabled;
+  }
+
+  public void setMplsNoPropagateTtl(boolean mplsNoPropagateTtl) {
+    _mplsNoPropagateTtl = mplsNoPropagateTtl;
+  }
+
   public void setHostname(String hostname) {
     _defaultRoutingInstance.setHostname(hostname);
+  }
+
+  public void setSystemDefaultExpClassifier(@Nullable String systemDefaultExpClassifier) {
+    _systemDefaultExpClassifier = systemDefaultExpClassifier;
   }
 
   public void setNatDestination(Nat natDestination) {
@@ -556,6 +717,10 @@ public class LogicalSystem implements Serializable {
 
   public void setNatStatic(Nat natStatic) {
     _natStatic = natStatic;
+  }
+
+  public void setRstpBridgePriority(int rstpBridgePriority) {
+    _rstpBridgePriority = rstpBridgePriority;
   }
 
   public void setSyslogFiles(Map<String, JunosSyslogFile> syslogFiles) {

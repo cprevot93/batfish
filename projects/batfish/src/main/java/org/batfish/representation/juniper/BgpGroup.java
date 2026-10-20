@@ -21,6 +21,7 @@ public class BgpGroup implements Serializable {
     NONE
   }
 
+  private @Nullable Boolean _acceptRemoteNexthop;
   private @Nullable AddPath _addPath;
   private Boolean _advertiseExternal;
   private Boolean _advertiseInactive;
@@ -31,10 +32,12 @@ public class BgpGroup implements Serializable {
   private Ip _clusterId;
   private String _description;
   private @Nullable Boolean _disable;
+  private @Nullable Boolean _disableLinkLocalAddress;
   private @Nonnull IntegerSpace _dropPathAttributes;
   private boolean _dynamic;
   private Boolean _ebgpMultihop;
   private Boolean _enforceFirstAs;
+  private @Nullable Boolean _errorTolerance;
   private @Nullable Boolean _evpnAf;
   private final List<String> _exportPolicies;
   private @Nullable String _forwardingContext;
@@ -47,15 +50,27 @@ public class BgpGroup implements Serializable {
   private Long _localAs;
   private @Nullable Long _localPreference;
   private Integer _loops;
+  private @Nullable Long _malformedRouteLimit;
+  private @Nullable Integer _malformedUpdateLogInterval;
   private Boolean _multipath;
   private Boolean _multipathMultipleAs;
+  private @Nullable Boolean _noMalformedRouteLimit;
   private Boolean _noPrependGlobalAs;
   private BgpGroup _parent;
   private Long _peerAs;
   private @Nullable Integer _preference;
+  private @Nullable Long _receiveBufferBytes;
   private Boolean _removePrivate;
+  private boolean _removePrivateAll;
+  private boolean _removePrivateNearest;
+  private boolean _removePrivateNoPeerLoopCheck;
+  private boolean _removePrivateReplace;
   private @Nullable String _ribGroup;
+  private @Nullable String _ribGroup6;
+  private @Nullable Long _sendBufferBytes;
+  private @Nullable Integer _ttl;
   private BgpGroupType _type;
+  private @Nullable Boolean _vpnApplyExport;
 
   public BgpGroup() {
     _dropPathAttributes = IntegerSpace.EMPTY;
@@ -70,6 +85,9 @@ public class BgpGroup implements Serializable {
     _inherited = true;
     if (_parent != null) {
       _parent.cascadeInheritance();
+      if (_acceptRemoteNexthop == null) {
+        _acceptRemoteNexthop = _parent._acceptRemoteNexthop;
+      }
       if (_addPath == null) {
         _addPath = _parent._addPath;
       }
@@ -98,9 +116,15 @@ public class BgpGroup implements Serializable {
       if (_disable == null) {
         _disable = _parent._disable;
       }
+      if (_disableLinkLocalAddress == null) {
+        _disableLinkLocalAddress = _parent._disableLinkLocalAddress;
+      }
       // Deliberately do not inherit drop-path-attributes (protocol-level only)
       if (_enforceFirstAs == null) {
         _enforceFirstAs = _parent._enforceFirstAs;
+      }
+      if (_errorTolerance == null) {
+        _errorTolerance = _parent._errorTolerance;
       }
       if (_evpnAf == null) {
         _evpnAf = _parent._evpnAf;
@@ -132,8 +156,15 @@ public class BgpGroup implements Serializable {
       if (_loops == null) {
         _loops = _parent._loops;
       }
+      if (_malformedRouteLimit == null && _noMalformedRouteLimit == null) {
+        _malformedRouteLimit = _parent._malformedRouteLimit;
+        _noMalformedRouteLimit = _parent._noMalformedRouteLimit;
+      }
       if (_localAddress == null) {
         _localAddress = _parent._localAddress;
+      }
+      if (_malformedUpdateLogInterval == null) {
+        _malformedUpdateLogInterval = _parent._malformedUpdateLogInterval;
       }
       if (_multipath == null) {
         _multipath = _parent._multipath;
@@ -150,13 +181,39 @@ public class BgpGroup implements Serializable {
       if (_preference == null) {
         _preference = _parent._preference;
       }
+      if (_receiveBufferBytes == null) {
+        _receiveBufferBytes = _parent._receiveBufferBytes;
+      }
+      if (_removePrivate == null) {
+        _removePrivate = _parent._removePrivate;
+        _removePrivateAll = _parent._removePrivateAll;
+        _removePrivateNearest = _parent._removePrivateNearest;
+        _removePrivateNoPeerLoopCheck = _parent._removePrivateNoPeerLoopCheck;
+        _removePrivateReplace = _parent._removePrivateReplace;
+      }
       if (_ribGroup == null) {
         _ribGroup = _parent._ribGroup;
+      }
+      if (_ribGroup6 == null) {
+        _ribGroup6 = _parent._ribGroup6;
+      }
+      if (_sendBufferBytes == null) {
+        _sendBufferBytes = _parent._sendBufferBytes;
+      }
+      if (_ttl == null) {
+        _ttl = _parent._ttl;
       }
       if (_type == null) {
         _type = _parent._type;
       }
+      if (_vpnApplyExport == null) {
+        _vpnApplyExport = _parent._vpnApplyExport;
+      }
     }
+  }
+
+  public @Nullable Boolean getAcceptRemoteNexthop() {
+    return _acceptRemoteNexthop;
   }
 
   /** Returns add-path configuration for family inet unicast. */
@@ -207,6 +264,10 @@ public class BgpGroup implements Serializable {
     return _disable;
   }
 
+  public @Nullable Boolean getDisableLinkLocalAddress() {
+    return _disableLinkLocalAddress;
+  }
+
   public @Nonnull IntegerSpace getDropPathAttributes() {
     return _dropPathAttributes;
   }
@@ -221,6 +282,10 @@ public class BgpGroup implements Serializable {
 
   public Boolean getEnforceFirstAs() {
     return _enforceFirstAs;
+  }
+
+  public @Nullable Boolean getErrorTolerance() {
+    return _errorTolerance;
   }
 
   public @Nullable Boolean getEvpnAf() {
@@ -271,12 +336,24 @@ public class BgpGroup implements Serializable {
     return _loops;
   }
 
+  public @Nullable Long getMalformedRouteLimit() {
+    return _malformedRouteLimit;
+  }
+
+  public @Nullable Integer getMalformedUpdateLogInterval() {
+    return _malformedUpdateLogInterval;
+  }
+
   public Boolean getMultipath() {
     return _multipath;
   }
 
   public Boolean getMultipathMultipleAs() {
     return _multipathMultipleAs;
+  }
+
+  public @Nullable Boolean getNoMalformedRouteLimit() {
+    return _noMalformedRouteLimit;
   }
 
   public final BgpGroup getParent() {
@@ -293,6 +370,10 @@ public class BgpGroup implements Serializable {
 
   public void setPreference(@Nullable Integer preference) {
     _preference = preference;
+  }
+
+  public @Nullable Long getReceiveBufferBytes() {
+    return _receiveBufferBytes;
   }
 
   /**
@@ -315,12 +396,56 @@ public class BgpGroup implements Serializable {
     return _removePrivate;
   }
 
+  public boolean getRemovePrivateAll() {
+    return _removePrivateAll;
+  }
+
+  public boolean getRemovePrivateNearest() {
+    return _removePrivateNearest;
+  }
+
+  public boolean getRemovePrivateNoPeerLoopCheck() {
+    return _removePrivateNoPeerLoopCheck;
+  }
+
+  public boolean getRemovePrivateReplace() {
+    return _removePrivateReplace;
+  }
+
+  public boolean isRemovePrivateAllNoPeerLoopCheck() {
+    return Boolean.TRUE.equals(_removePrivate)
+        && _removePrivateAll
+        && _removePrivateNoPeerLoopCheck
+        && !_removePrivateNearest
+        && !_removePrivateReplace;
+  }
+
   public @Nullable String getRibGroup() {
     return _ribGroup;
   }
 
+  public @Nullable String getRibGroup6() {
+    return _ribGroup6;
+  }
+
+  public @Nullable Long getSendBufferBytes() {
+    return _sendBufferBytes;
+  }
+
+  public @Nullable Integer getTtl() {
+    return _ttl;
+  }
+
   public final BgpGroupType getType() {
     return _type;
+  }
+
+  public @Nullable Boolean getVpnApplyExport() {
+    return _vpnApplyExport;
+  }
+
+  public void setAcceptRemoteNexthop(boolean acceptRemoteNexthop) {
+    _acceptRemoteNexthop = acceptRemoteNexthop;
   }
 
   public void setAdvertiseExternal(boolean advertiseExternal) {
@@ -359,6 +484,10 @@ public class BgpGroup implements Serializable {
     _disable = disable;
   }
 
+  public void setDisableLinkLocalAddress(boolean disableLinkLocalAddress) {
+    _disableLinkLocalAddress = disableLinkLocalAddress;
+  }
+
   public void setDropPathAttributes(@Nonnull IntegerSpace dropPathAttributes) {
     _dropPathAttributes = dropPathAttributes;
   }
@@ -373,6 +502,10 @@ public class BgpGroup implements Serializable {
 
   public void setEnforceFirstAs(Boolean enforceFirstAs) {
     _enforceFirstAs = enforceFirstAs;
+  }
+
+  public void setErrorTolerance(boolean errorTolerance) {
+    _errorTolerance = errorTolerance;
   }
 
   public void setIpv6(boolean ipv6) {
@@ -395,12 +528,26 @@ public class BgpGroup implements Serializable {
     _loops = loops;
   }
 
+  public void setMalformedRouteLimit(long malformedRouteLimit) {
+    _malformedRouteLimit = malformedRouteLimit;
+    _noMalformedRouteLimit = null;
+  }
+
+  public void setMalformedUpdateLogInterval(int malformedUpdateLogInterval) {
+    _malformedUpdateLogInterval = malformedUpdateLogInterval;
+  }
+
   public void setMultipath(Boolean multipath) {
     _multipath = multipath;
   }
 
   public void setMultipathMultipleAs(Boolean multipathMultipleAs) {
     _multipathMultipleAs = multipathMultipleAs;
+  }
+
+  public void setNoMalformedRouteLimit(boolean noMalformedRouteLimit) {
+    _noMalformedRouteLimit = noMalformedRouteLimit;
+    _malformedRouteLimit = null;
   }
 
   public @Nullable Boolean getNoPrependGlobalAs() {
@@ -419,15 +566,51 @@ public class BgpGroup implements Serializable {
     _peerAs = peerAs;
   }
 
+  public void setReceiveBufferBytes(long receiveBufferBytes) {
+    _receiveBufferBytes = receiveBufferBytes;
+  }
+
   public void setRemovePrivate(boolean removePrivate) {
     _removePrivate = removePrivate;
+  }
+
+  public void setRemovePrivateAll(boolean removePrivateAll) {
+    _removePrivateAll = removePrivateAll;
+  }
+
+  public void setRemovePrivateNearest(boolean removePrivateNearest) {
+    _removePrivateNearest = removePrivateNearest;
+  }
+
+  public void setRemovePrivateNoPeerLoopCheck(boolean removePrivateNoPeerLoopCheck) {
+    _removePrivateNoPeerLoopCheck = removePrivateNoPeerLoopCheck;
+  }
+
+  public void setRemovePrivateReplace(boolean removePrivateReplace) {
+    _removePrivateReplace = removePrivateReplace;
   }
 
   public void setRibGroup(@Nullable String ribGroup) {
     _ribGroup = ribGroup;
   }
 
+  public void setRibGroup6(@Nullable String ribGroup6) {
+    _ribGroup6 = ribGroup6;
+  }
+
+  public void setSendBufferBytes(long sendBufferBytes) {
+    _sendBufferBytes = sendBufferBytes;
+  }
+
+  public void setTtl(@Nullable Integer ttl) {
+    _ttl = ttl;
+  }
+
   public final void setType(BgpGroupType type) {
     _type = type;
+  }
+
+  public void setVpnApplyExport(boolean vpnApplyExport) {
+    _vpnApplyExport = vpnApplyExport;
   }
 }
