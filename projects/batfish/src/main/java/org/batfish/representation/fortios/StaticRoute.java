@@ -21,7 +21,6 @@ public class StaticRoute implements Serializable {
   private @Nullable Boolean _sdwanEnabled;
   private final @Nonnull String _seqNum;
   private @Nullable Status _status;
-  private @Nullable String _vdom;
 
   public static final int DEFAULT_DISTANCE = 10; // for non-SD-WAN routes only
   public static final int DEFAULT_DISTANCE_SDWAN = 1;
@@ -102,13 +101,5 @@ public class StaticRoute implements Serializable {
 
   public void setStatus(Status status) {
     _status = status;
-  }
-
-  public @Nullable String getVdom() {
-    return _vdom;
-  }
-
-  public void setVdom(@Nullable String vdom) {
-    _vdom = vdom;
   }
 }

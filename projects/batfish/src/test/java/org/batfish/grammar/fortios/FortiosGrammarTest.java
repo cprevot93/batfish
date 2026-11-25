@@ -2331,7 +2331,6 @@ final class FortiosGrammarTest {
     assertThat(r0.getGateway(), equalTo(Ip.parse("2.2.2.2")));
     assertThat(r0.getSdwanEnabled(), equalTo(false));
     assertThat(r0.getStatus(), equalTo(StaticRoute.Status.ENABLE));
-    assertThat(r0.getVdom(), equalTo("root"));
 
     // All values default except device (which is required to be set)
     StaticRoute r1 = vc.getStaticRoutes("root").get("1");
@@ -2441,20 +2440,18 @@ final class FortiosGrammarTest {
     Map<String, StaticRoute> rootRoutes = vc.getStaticRoutes("root");
     assertThat(rootRoutes, hasKeys("0", "1"));
     assertThat(rootRoutes.get("0").getDevice(), equalTo("port1"));
-    assertThat(rootRoutes.get("0").getVdom(), equalTo("root"));
     assertThat(rootRoutes.get("1").getDst(), equalTo(Prefix.parse("1.1.1.0/24")));
     assertThat(rootRoutes.get("1").getGateway(), equalTo(Ip.parse("2.2.2.2")));
-    assertThat(rootRoutes.get("1").getVdom(), equalTo("root"));
 
     // software-factory VDOM routes
     Map<String, StaticRoute> swRoutes = vc.getStaticRoutes("software-factory");
-    assertThat(swRoutes, hasKeys("0", "1"));
+    assertThat(swRoutes, hasKeys("0", "1", "2"));
     assertThat(swRoutes.get("0").getGateway(), equalTo(Ip.parse("172.16.254.1")));
     assertThat(swRoutes.get("0").getDevice(), equalTo("sw_fact_vl1_10"));
-    assertThat(swRoutes.get("0").getVdom(), equalTo("software-factory"));
-    assertThat(swRoutes.get("1").getGateway(), equalTo(Ip.parse("2.2.2.2")));
+    assertThat(swRoutes.get("1").getDevice(), equalTo("port2"));
+    assertThat(swRoutes.get("1").getGateway(), equalTo(Ip.parse("10.0.0.254")));
     assertThat(swRoutes.get("1").getDst(), equalTo(Prefix.parse("8.8.8.0/24")));
-    assertThat(swRoutes.get("1").getVdom(), equalTo("software-factory"));
+    assertThat(swRoutes.get("2").getDevice(), equalTo("port1"));
   }
 
   @Test
@@ -2462,19 +2459,15 @@ final class FortiosGrammarTest {
     String hostname = "static_routes_vdom";
     Configuration c = parseConfig(hostname);
 
-    // root VDOM routes should be in root:0
     Set<org.batfish.datamodel.StaticRoute> rootRoutes =
         c.getVrfs().get(computeVrfName("root", Interface.DEFAULT_VRF)).getStaticRoutes();
-    assertThat(rootRoutes, hasSize(2));
-
-    // software-factory VDOM routes should be in software-factory:0
-    Set<org.batfish.datamodel.StaticRoute> swRoutes =
+    Set<org.batfish.datamodel.StaticRoute> swDefaultRoutes =
         c.getVrfs()
             .get(computeVrfName("software-factory", Interface.DEFAULT_VRF))
             .getStaticRoutes();
-    assertThat(swRoutes, hasSize(2));
+    Set<org.batfish.datamodel.StaticRoute> swVrf7Routes =
+        c.getVrfs().get(computeVrfName("software-factory", 7)).getStaticRoutes();
 
-    // root VRF should contain only root routes, not software-factory routes
     assertThat(
         rootRoutes,
         containsInAnyOrder(
@@ -2489,21 +2482,21 @@ final class FortiosGrammarTest {
                 .setNextHop(NextHopInterface.of("port1", Ip.parse("2.2.2.2")))
                 .build()));
 
-    // software-factory VRF should contain its own routes
     assertThat(
-        swRoutes,
-        containsInAnyOrder(
+        swDefaultRoutes,
+        contains(
             org.batfish.datamodel.StaticRoute.builder()
                 .setAdmin(StaticRoute.DEFAULT_DISTANCE)
                 .setNetwork(Prefix.ZERO)
-                .setNextHop(
-                    NextHopInterface.of("sw_fact_vl1_10", Ip.parse("172.16.254.1")))
-                .build(),
+                .setNextHop(NextHopInterface.of("sw_fact_vl1_10", Ip.parse("172.16.254.1")))
+                .build()));
+    assertThat(
+        swVrf7Routes,
+        contains(
             org.batfish.datamodel.StaticRoute.builder()
                 .setAdmin(StaticRoute.DEFAULT_DISTANCE)
                 .setNetwork(Prefix.parse("8.8.8.0/24"))
-                .setNextHop(
-                    NextHopInterface.of("sw_fact_vl1_10", Ip.parse("2.2.2.2")))
+                .setNextHop(NextHopInterface.of("port2", Ip.parse("10.0.0.254")))
                 .build()));
   }
 
@@ -2518,16 +2511,55 @@ final class FortiosGrammarTest {
 
     assertThat(vc.getStaticRoutes(), hasKeys("root", "software-factory"));
 
-    // Both VDOMs have route 1 — IDs are VDOM-scoped, not global
     Map<String, StaticRoute> rootRoutes = vc.getStaticRoutes("root");
     assertThat(rootRoutes, hasKeys("1"));
     assertThat(rootRoutes.get("1").getDevice(), equalTo("port1"));
-    assertThat(rootRoutes.get("1").getVdom(), equalTo("root"));
 
     Map<String, StaticRoute> swRoutes = vc.getStaticRoutes("software-factory");
     assertThat(swRoutes, hasKeys("1"));
     assertThat(swRoutes.get("1").getDevice(), equalTo("port2"));
-    assertThat(swRoutes.get("1").getVdom(), equalTo("software-factory"));
+  }
+
+  @Test
+  void testStaticRouteVdomEndExtraction() throws IOException {
+    assertStaticRouteVdomExtraction("static_routes_vdom_end", "primary");
+    Batfish batfish = getBatfishForConfigurationNames("static_routes_vdom_end");
+    Warnings warnings =
+        getOnlyElement(
+            batfish
+                .loadParseVendorConfigurationAnswerElement(batfish.getSnapshot())
+                .getWarnings()
+                .values());
+    assertThat(
+        warnings,
+        hasParseWarning(
+            allOf(
+                hasText(equalTo("config router bgp")),
+                hasComment("Only static routes are modeled inside VDOMs"))));
+    assertThat(
+        warnings,
+        hasParseWarning(allOf(hasText(equalTo("ospf")), hasComment(Warnings.TODO_COMMENT))));
+  }
+
+  @Test
+  void testStaticRouteVdomFmgExtraction() {
+    assertStaticRouteVdomExtraction("static_routes_vdom_fmg", "root");
+  }
+
+  private void assertStaticRouteVdomExtraction(String hostname, String firstVdom) {
+    FortiosConfiguration vc = parseVendorConfig(hostname);
+
+    assertThat(vc.getHostname(), equalTo(hostname));
+    assertThat(vc.getBgpProcess(), nullValue());
+    assertThat(vc.getStaticRoutes(), hasKeys(firstVdom, "software-factory"));
+
+    Map<String, StaticRoute> firstRoutes = vc.getStaticRoutes(firstVdom);
+    assertThat(firstRoutes, hasKeys("1"));
+    assertThat(firstRoutes.get("1").getDst(), equalTo(Prefix.parse("10.0.0.0/8")));
+
+    Map<String, StaticRoute> swRoutes = vc.getStaticRoutes("software-factory");
+    assertThat(swRoutes, hasKeys("1"));
+    assertThat(swRoutes.get("1").getDst(), equalTo(Prefix.parse("192.168.1.0/24")));
   }
 
   @Test

@@ -1,3 +1,10 @@
+config vdom
+edit root
+next
+edit software-factory
+next
+end
+
 config system global
     set hostname "static_routes_vdom_no_next"
 end
@@ -24,6 +31,7 @@ config router static
         set dst 10.0.0.0 255.0.0.0
     next
 end
+# VDOM can be closed with 'end'
 end
 
 # software-factory VDOM: route 1 reuses the same ID as root — IDs are VDOM-scoped

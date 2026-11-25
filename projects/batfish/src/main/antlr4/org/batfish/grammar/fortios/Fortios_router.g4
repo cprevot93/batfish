@@ -9,5 +9,5 @@ c_router: ROUTER (
     | cr_bgp
     | cr_route_map
     | cr_static
-    | IGNORED_CONFIG_BLOCK
+    | config_unsupported
 );

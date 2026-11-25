@@ -16,13 +16,13 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.SortedSet;
 import java.util.function.Function;
 import java.util.stream.Stream;
 import javax.annotation.Nonnull;
@@ -50,6 +50,8 @@ import org.batfish.vendor.VendorConfiguration;
 import org.batfish.vendor.VendorStructureId;
 
 public class FortiosConfiguration extends VendorConfiguration {
+
+  public static final String DEFAULT_VDOM = "root";
 
   public FortiosConfiguration() {
     _accessLists = new HashMap<>();
@@ -146,9 +148,9 @@ public class FortiosConfiguration extends VendorConfiguration {
     return _staticRoutes;
   }
 
-  /** Returns the per-VDOM route map for the given VDOM, creating if absent. */
+  /** Returns the static routes in the given VDOM. */
   public @Nonnull Map<String, StaticRoute> getStaticRoutes(@Nonnull String vdom) {
-    return _staticRoutes.computeIfAbsent(vdom, k -> new HashMap<>());
+    return _staticRoutes.getOrDefault(vdom, ImmutableMap.of());
   }
 
   /** name -> zone */
@@ -228,17 +230,8 @@ public class FortiosConfiguration extends VendorConfiguration {
       convertBgp(_bgpProcess, c, _w);
     }
 
-    // Convert static routes per VDOM, adding each VDOM's routes only to VRFs within that VDOM.
-    // Must happen after all VRFs are created (interfaces must be converted).
-    _staticRoutes.forEach((vdom, routes) -> {
-      SortedSet<org.batfish.datamodel.StaticRoute> viRoutes =
-          convertStaticRoutes(routes.values());
-      c.getVrfs().forEach((vrfName, vrf) -> {
-        if (vrfName.startsWith(vdom + ":")) {
-          vrf.setStaticRoutes(viRoutes);
-        }
-      });
-    });
+    // Static routes use the VRF of their outgoing interface.
+    convertVdomStaticRoutes(c);
 
     // Count structure references
     markConcreteStructure(FortiosStructureType.ROUTE_MAP);
@@ -251,6 +244,30 @@ public class FortiosConfiguration extends VendorConfiguration {
     markConcreteStructure(FortiosStructureType.ACCESS_LIST);
     markConcreteStructure(FortiosStructureType.POLICY);
     return c;
+  }
+
+  private void convertVdomStaticRoutes(Configuration c) {
+    Map<String, List<StaticRoute>> routesByVrf = new HashMap<>();
+    _staticRoutes.forEach((vdom, routes) -> {
+      for (StaticRoute route : routes.values()) {
+        if (!route.getStatusEffective()) {
+          continue;
+        }
+        String device = route.getDevice();
+        Interface iface = _interfaces.get(device);
+        org.batfish.datamodel.Interface converted = c.getAllInterfaces().get(device);
+        if (iface == null || !vdom.equals(iface.getVdom()) || converted == null) {
+          _w.redFlagf(
+              "Cannot convert static route %s in VDOM %s: outgoing interface %s is unavailable"
+                  + " in that VDOM",
+              route.getSeqNum(), vdom, device);
+          continue;
+        }
+        routesByVrf.computeIfAbsent(converted.getVrfName(), vrf -> new ArrayList<>()).add(route);
+      }
+    });
+    routesByVrf.forEach(
+        (vrf, routes) -> c.getVrfs().get(vrf).setStaticRoutes(convertStaticRoutes(routes)));
   }
 
   @VisibleForTesting
