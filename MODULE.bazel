@@ -101,7 +101,7 @@ module(
 # Core Bazel dependencies
 bazel_dep(name = "bazel_skylib", version = "1.9.2")
 bazel_dep(name = "rules_license", version = "1.0.0")
-bazel_dep(name = "bazel_features", version = "1.55.0")
+bazel_dep(name = "bazel_features", version = "1.56.0")
 bazel_dep(name = "platforms", version = "1.1.0")
 
 # Java rules and dependencies
@@ -109,12 +109,19 @@ bazel_dep(name = "rules_java", version = "9.9.0")
 bazel_dep(name = "rules_jvm_external", version = "7.2")
 
 # Python rules
-bazel_dep(name = "rules_python", version = "2.5.0")
+bazel_dep(name = "rules_python", version = "2.5.1")
 
 # Development tools
-bazel_dep(name = "buildifier_prebuilt", version = "10.1.0", dev_dependency = True)
+bazel_dep(name = "buildifier_prebuilt", version = "10.2.0", dev_dependency = True)
 
-bazel_dep(name = "rules_shell", version = "0.8.0")
+bazel_dep(name = "rules_shell", version = "0.10.0")
+
+batfish_version = use_repo_rule("//skylark:batfish_version.bzl", "batfish_version")
+
+batfish_version(
+    name = "batfish_version",
+    version_file = "//projects:VERSION",
+)
 
 # Override rules_android to 0.7.1 for Bazel 9 compatibility (CcInfo removal)
 single_version_override(
