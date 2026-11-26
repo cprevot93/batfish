@@ -255,12 +255,25 @@ public class FortiosConfiguration extends VendorConfiguration {
         }
         String device = route.getDevice();
         Interface iface = _interfaces.get(device);
-        org.batfish.datamodel.Interface converted = c.getAllInterfaces().get(device);
-        if (iface == null || !vdom.equals(iface.getVdom()) || converted == null) {
+        if (iface == null) {
           _w.redFlagf(
-              "Cannot convert static route %s in VDOM %s: outgoing interface %s is unavailable"
-                  + " in that VDOM",
+              "Cannot convert static route %s in VDOM %s: outgoing interface %s is undefined",
               route.getSeqNum(), vdom, device);
+          continue;
+        }
+        String interfaceVdom = iface.getVdomEffective();
+        if (!vdom.equals(interfaceVdom)) {
+          _w.redFlagf(
+              "Cannot convert static route %s in VDOM %s: outgoing interface %s belongs to VDOM %s",
+              route.getSeqNum(), vdom, device, interfaceVdom);
+          continue;
+        }
+        org.batfish.datamodel.Interface converted = c.getAllInterfaces().get(device);
+        if (converted == null) {
+          _w.redFlagf(
+              "Cannot convert static route %s in VDOM %s: outgoing interface %s of type %s was not"
+                  + " converted",
+              route.getSeqNum(), vdom, device, iface.getTypeEffective());
           continue;
         }
         routesByVrf.computeIfAbsent(converted.getVrfName(), vrf -> new ArrayList<>()).add(route);
@@ -300,9 +313,7 @@ public class FortiosConfiguration extends VendorConfiguration {
           iface.getName(), iface.getTypeEffective());
       return;
     }
-    String vdom = iface.getVdom();
-    assert vdom != null; // An interface with no VDOM set should fail in extraction
-    String vrfName = computeVrfName(vdom, iface.getVrfEffective());
+    String vrfName = computeVrfName(iface.getVdomEffective(), iface.getVrfEffective());
     // Referencing a VRF in an interface implicitly creates it
     Vrf vrf = c.getVrfs().computeIfAbsent(vrfName, name -> Vrf.builder().setName(name).build());
     org.batfish.datamodel.Interface.Builder viIface =

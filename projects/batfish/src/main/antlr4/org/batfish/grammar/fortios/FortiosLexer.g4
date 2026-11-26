@@ -808,6 +808,18 @@ F_QuotedEscapedChar: '\\' ["'\\];
 fragment
 F_WordChar: ~[ \t\u000C\u00A0\r\n#()<>?'"\\];
 
+fragment
+F_IgnoredLineRest
+:
+  (
+    '"' ('\\' . | ~["\\])* '"'
+    | ['] ~[']* [']
+    | F_LineContinuation
+    | '\\' ~[\r\n]
+    | ~["'\n\r\\]
+  )* F_Newline
+;
+
 mode M_DoubleQuote;
 
 M_DoubleQuote_DOUBLE_QUOTE: '"' -> type(DOUBLE_QUOTE), popMode;
@@ -863,52 +875,52 @@ M_SingleStrValue_NEWLINE: F_Newline -> type(NEWLINE), popMode;
 // then start ignoring inner lines.
 mode M_IgnoredConfigBlock;
 
-M_IgnoredConfigBlock_REST_OF_LINE: F_NonNewline* F_Newline -> more, mode(M_IgnoredConfigBlockInner);
+M_IgnoredConfigBlock_REST_OF_LINE: F_IgnoredLineRest -> more, mode(M_IgnoredConfigBlockInner);
 
 // We are on some line inside an ignored config block. Eat lines, push if we hit an inner stanza.
 mode M_IgnoredConfigBlockInner;
 
-M_IgnoredConfigBlockInner_EDIT: 'edit' F_NonNewline* F_Newline -> more, pushMode(M_IgnoredEditBlock);
+M_IgnoredConfigBlockInner_EDIT: 'edit' F_IgnoredLineRest -> more, pushMode(M_IgnoredEditBlock);
 
-M_IgnoredConfigBlockInner_SINGLE_LINE: ('set' | 'unset') F_NonNewline* F_Newline -> more;
+M_IgnoredConfigBlockInner_SINGLE_LINE: ('set' | 'unset' | 'append' | 'select' | 'unselect' | 'clear') F_IgnoredLineRest -> more;
 
 M_IgnoredConfigBlockInner_COMMENT: '#' F_NonNewline* F_Newline -> more;
 
 // Nested `config X` directly inside an ignored block (no enclosing edit). Handles e.g.
 // `config router ospf / config redistribute "connected" / end / end`.
-M_IgnoredConfigBlockInner_CONFIG: 'config' F_NonNewline* F_Newline -> more, pushMode(M_IgnoredInteriorConfigBlockInner);
+M_IgnoredConfigBlockInner_CONFIG: 'config' F_IgnoredLineRest -> more, pushMode(M_IgnoredInteriorConfigBlockInner);
 
 M_IgnoredConfigBlockInner_END: 'end' -> type(END), popMode;
 
-M_IgnoredConfigBlockInner_WS: F_Whitespace+ -> more;
+M_IgnoredConfigBlockInner_WS: (F_Whitespace | F_NewlineChar)+ -> more;
 
 // This is the entrance to an edit line
 mode M_IgnoredEditBlock;
 
-M_IgnoredEditBlock_CONFIG: 'config' F_NonNewline* F_Newline -> more, pushMode(M_IgnoredInteriorConfigBlockInner);
+M_IgnoredEditBlock_CONFIG: 'config' F_IgnoredLineRest -> more, pushMode(M_IgnoredInteriorConfigBlockInner);
 
-M_IgnoredEditBlock_SINGLE_LINE: ('set' | 'unset') F_NonNewline* F_Newline -> more;
+M_IgnoredEditBlock_SINGLE_LINE: ('set' | 'unset' | 'append' | 'select' | 'unselect' | 'clear') F_IgnoredLineRest -> more;
 
 M_IgnoredEditBlock_COMMENT: '#' F_NonNewline* F_Newline -> more;
 
 M_IgnoredEditBlock_NEXT: 'next' F_Whitespace* F_Newline -> more, popMode;
 
-M_IgnoredEditBlock_WS: F_Whitespace+ -> more;
+M_IgnoredEditBlock_WS: (F_Whitespace | F_NewlineChar)+ -> more;
 
 // We are on some line inside an ignored config block (not the outermost on).
 // Eat lines, push if we hit an inner stanza.
 // This is the same as M_IgnoredConfigBlockInner, except that the END token is also skipped.
 mode M_IgnoredInteriorConfigBlockInner;
 
-M_IgnoredInteriorConfigBlockInner_EDIT: 'edit' F_NonNewline* F_Newline -> more, pushMode(M_IgnoredEditBlock);
+M_IgnoredInteriorConfigBlockInner_EDIT: 'edit' F_IgnoredLineRest -> more, pushMode(M_IgnoredEditBlock);
 
-M_IgnoredInteriorConfigBlockInner_SINGLE_LINE: ('set' | 'unset') F_NonNewline* F_Newline -> more;
+M_IgnoredInteriorConfigBlockInner_SINGLE_LINE: ('set' | 'unset' | 'append' | 'select' | 'unselect' | 'clear') F_IgnoredLineRest -> more;
 
 M_IgnoredInteriorConfigBlockInner_COMMENT: '#' F_NonNewline* F_Newline -> more;
 
 // Nested `config X` without enclosing edit (e.g. redistribute blocks under router protocols).
-M_IgnoredInteriorConfigBlockInner_CONFIG: 'config' F_NonNewline* F_Newline -> more, pushMode(M_IgnoredInteriorConfigBlockInner);
+M_IgnoredInteriorConfigBlockInner_CONFIG: 'config' F_IgnoredLineRest -> more, pushMode(M_IgnoredInteriorConfigBlockInner);
 
 M_IgnoredInteriorConfigBlockInner_END: 'end' F_Whitespace* F_Newline -> more, popMode;
 
-M_IgnoredInteriorConfigBlockInner_WS: F_Whitespace+ -> more;
+M_IgnoredInteriorConfigBlockInner_WS: (F_Whitespace | F_NewlineChar)+ -> more;

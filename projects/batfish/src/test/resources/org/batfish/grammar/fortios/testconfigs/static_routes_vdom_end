@@ -1,21 +1,25 @@
 
 # vdom creation at the top of the file
 config vdom
+edit root
+next
 edit primary
 next
 edit software-factory
 next
 end
 
-config system interface
-    edit port1
-        set vdom primary
-        set type physical
-    next
-    edit port2
-        set vdom software-factory
-        set type physical
-    next
+config global
+    config system interface
+        edit port1
+            set vdom primary
+            set type physical
+        next
+        edit port2
+            set vdom software-factory
+            set type physical
+        next
+    end
 end
 
 config vdom

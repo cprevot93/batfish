@@ -2597,6 +2597,56 @@ final class FortiosGrammarTest {
   }
 
   @Test
+  void testStaticRouteVdomMultilineIgnored() throws IOException {
+    String hostname = "static_routes_vdom_multiline_ignored";
+    FortiosConfiguration vc = parseVendorConfig(hostname);
+
+    assertThat(vc.getHostname(), equalTo(hostname));
+    assertThat(vc.getStaticRoutes(), hasKeys("root", "ITS_legacy"));
+    assertThat(vc.getStaticRoutes("root"), hasKeys("1"));
+    assertThat(vc.getStaticRoutes("root").get("1").getDevice(), equalTo("port1"));
+    assertThat(vc.getStaticRoutes("ITS_legacy"), hasKeys("1"));
+    assertThat(vc.getStaticRoutes("ITS_legacy").get("1").getDevice(), equalTo("port2"));
+
+    Batfish batfish = getBatfishForConfigurationNames(hostname);
+    Warnings warnings =
+        getOnlyElement(
+            batfish
+                .loadParseVendorConfigurationAnswerElement(batfish.getSnapshot())
+                .getWarnings()
+                .values());
+    assertThat(warnings, not(hasParseWarning(hasComment("This syntax is unrecognized"))));
+    assertThat(
+        warnings,
+        hasParseWarnings(
+            contains(
+                allOf(hasText(equalTo("vpn")), hasComment(Warnings.TODO_COMMENT)),
+                allOf(hasText(equalTo("vpn")), hasComment(Warnings.TODO_COMMENT)),
+                allOf(hasText(equalTo("vpn")), hasComment(Warnings.TODO_COMMENT)))));
+    assertThat(
+        batfish.loadConvertConfigurationAnswerElementOrReparse(batfish.getSnapshot()).getWarnings(),
+        not(hasKey(hostname)));
+
+    Configuration c = batfish.loadConfigurations(batfish.getSnapshot()).get(hostname);
+    assertThat(
+        c.getVrfs().get(computeVrfName("root", Interface.DEFAULT_VRF)).getStaticRoutes(),
+        containsInAnyOrder(
+            org.batfish.datamodel.StaticRoute.builder()
+                .setAdmin(StaticRoute.DEFAULT_DISTANCE)
+                .setNetwork(Prefix.parse("10.0.0.0/8"))
+                .setNextHop(NextHopInterface.of("port1", Ip.parse("192.168.1.254")))
+                .build()));
+    assertThat(
+        c.getVrfs().get(computeVrfName("ITS_legacy", Interface.DEFAULT_VRF)).getStaticRoutes(),
+        containsInAnyOrder(
+            org.batfish.datamodel.StaticRoute.builder()
+                .setAdmin(StaticRoute.DEFAULT_DISTANCE)
+                .setNetwork(Prefix.parse("192.168.2.0/24"))
+                .setNextHop(NextHopInterface.of("port2", Ip.parse("10.0.0.254")))
+                .build()));
+  }
+
+  @Test
   void testSystemRecovery() throws IOException {
     String hostname = "fortios_system_recovery";
     Batfish batfish = getBatfishForConfigurationNames(hostname);
