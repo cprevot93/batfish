@@ -2598,15 +2598,23 @@ final class FortiosGrammarTest {
 
   @Test
   void testStaticRouteVdomMultilineIgnored() throws IOException {
+/**
+ * Inside config vdom → edit <vdom1> on real backups, unsupported blocks like config vpn certificate ca
+ * and config vpn ipsec phase1-interface appear before edit <vdom2> and config router static.
+ * Without F_IgnoredLineRest, multi-line PEM certs and escaped \" inside those blocks escape
+ * M_IgnoredConfigBlock back to DEFAULT_MODE, causing inner next/end lines to prematurely close
+ * config vdom and drop all subsequent <vdom2> static routes into root.
+ **/
+
     String hostname = "static_routes_vdom_multiline_ignored";
     FortiosConfiguration vc = parseVendorConfig(hostname);
 
     assertThat(vc.getHostname(), equalTo(hostname));
-    assertThat(vc.getStaticRoutes(), hasKeys("root", "ITS_legacy"));
+    assertThat(vc.getStaticRoutes(), hasKeys("root", "legacy"));
     assertThat(vc.getStaticRoutes("root"), hasKeys("1"));
     assertThat(vc.getStaticRoutes("root").get("1").getDevice(), equalTo("port1"));
-    assertThat(vc.getStaticRoutes("ITS_legacy"), hasKeys("1"));
-    assertThat(vc.getStaticRoutes("ITS_legacy").get("1").getDevice(), equalTo("port2"));
+    assertThat(vc.getStaticRoutes("legacy"), hasKeys("1"));
+    assertThat(vc.getStaticRoutes("legacy").get("1").getDevice(), equalTo("port2"));
 
     Batfish batfish = getBatfishForConfigurationNames(hostname);
     Warnings warnings =
@@ -2637,7 +2645,7 @@ final class FortiosGrammarTest {
                 .setNextHop(NextHopInterface.of("port1", Ip.parse("192.168.1.254")))
                 .build()));
     assertThat(
-        c.getVrfs().get(computeVrfName("ITS_legacy", Interface.DEFAULT_VRF)).getStaticRoutes(),
+        c.getVrfs().get(computeVrfName("legacy", Interface.DEFAULT_VRF)).getStaticRoutes(),
         containsInAnyOrder(
             org.batfish.datamodel.StaticRoute.builder()
                 .setAdmin(StaticRoute.DEFAULT_DISTANCE)
